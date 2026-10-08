@@ -74,6 +74,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Snooze sync from the Home Assistant companion app (checked against the webhook id). -->
+        <receiver
+            android:name=".HaReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="studio.alans.fxwatcher.HA_SNOOZE" />
+            </intent-filter>
+        </receiver>
+
         <!-- Test hooks for adb only (the shell holds DUMP, other apps do not). -->
         <receiver
             android:name=".DebugReceiver"

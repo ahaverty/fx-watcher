@@ -154,11 +154,6 @@ public class CamapsListener extends NotificationListenerService {
 
     /** POSTs the reading to the Home Assistant webhook, if one is set. Same payload as CamAPS Bridge. */
     static void forward(Context c, String status, Double glucose, List<String> texts, String pkg) {
-        SharedPreferences p = Store.p(c);
-        String url = p.getString(Store.URL, "");
-        if (url == null || url.isEmpty()) return;
-
-        final String body;
         try {
             JSONObject j = new JSONObject();
             j.put("status", status);
@@ -166,10 +161,29 @@ public class CamapsListener extends NotificationListenerService {
             j.put("texts", new JSONArray(texts));
             if (pkg != null) j.put("package", pkg);
             j.put("ts", System.currentTimeMillis());
-            body = j.toString();
-        } catch (Exception e) {
-            return;
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
         }
+    }
+
+    /** Tells Home Assistant about a snooze set on the phone, so its alarms snooze too. 0 = cancelled. */
+    static void forwardSnooze(Context c, long until) {
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "snooze");
+            j.put("until", until);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
+    private static void post(Context c, String body) {
+        SharedPreferences p = Store.p(c);
+        String url = p.getString(Store.URL, "");
+        if (url == null || url.isEmpty()) return;
 
         net.execute(() -> {
             for (int attempt = 0; attempt < 3; attempt++) {

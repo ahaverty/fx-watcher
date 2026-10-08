@@ -288,15 +288,28 @@ final class Monitor {
     }
 
     static void snooze(Context c, double hours) {
-        long until = System.currentTimeMillis() + (long) (hours * 3_600_000L);
-        Store.p(c).edit().putLong(Store.SNOOZE_UNTIL, until).apply();
-        Store.log(c, "Snoozed until " + Store.hm(until));
-        evaluate(c);
+        setSnooze(c, System.currentTimeMillis() + (long) (hours * 3_600_000L), false);
     }
 
     static void unsnooze(Context c) {
-        Store.p(c).edit().putLong(Store.SNOOZE_UNTIL, 0).apply();
-        Store.log(c, "Snooze cancelled");
+        setSnooze(c, 0, false);
+    }
+
+    /**
+     * Snoozes signal alarms until the given time (0 = cancel). Snoozes made on the phone are sent to
+     * Home Assistant so its alarms snooze too; snoozes that came from Home Assistant are not echoed back.
+     */
+    static void setSnooze(Context c, long until, boolean fromHa) {
+        long now = System.currentTimeMillis();
+        if (until <= now) until = 0;
+        SharedPreferences p = Store.p(c);
+        long old = p.getLong(Store.SNOOZE_UNTIL, 0);
+        if (old <= now) old = 0;
+        if (fromHa && Math.abs(old - until) < 60_000L) return; // the echo of our own snooze
+        p.edit().putLong(Store.SNOOZE_UNTIL, until).apply();
+        String from = fromHa ? " (from Home Assistant)" : "";
+        Store.log(c, until == 0 ? "Snooze cancelled" + from : "Snoozed until " + Store.hm(until) + from);
+        if (!fromHa) CamapsListener.forwardSnooze(c, until);
         evaluate(c);
     }
 
