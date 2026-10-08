@@ -152,7 +152,7 @@ public class MainActivity extends Activity {
                 p.getFloat(Store.LOW_MMOL, Store.DEF_LOW_MMOL), true);
         EditText pumpMin = number("Pump link off: warn and reopen CamAPS after (min, alarm 10 min later, 0 = off)",
                 p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN), false);
-        EditText pumpNudge = number("Pump link off: wake the screen to help it reconnect after (min, then every 8, 0 = off)",
+        EditText pumpNudge = number("Pump link off: quietly reopen CamAPS after (min, then every 8, screen off only, 0 = off)",
                 p.getInt(Store.PUMP_NUDGE, Store.DEF_PUMP_NUDGE), false);
         root.addView(text("Pump Bluetooth name (or part of it)", 14));
         EditText pumpName = new EditText(this);

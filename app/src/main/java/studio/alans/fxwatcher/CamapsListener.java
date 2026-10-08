@@ -58,15 +58,38 @@ public class CamapsListener extends NotificationListenerService {
         return true;
     }
 
+    /** While the pump link is off, notes when the screen comes on or the phone is unlocked (to learn what brings it back). */
+    private final android.content.BroadcastReceiver screen = new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(Context c, android.content.Intent i) {
+            SharedPreferences p = Store.p(c);
+            long down = p.getLong(Store.PUMP_DOWN_SINCE, 0);
+            if (down == 0) return;
+            String what = android.content.Intent.ACTION_USER_PRESENT.equals(i.getAction()) ? "Phone unlocked" : "Screen on";
+            Store.log(c, what + " (pump link off " + Store.ago(down, System.currentTimeMillis()).replace(" ago", "") + ")");
+        }
+    };
+    private boolean screenRegistered;
+
     @Override
     public void onListenerConnected() {
         instance = this;
         Store.log(this, "Notification listener connected");
+        if (!screenRegistered) {
+            android.content.IntentFilter f = new android.content.IntentFilter(android.content.Intent.ACTION_SCREEN_ON);
+            f.addAction(android.content.Intent.ACTION_USER_PRESENT);
+            registerReceiver(screen, f);
+            screenRegistered = true;
+        }
         scanActive();
     }
 
     @Override
     public void onListenerDisconnected() {
+        if (screenRegistered) {
+            try { unregisterReceiver(screen); } catch (Exception ignored) { }
+            screenRegistered = false;
+        }
         instance = null;
         Store.log(this, "Notification listener disconnected, asking to rebind");
         requestRebind(new ComponentName(this, CamapsListener.class));

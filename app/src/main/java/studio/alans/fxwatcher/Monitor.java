@@ -301,16 +301,18 @@ final class Monitor {
         return Math.max(down + after * 60_000L, p.getLong(Store.LAST_NUDGE, 0) + NUDGE_EVERY);
     }
 
-    /** The pump link tends to come back when the phone wakes, so wake the screen briefly to help it. */
+    /**
+     * The link has come back soon after CamAPS was opened, so reopen it quietly (screen off only,
+     * so it never jumps in front of what you're doing). The log records whether the link returned.
+     */
     private static void nudgePump(Context c, long now) {
         long due = nextNudge(c);
         SharedPreferences p = Store.p(c);
         if (due == 0 || now < due || p.getLong(Store.SIM_UNTIL, 0) > now) return;
-        if (c.getSystemService(PowerManager.class).isInteractive()) return; // screen's already on
-        p.edit().putLong(Store.LAST_NUDGE, now).apply();
-        Store.log(c, "Pump link off " + Store.ago(p.getLong(Store.PUMP_DOWN_SINCE, now), now).replace(" ago", "")
-                + ": waking the screen to help it reconnect");
-        WakeActivity.nudge(c);
+        if (c.getSystemService(PowerManager.class).isInteractive()) return; // you're using the phone
+        p.edit().putLong(Store.LAST_NUDGE, now).putLong(Store.LAST_LAUNCH, now).apply();
+        launchCamaps(c, "pump link off "
+                + Store.ago(p.getLong(Store.PUMP_DOWN_SINCE, now), now).replace(" ago", ""));
     }
 
     /** At night, a phone under the nag level and not charging is a problem (it has to last till morning). */
