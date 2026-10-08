@@ -25,8 +25,20 @@ final class Store {
     static final String MAX_VOLUME = "max_volume";
     static final String SOUND = "sound";                // alarm tone URI, "" = system alarm sound
     static final String STATUS_NOTIF = "status_notif";
+    static final String PUMP_NAME = "pump_name";        // paired Bluetooth name (part of it) or address
+    static final String PUMP_MIN = "pump_min";          // pump link off -> warn + reopen CamAPS after; alarm 10 min later
+    static final String BATT_NAG = "batt_nag";          // at night, warn below this % when not charging
+    static final String BATT_ALARM = "batt_alarm";      // at night, alarm below this % when not charging
+    static final String NIGHT_FROM = "night_from";      // hour
+    static final String NIGHT_TO = "night_to";          // hour
 
     static final int DEF_SIGNAL_MIN = 20;
+    static final String DEF_PUMP_NAME = "YpsoPump";
+    static final int DEF_PUMP_MIN = 30;
+    static final int DEF_BATT_NAG = 30;
+    static final int DEF_BATT_ALARM = 15;
+    static final int DEF_NIGHT_FROM = 23;
+    static final int DEF_NIGHT_TO = 8;
     static final int DEF_MISSING_MIN = 5;
     static final int DEF_STALE_MIN = 15;
     static final int DEF_REALARM_MIN = 15;
@@ -53,6 +65,12 @@ final class Store {
     static final String SIM_UNTIL = "sim_until";
     static final String TEST_UNTIL = "test_until";
     static final String SAVED_VOLUME = "saved_volume";
+    static final String PUMP_STATE = "pump_state";      // Phone.UP / DOWN / UNKNOWN
+    static final String PUMP_DOWN_SINCE = "pump_down_since";
+    static final String PUMP_UP_AT = "pump_up_at";
+    static final String BATT_LOW_SINCE = "batt_low_since";
+    static final String LAST_REPORT = "last_report";    // last state report to Home Assistant
+    static final String REPORTED = "reported";          // what it said, to report changes at once
     static final String LOG = "log";
 
     static SharedPreferences p(Context c) {

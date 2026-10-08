@@ -45,10 +45,13 @@ public class MainActivity extends Activity {
             p.edit().putString(Store.URL, fromIntent.trim()).apply();
         }
         Alerts.channels(this);
+        java.util.List<String> ask = new java.util.ArrayList<>();
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+            ask.add(Manifest.permission.POST_NOTIFICATIONS);
         }
+        if (!Phone.canSeeBluetooth(this)) ask.add(Manifest.permission.BLUETOOTH_CONNECT);
+        if (!ask.isEmpty()) requestPermissions(ask.toArray(new String[0]), 1);
         NotificationListenerService.requestRebind(new ComponentName(this, CamapsListener.class));
     }
 
@@ -77,8 +80,14 @@ public class MainActivity extends Activity {
         String line = pr == null ? "All good" : pr.title;
         if (seen > 0) line += " · checked " + Store.ago(seen, now);
         TextView st = text(line, 16);
-        st.setTextColor(pr == null ? 0xFF2E7D32 : 0xFFC62828);
+        st.setTextColor(pr == null ? 0xFF2E7D32 : now < pr.warnAt ? 0xFFEF6C00 : 0xFFC62828);
         root.addView(st);
+        int pump = p.getInt(Store.PUMP_STATE, Phone.UNKNOWN);
+        long upAt = p.getLong(Store.PUMP_UP_AT, 0);
+        root.addView(text("Pump link " + (pump == Phone.UP ? "on"
+                : pump == Phone.DOWN ? "off since " + Store.hm(p.getLong(Store.PUMP_DOWN_SINCE, now)) : "unknown")
+                + (pump != Phone.UP && upAt > 0 ? " (last on " + Store.hm(upAt) + ")" : "")
+                + " · battery " + Phone.battery(this) + "%" + (Phone.charging(this) ? " charging" : ""), 14));
 
         long snooze = p.getLong(Store.SNOOZE_UNTIL, 0);
         if (snooze > now) {
@@ -111,6 +120,8 @@ public class MainActivity extends Activity {
         check("Display over other apps (lets it reopen CamAPS)", Settings.canDrawOverlays(this), () ->
                 startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName()))));
+        check("See the pump's Bluetooth link", Phone.canSeeBluetooth(this), () ->
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 1));
         PowerManager pm = getSystemService(PowerManager.class);
         check("Battery: unrestricted", pm.isIgnoringBatteryOptimizations(getPackageName()), () ->
                 startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
@@ -139,6 +150,19 @@ public class MainActivity extends Activity {
                 p.getInt(Store.REALARM_MIN, Store.DEF_REALARM_MIN), false);
         EditText low = number("Urgent low alarm at or below (mmol/L, 0 = off)",
                 p.getFloat(Store.LOW_MMOL, Store.DEF_LOW_MMOL), true);
+        EditText pumpMin = number("Pump link off: warn and reopen CamAPS after (min, alarm 10 min later, 0 = off)",
+                p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN), false);
+        root.addView(text("Pump Bluetooth name (or part of it)", 14));
+        EditText pumpName = new EditText(this);
+        pumpName.setSingleLine(true);
+        pumpName.setText(p.getString(Store.PUMP_NAME, Store.DEF_PUMP_NAME));
+        root.addView(pumpName);
+        EditText battNag = number("At night, warn if battery below (%) and not charging",
+                p.getInt(Store.BATT_NAG, Store.DEF_BATT_NAG), false);
+        EditText battAlarm = number("At night, alarm if battery below (%) and not charging",
+                p.getInt(Store.BATT_ALARM, Store.DEF_BATT_ALARM), false);
+        EditText nightFrom = number("Night starts (hour)", p.getInt(Store.NIGHT_FROM, Store.DEF_NIGHT_FROM), false);
+        EditText nightTo = number("Night ends (hour)", p.getInt(Store.NIGHT_TO, Store.DEF_NIGHT_TO), false);
         CheckBox launch = box("Reopen CamAPS automatically when something's wrong",
                 p.getBoolean(Store.AUTO_LAUNCH, true));
         CheckBox maxVol = box("Alarm at full alarm volume", p.getBoolean(Store.MAX_VOLUME, true));
@@ -162,6 +186,12 @@ public class MainActivity extends Activity {
                     .putInt(Store.STALE_MIN, Math.max(6, intOf(stale, Store.DEF_STALE_MIN)))
                     .putInt(Store.REALARM_MIN, Math.max(1, intOf(realarm, Store.DEF_REALARM_MIN)))
                     .putFloat(Store.LOW_MMOL, floatOf(low, Store.DEF_LOW_MMOL))
+                    .putInt(Store.PUMP_MIN, intOf(pumpMin, Store.DEF_PUMP_MIN))
+                    .putString(Store.PUMP_NAME, pumpName.getText().toString().trim())
+                    .putInt(Store.BATT_NAG, Math.min(100, intOf(battNag, Store.DEF_BATT_NAG)))
+                    .putInt(Store.BATT_ALARM, Math.min(100, intOf(battAlarm, Store.DEF_BATT_ALARM)))
+                    .putInt(Store.NIGHT_FROM, Math.min(23, intOf(nightFrom, Store.DEF_NIGHT_FROM)))
+                    .putInt(Store.NIGHT_TO, Math.min(23, intOf(nightTo, Store.DEF_NIGHT_TO)))
                     .putBoolean(Store.AUTO_LAUNCH, launch.isChecked())
                     .putBoolean(Store.MAX_VOLUME, maxVol.isChecked())
                     .putBoolean(Store.STATUS_NOTIF, statusN.isChecked())

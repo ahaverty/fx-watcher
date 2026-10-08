@@ -180,6 +180,26 @@ public class CamapsListener extends NotificationListenerService {
         }
     }
 
+    /** FX Watcher's own state and heartbeat, so Home Assistant only steps in when it's needed. */
+    static void forwardState(Context c, String level, String code, String title, boolean snoozed,
+                             String pump, int battery, boolean charging) {
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "state");
+            j.put("level", level);
+            j.put("problem", code);
+            j.put("title", title);
+            j.put("snoozed", snoozed);
+            j.put("pump", pump);
+            j.put("battery", battery);
+            j.put("charging", charging);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
     private static void post(Context c, String body) {
         SharedPreferences p = Store.p(c);
         String url = p.getString(Store.URL, "");

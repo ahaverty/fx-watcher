@@ -18,6 +18,8 @@ import java.util.List;
  *  STALE    FX Watcher has not been able to confirm CamAPS for a while (lost notification access?)
  *  LOW      urgent low glucose (not snoozable)
  *  SIGNAL   auto mode is not "On", or no glucose is shown (sensor or pump signal loss)
+ *  PUMP     the pump's Bluetooth link has been off for a long time (short gaps are normal)
+ *  BATTERY  at night, the phone is low and not charging
  *
  * Each problem first raises a warning (normal notification, reaches the watch and the car),
  * then a full alarm (alarm-stream sound at full volume, vibration, full-screen alert).
@@ -155,7 +157,43 @@ final class Monitor {
             return s;
         }
 
-        if (!present) return null;
+        Problem cam = present ? camapsProblem(c, p, now) : null;
+        if (cam != null) return cam;
+
+        // The pump link drops between CamAPS's exchanges with the pump, so a gap is "quiet" at first.
+        Problem pump = null;
+        long downSince = p.getLong(Store.PUMP_DOWN_SINCE, 0);
+        int pumpMin = p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN);
+        if (pumpMin > 0 && downSince > 0 && p.getInt(Store.PUMP_STATE, Phone.UNKNOWN) == Phone.DOWN) {
+            pump = new Problem();
+            pump.code = "PUMP";
+            pump.since = downSince;
+            pump.warnAt = downSince + pumpMin * 60_000L;
+            pump.alarmAt = pump.warnAt + 10 * 60_000L;
+            String mins = Store.ago(downSince, now).replace(" ago", "");
+            pump.title = now < pump.warnAt ? "Pump link quiet (" + mins + ")" : "Pump link off for " + mins;
+            pump.detail = "The pump's Bluetooth link has been off since " + Store.hm(downSince)
+                    + ". CamAPS may not be controlling insulin. Check the pump is near the phone and open CamAPS.";
+            pump.launch = true;
+            if (now >= pump.warnAt) return pump;
+        }
+
+        long battSince = p.getLong(Store.BATT_LOW_SINCE, 0);
+        if (battSince > 0) {
+            int pct = Phone.battery(c);
+            Problem b = new Problem();
+            b.code = "BATTERY";
+            b.title = "Phone battery " + pct + "%, not charging";
+            b.detail = "Put the phone on charge: FX Watcher can only wake you overnight while it has power.";
+            b.since = b.warnAt = battSince;
+            b.alarmAt = pct >= 0 && pct < p.getInt(Store.BATT_ALARM, Store.DEF_BATT_ALARM) ? battSince : Long.MAX_VALUE;
+            return b;
+        }
+        return pump;
+    }
+
+    /** Problems read from the CamAPS notification itself: urgent low, auto mode off, no glucose. */
+    private static Problem camapsProblem(Context c, SharedPreferences p, long now) {
         String status = p.getString(Store.STATUS, "");
         String glucose = p.getString(Store.GLUCOSE, "");
         String texts = p.getString(Store.TEXTS, "");
@@ -193,6 +231,8 @@ final class Monitor {
     static synchronized void evaluate(Context c) {
         SharedPreferences p = Store.p(c);
         long now = System.currentTimeMillis();
+        if (p.getLong(Store.SIM_UNTIL, 0) <= now) Phone.refreshPump(c, Phone.UNKNOWN);
+        refreshBattery(c, now);
         Problem pr = problem(c, now);
         int prevLevel = p.getInt(Store.LEVEL, NONE);
         String prevCode = p.getString(Store.PROBLEM, "");
@@ -237,7 +277,7 @@ final class Monitor {
 
         // Try to fix it: relaunching CamAPS restarts it if it was killed and nudges its Bluetooth.
         if (pr != null && pr.launch && now >= pr.warnAt && p.getBoolean(Store.AUTO_LAUNCH, true)
-                && !(snoozed && "SIGNAL".equals(pr.code))
+                && !(snoozed && ("SIGNAL".equals(pr.code) || "PUMP".equals(pr.code)))
                 && now - p.getLong(Store.LAST_LAUNCH, 0) > 10 * 60_000L) {
             p.edit().putLong(Store.LAST_LAUNCH, now).apply();
             launchCamaps(c, "auto");
@@ -245,6 +285,43 @@ final class Monitor {
 
         Alerts.status(c, pr, level, snoozed);
         schedule(c, pr, level, now);
+        report(c, pr, level, snoozed, now);
+    }
+
+    /** At night, a phone under the nag level and not charging is a problem (it has to last till morning). */
+    private static void refreshBattery(Context c, long now) {
+        SharedPreferences p = Store.p(c);
+        int pct = Phone.battery(c);
+        boolean low = pct >= 0 && !Phone.charging(c) && Phone.night(c, now)
+                && pct < p.getInt(Store.BATT_NAG, Store.DEF_BATT_NAG);
+        long since = p.getLong(Store.BATT_LOW_SINCE, 0);
+        if (low && since == 0) {
+            p.edit().putLong(Store.BATT_LOW_SINCE, now).apply();
+            Store.log(c, "Battery " + pct + "% and not charging at night");
+        } else if (!low && since > 0) {
+            p.edit().putLong(Store.BATT_LOW_SINCE, 0).apply();
+        }
+    }
+
+    static final String[] LEVELS = {"NONE", "WARN", "ACKED", "ALARM"};
+
+    /**
+     * Tells Home Assistant what FX Watcher is doing: at once when it changes, otherwise every
+     * 9 minutes as a heartbeat. HA stays quiet while FX Watcher is alive and handling things,
+     * and steps in if the heartbeat stops or an alarm goes unanswered.
+     */
+    private static void report(Context c, Problem pr, int level, boolean snoozed, long now) {
+        SharedPreferences p = Store.p(c);
+        String code = pr == null ? "" : pr.code;
+        String what = LEVELS[level] + "|" + code + "|" + snoozed;
+        if (what.equals(p.getString(Store.REPORTED, "")) && now - p.getLong(Store.LAST_REPORT, 0) < 9 * 60_000L) {
+            return;
+        }
+        p.edit().putString(Store.REPORTED, what).putLong(Store.LAST_REPORT, now).apply();
+        int pump = p.getInt(Store.PUMP_STATE, Phone.UNKNOWN);
+        CamapsListener.forwardState(c, LEVELS[level], code, pr == null ? "OK" : pr.title, snoozed,
+                pump == Phone.UP ? "on" : pump == Phone.DOWN ? "off" : "unknown",
+                Phone.battery(c), Phone.charging(c));
     }
 
     /** Next watchdog wake-up: the next deadline, the end of a snooze or silence, or 10 minutes. */
@@ -265,6 +342,12 @@ final class Monitor {
         if (lastSeen > 0 && staleAt > now) next = Math.min(next, staleAt + 1000);
         long test = p.getLong(Store.TEST_UNTIL, 0);
         if (test > now) next = Math.min(next, test);
+        long pumpDown = p.getLong(Store.PUMP_DOWN_SINCE, 0);
+        if (pumpDown > 0) {
+            long pumpWarn = pumpDown + p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN) * 60_000L;
+            if (pumpWarn > now) next = Math.min(next, pumpWarn);
+            else if (pumpWarn + 10 * 60_000L > now) next = Math.min(next, pumpWarn + 10 * 60_000L);
+        }
         next = Math.max(next, now + 30_000L);
 
         AlarmManager am = c.getSystemService(AlarmManager.class);
