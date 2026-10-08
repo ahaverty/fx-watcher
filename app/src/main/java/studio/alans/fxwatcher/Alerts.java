@@ -105,7 +105,7 @@ final class Alerts {
                 .setConversationTitle("FX Watcher")
                 .addMessage(head + ". " + pr.detail, now, bot);
 
-        // Android Auto needs a reply action and a mark-as-read action that open no UI.
+        // Android Auto needs a reply action and a mark-as-read action (both background broadcasts).
         RemoteInput ri = new RemoteInput.Builder(KEY_REPLY)
                 .setLabel("Reply 'snooze 2' or 'ok'").build();
         Notification.Action reply = new Notification.Action.Builder(
@@ -113,12 +113,12 @@ final class Alerts {
                 action(c, ActionReceiver.REPLY, 20, 0))
                 .addRemoteInput(ri)
                 .setSemanticAction(Notification.Action.SEMANTIC_ACTION_REPLY)
-                .setShowsUserInterface(false).build();
+                .build();
         Notification.Action silence = new Notification.Action.Builder(
                 Icon.createWithResource(c, R.drawable.ic_stat), "Silence 15m",
                 action(c, ActionReceiver.SILENCE, 21, 0))
                 .setSemanticAction(Notification.Action.SEMANTIC_ACTION_MARK_AS_READ)
-                .setShowsUserInterface(false).build();
+                .build();
         Notification.Action snooze = new Notification.Action.Builder(
                 Icon.createWithResource(c, R.drawable.ic_stat), "Snooze 2h",
                 action(c, ActionReceiver.SNOOZE, 22, 2)).build();
