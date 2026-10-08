@@ -58,11 +58,11 @@ public class ActionReceiver extends BroadcastReceiver {
         }
         if (text.contains("snooze") || text.contains("hour")) {
             double hours = 2;
-            Matcher m = Pattern.compile("(\d+(\.\d+)?)").matcher(text);
+            Matcher m = Pattern.compile("(\\d+(\\.\\d+)?)").matcher(text);
             if (m.find()) hours = Double.parseDouble(m.group(1));
             else {
                 for (int n = 1; n < NUMBERS.length; n++) {
-                    if (text.matches(".*\b" + NUMBERS[n] + "\b.*")) { hours = n; break; }
+                    if (text.matches(".*\\b" + NUMBERS[n] + "\\b.*")) { hours = n; break; }
                 }
             }
             if (text.contains("half") && hours == 2) hours = 0.5;
