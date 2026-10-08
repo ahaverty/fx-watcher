@@ -23,6 +23,13 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         SharedPreferences p = getSharedPreferences(CamapsListener.PREFS, MODE_PRIVATE);
 
+        // Allow setup over adb: am start -n studio.alans.camapsbridge/.MainActivity --es url "<webhook url>"
+        String fromIntent = getIntent() != null ? getIntent().getStringExtra("url") : null;
+        if (fromIntent != null && !fromIntent.trim().isEmpty()) {
+            p.edit().putString(CamapsListener.KEY_URL, fromIntent.trim()).apply();
+            NotificationListenerService.requestRebind(new ComponentName(this, CamapsListener.class));
+        }
+
         int pad = (int) (16 * getResources().getDisplayMetrics().density);
         LinearLayout l = new LinearLayout(this);
         l.setOrientation(LinearLayout.VERTICAL);
