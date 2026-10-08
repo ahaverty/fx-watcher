@@ -60,7 +60,9 @@ final class Monitor {
 
         if (present) {
             double mmol = toMmol(glucose, pkg);
-            boolean bad = !"On".equalsIgnoreCase(status) || mmol < 0;
+            // "Unknown" means the auto mode label wasn't found (e.g. CamAPS in another language):
+            // then only a missing glucose reading counts, so it never alarms just for that.
+            boolean bad = (!"On".equalsIgnoreCase(status) && !"Unknown".equals(status)) || mmol < 0;
             float lowThr = p.getFloat(Store.LOW_MMOL, Store.DEF_LOW_MMOL);
             boolean low = lowThr > 0 && mmol >= 0 && mmol <= lowThr;
             String joined = String.join(" | ", texts);

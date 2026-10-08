@@ -10,26 +10,29 @@ android {
         applicationId 'studio.alans.fxwatcher'
         minSdk 29
         targetSdk 34
-        versionCode 5
-        versionName '2.3'
+        versionCode 6
+        versionName '2.4'
     }
 
+    // Release builds are signed in CI from repository secrets (FX_KEYSTORE / FX_KEYSTORE_PASSWORD).
+    // Without them (forks, local builds) they fall back to the debug key.
+    def ks = System.getenv('FX_KEYSTORE')
     signingConfigs {
-        bridge {
-            storeFile file('bridge.keystore')
-            storePassword 'camapsbridge'
-            keyAlias 'bridge'
-            keyPassword 'camapsbridge'
+        release {
+            if (ks) {
+                storeFile file(ks)
+                storeType 'pkcs12'
+                storePassword System.getenv('FX_KEYSTORE_PASSWORD')
+                keyAlias 'fxwatcher'
+                keyPassword System.getenv('FX_KEYSTORE_PASSWORD')
+            }
         }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.bridge
-        }
-        debug {
-            signingConfig signingConfigs.bridge
+            signingConfig ks ? signingConfigs.release : signingConfigs.debug
         }
     }
 

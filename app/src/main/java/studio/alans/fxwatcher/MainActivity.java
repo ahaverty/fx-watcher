@@ -53,6 +53,20 @@ public class MainActivity extends Activity {
         if (!Phone.canSeeBluetooth(this)) ask.add(Manifest.permission.BLUETOOTH_CONNECT);
         if (!ask.isEmpty()) requestPermissions(ask.toArray(new String[0]), 1);
         NotificationListenerService.requestRebind(new ComponentName(this, CamapsListener.class));
+        if (!p.getBoolean(Store.ACCEPTED, false)) {
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle("Before you rely on this")
+                    .setMessage("FX Watcher is an unofficial extra alarm, not a medical device. It is not made "
+                            + "by or affiliated with CamDiab or Ypsomed, and it can fail (for example if the phone "
+                            + "is off, the battery dies, or a CamAPS update changes its notification).\n\n"
+                            + "Keep CamAPS FX's own alerts switched on. FX Watcher only reads CamAPS's "
+                            + "notification and may reopen the app; it never changes CamAPS settings or "
+                            + "insulin delivery.\n\nUse \"Test alarm\" after setup to check it can wake you.")
+                    .setCancelable(false)
+                    .setPositiveButton("I understand", (d, w) -> p.edit().putBoolean(Store.ACCEPTED, true).apply())
+                    .setNegativeButton("Exit", (d, w) -> finish())
+                    .show();
+        }
     }
 
     @Override
@@ -126,9 +140,13 @@ public class MainActivity extends Activity {
         check("Battery: unrestricted", pm.isIgnoringBatteryOptimizations(getPackageName()), () ->
                 startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                         Uri.parse("package:" + getPackageName()))));
-        root.addView(text("Garmin: allow FX Watcher in Garmin Connect > Notifications. "
-                + "Android Auto: messages from sideloaded apps may need Android Auto developer "
-                + "settings > Unknown sources.", 13));
+        if ("Unknown".equals(p.getString(Store.STATUS, "")) && p.getBoolean(Store.PRESENT, false)) {
+            TextView lang = text("FX Watcher can't read the auto mode from CamAPS (it looks for the English "
+                    + "label \"Auto mode\"). It will still alarm if glucose disappears or CamAPS stops, "
+                    + "but not when auto mode drops out.", 14);
+            lang.setTextColor(0xFFEF6C00);
+            root.addView(lang);
+        }
 
         // ---- Test
         header("Test");
@@ -148,7 +166,7 @@ public class MainActivity extends Activity {
                 p.getInt(Store.STALE_MIN, Store.DEF_STALE_MIN), false);
         EditText realarm = number("Silenced alarm comes back after (min)",
                 p.getInt(Store.REALARM_MIN, Store.DEF_REALARM_MIN), false);
-        EditText low = number("Urgent low alarm at or below (mmol/L, 0 = off)",
+        EditText low = number("Urgent low alarm at or below (mmol/L; 3.0 = 54 mg/dL; 0 = off)",
                 p.getFloat(Store.LOW_MMOL, Store.DEF_LOW_MMOL), true);
         EditText pumpMin = number("Pump link off: warn and reopen CamAPS after (min, alarm 10 min later, 0 = off)",
                 p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN), false);
@@ -176,7 +194,8 @@ public class MainActivity extends Activity {
         }
         root.addView(button("Alarm tone: " + tone, this::pickTone));
         CheckBox statusN = box("Quiet status notification", p.getBoolean(Store.STATUS_NOTIF, true));
-        root.addView(text("Home Assistant webhook (optional)", 14));
+        root.addView(text("Advanced, optional: Home Assistant webhook. Leave empty unless you use Home "
+                + "Assistant; nothing leaves the phone without it.", 14));
         EditText url = new EditText(this);
         url.setSingleLine(true);
         url.setText(p.getString(Store.URL, ""));

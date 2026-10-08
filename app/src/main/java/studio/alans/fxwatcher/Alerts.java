@@ -25,7 +25,7 @@ import android.os.Vibrator;
  * Notifications and the alarm sound.
  *
  * Problem notifications use MessagingStyle with reply and mark-as-read actions: that is what
- * Android Auto requires before it will show (and read out) a notification, and Garmin mirrors it
+ * Android Auto requires before it will show (and read out) a notification, and smartwatches mirror it
  * like a message. The alarm itself plays on the alarm stream, so media volume and silent mode
  * don't matter, and it bypasses Do Not Disturb as long as DND allows alarms (the default).
  */
@@ -190,7 +190,7 @@ final class Alerts {
         channels(c);
         long now = System.currentTimeMillis();
         // Kept free of glucose, times and minute counts so it only changes when the state does:
-        // Garmin re-announces the notification every time its text changes.
+        // Watches re-announce the notification every time its text changes.
         String title;
         if (pr == null) title = p.getBoolean(Store.PRESENT, false) ? "CamAPS OK" : summary(c, now);
         else if ("PUMP".equals(pr.code)) title = (now < pr.warnAt ? "Pump link quiet since " : "Pump link off since ")

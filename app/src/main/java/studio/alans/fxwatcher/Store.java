@@ -75,6 +75,7 @@ final class Store {
     static final String LAST_REPORT = "last_report";    // last state report to Home Assistant
     static final String REPORTED = "reported";          // what it said, to report changes at once
     static final String LOG = "log";
+    static final String ACCEPTED = "accepted";          // first-run disclaimer accepted
 
     static SharedPreferences p(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
