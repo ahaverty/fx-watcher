@@ -1,0 +1,247 @@
+package studio.alans.fxwatcher;
+
+import android.Manifest;
+import android.app.Activity;
+import android.app.NotificationManager;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.service.notification.NotificationListenerService;
+import android.text.InputType;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+/** Status, snooze, setup checklist, settings, test alarm and the event log. */
+public class MainActivity extends Activity {
+
+    private LinearLayout root;
+    private int pad;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    @Override
+    protected void onCreate(Bundle b) {
+        super.onCreate(b);
+        pad = (int) (16 * getResources().getDisplayMetrics().density);
+        SharedPreferences p = Store.p(this);
+
+        // Setup over adb: am start -n studio.alans.fxwatcher/.MainActivity --es url "<webhook url>"
+        String fromIntent = getIntent() != null ? getIntent().getStringExtra("url") : null;
+        if (fromIntent != null && !fromIntent.trim().isEmpty()) {
+            p.edit().putString(Store.URL, fromIntent.trim()).apply();
+        }
+        Alerts.channels(this);
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+        }
+        NotificationListenerService.requestRebind(new ComponentName(this, CamapsListener.class));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Monitor.check(this);
+        build();
+    }
+
+    private void build() {
+        SharedPreferences p = Store.p(this);
+        long now = System.currentTimeMillis();
+        ScrollView sv = new ScrollView(this);
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(pad, pad * 3, pad, pad * 2);
+        sv.addView(root);
+
+        // ---- Status
+        Monitor.Problem pr = Monitor.problem(this, now);
+        TextView big = text(Alerts.summary(this, now), 22);
+        big.setTypeface(Typeface.DEFAULT_BOLD);
+        root.addView(big);
+        long seen = p.getLong(Store.LAST_SEEN, 0);
+        String line = pr == null ? "All good" : pr.title;
+        if (seen > 0) line += " · checked " + Store.ago(seen, now);
+        TextView st = text(line, 16);
+        st.setTextColor(pr == null ? 0xFF2E7D32 : 0xFFC62828);
+        root.addView(st);
+
+        long snooze = p.getLong(Store.SNOOZE_UNTIL, 0);
+        if (snooze > now) {
+            root.addView(text("Signal alarms snoozed until " + Store.hm(snooze)
+                    + ". Urgent lows still alarm.", 16));
+            root.addView(button("Cancel snooze", () -> Monitor.unsnooze(this)));
+        }
+        LinearLayout row = new LinearLayout(this);
+        for (int h : new int[]{1, 2, 4, 8}) {
+            row.addView(button("Snooze " + h + "h", () -> Monitor.snooze(this, h)),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        }
+        root.addView(row);
+        if (Alerts.sounding() || p.getInt(Store.LEVEL, 0) >= Monitor.ACKED) {
+            root.addView(button("Silence alarm", () -> Monitor.silence(this)));
+        }
+
+        // ---- Setup checklist
+        header("Setup");
+        String enabled = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+        check("Read CamAPS notification", enabled != null && enabled.contains(getPackageName()),
+                () -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        check("Show notifications", nm.areNotificationsEnabled(), this::appNotificationSettings);
+        if (Build.VERSION.SDK_INT >= 34) {
+            check("Full-screen alarms over the lock screen", nm.canUseFullScreenIntent(), () ->
+                    startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                            Uri.parse("package:" + getPackageName()))));
+        }
+        check("Display over other apps (lets it reopen CamAPS)", Settings.canDrawOverlays(this), () ->
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()))));
+        PowerManager pm = getSystemService(PowerManager.class);
+        check("Battery: unrestricted", pm.isIgnoringBatteryOptimizations(getPackageName()), () ->
+                startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + getPackageName()))));
+        root.addView(text("Garmin: allow FX Watcher in Garmin Connect > Notifications. "
+                + "Android Auto: messages from sideloaded apps may need Android Auto developer "
+                + "settings > Unknown sources.", 13));
+
+        // ---- Test
+        header("Test");
+        root.addView(button("Test alarm now", () -> Monitor.test(this)));
+        root.addView(button("Test alarm in 20 s (lock the phone)", () -> {
+            Toast.makeText(this, "Lock the phone now", Toast.LENGTH_SHORT).show();
+            handler.postDelayed(() -> Monitor.test(getApplicationContext()), 20_000L);
+        }));
+
+        // ---- Settings
+        header("Settings");
+        EditText signal = number("Signal loss / auto mode not On: alarm after (min)",
+                p.getInt(Store.SIGNAL_MIN, Store.DEF_SIGNAL_MIN), false);
+        EditText missing = number("CamAPS not running: alarm after (min)",
+                p.getInt(Store.MISSING_MIN, Store.DEF_MISSING_MIN), false);
+        EditText stale = number("No word from CamAPS: alarm after (min)",
+                p.getInt(Store.STALE_MIN, Store.DEF_STALE_MIN), false);
+        EditText realarm = number("Silenced alarm comes back after (min)",
+                p.getInt(Store.REALARM_MIN, Store.DEF_REALARM_MIN), false);
+        EditText low = number("Urgent low alarm at or below (mmol/L, 0 = off)",
+                p.getFloat(Store.LOW_MMOL, Store.DEF_LOW_MMOL), true);
+        CheckBox launch = box("Reopen CamAPS automatically when something's wrong",
+                p.getBoolean(Store.AUTO_LAUNCH, true));
+        CheckBox maxVol = box("Alarm at full alarm volume", p.getBoolean(Store.MAX_VOLUME, true));
+        CheckBox statusN = box("Quiet status notification", p.getBoolean(Store.STATUS_NOTIF, true));
+        root.addView(text("Home Assistant webhook (optional)", 14));
+        EditText url = new EditText(this);
+        url.setSingleLine(true);
+        url.setText(p.getString(Store.URL, ""));
+        url.setHint("https://…/api/webhook/…");
+        root.addView(url);
+        root.addView(button("Save settings", () -> {
+            p.edit().putInt(Store.SIGNAL_MIN, intOf(signal, Store.DEF_SIGNAL_MIN))
+                    .putInt(Store.MISSING_MIN, intOf(missing, Store.DEF_MISSING_MIN))
+                    .putInt(Store.STALE_MIN, Math.max(6, intOf(stale, Store.DEF_STALE_MIN)))
+                    .putInt(Store.REALARM_MIN, Math.max(1, intOf(realarm, Store.DEF_REALARM_MIN)))
+                    .putFloat(Store.LOW_MMOL, floatOf(low, Store.DEF_LOW_MMOL))
+                    .putBoolean(Store.AUTO_LAUNCH, launch.isChecked())
+                    .putBoolean(Store.MAX_VOLUME, maxVol.isChecked())
+                    .putBoolean(Store.STATUS_NOTIF, statusN.isChecked())
+                    .putString(Store.URL, url.getText().toString().trim())
+                    .apply();
+            Store.log(this, "Settings saved");
+            Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
+        }));
+        root.addView(button("Open CamAPS now", () -> Monitor.launchCamaps(this, "manual")));
+
+        // ---- Log
+        header("Log");
+        TextView log = text(p.getString(Store.LOG, ""), 12);
+        log.setTypeface(Typeface.MONOSPACE);
+        root.addView(log);
+
+        setContentView(sv);
+    }
+
+    private void appNotificationSettings() {
+        startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+    }
+
+    private TextView text(String s, int size) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(size);
+        t.setPadding(0, pad / 4, 0, pad / 4);
+        return t;
+    }
+
+    private void header(String s) {
+        TextView t = text(s, 18);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setPadding(0, pad * 2, 0, pad / 2);
+        root.addView(t);
+    }
+
+    private void check(String label, boolean ok, Runnable fix) {
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        TextView t = text((ok ? "✓  " : "✗  ") + label, 15);
+        t.setTextColor(ok ? 0xFF2E7D32 : 0xFFC62828);
+        r.addView(t, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        if (!ok) {
+            Button b = new Button(this);
+            b.setText("Fix");
+            b.setOnClickListener(v -> fix.run());
+            r.addView(b);
+        }
+        root.addView(r);
+    }
+
+    private Button button(String s, Runnable r) {
+        Button b = new Button(this);
+        b.setText(s);
+        b.setAllCaps(false);
+        b.setOnClickListener(v -> {
+            r.run();
+            build();
+        });
+        return b;
+    }
+
+    private EditText number(String label, float value, boolean decimal) {
+        root.addView(text(label, 14));
+        EditText e = new EditText(this);
+        e.setSingleLine(true);
+        e.setInputType(InputType.TYPE_CLASS_NUMBER | (decimal ? InputType.TYPE_NUMBER_FLAG_DECIMAL : 0));
+        e.setText(decimal ? String.valueOf(value) : String.valueOf((int) value));
+        root.addView(e);
+        return e;
+    }
+
+    private CheckBox box(String label, boolean checked) {
+        CheckBox b = new CheckBox(this);
+        b.setText(label);
+        b.setChecked(checked);
+        root.addView(b);
+        return b;
+    }
+
+    private static int intOf(EditText e, int def) {
+        try { return Math.max(0, Integer.parseInt(e.getText().toString().trim())); } catch (Exception x) { return def; }
+    }
+
+    private static float floatOf(EditText e, float def) {
+        try { return Math.max(0, Float.parseFloat(e.getText().toString().trim().replace(',', '.'))); } catch (Exception x) { return def; }
+    }
+}
