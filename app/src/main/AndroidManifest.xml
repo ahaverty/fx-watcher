@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Lets the app see that CamAPS is installed (needed to draw its notification layout). -->
+    <queries>
+        <package android:name="com.camdiab.fx_alert.mmoll" />
+        <package android:name="com.camdiab.fx_alert.mgdl" />
+    </queries>
+
+    <application
+        android:label="CamAPS Bridge"
+        android:icon="@android:drawable/stat_sys_data_bluetooth"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".CamapsListener"
+            android:exported="true"
+            android:label="CamAPS Bridge"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

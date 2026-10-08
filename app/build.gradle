@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'studio.alans.camapsbridge'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'studio.alans.camapsbridge'
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    signingConfigs {
+        bridge {
+            storeFile file('bridge.keystore')
+            storePassword 'camapsbridge'
+            keyAlias 'bridge'
+            keyPassword 'camapsbridge'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.bridge
+        }
+        debug {
+            signingConfig signingConfigs.bridge
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
