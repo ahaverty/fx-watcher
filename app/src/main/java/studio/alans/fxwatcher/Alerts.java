@@ -248,14 +248,16 @@ final class Alerts {
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build();
-        Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-        if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
         try {
-            MediaPlayer mp = new MediaPlayer();
-            mp.setAudioAttributes(attrs);
-            mp.setDataSource(app, uri);
-            mp.setLooping(true);
-            mp.prepare();
+            MediaPlayer mp;
+            try {
+                mp = prepare(app, attrs, soundUri(app));
+            } catch (Exception chosen) {
+                // The picked tone may have been deleted; fall back to the system alarm sound.
+                Store.log(app, "Chosen alarm tone failed, using default: " + chosen);
+                mp = prepare(app, attrs, defaultSound());
+            }
+            final MediaPlayer playing = mp;
             mp.setVolume(0.4f, 0.4f);
             mp.start();
             player = mp;
@@ -264,7 +266,7 @@ final class Alerts {
                 final float v = 0.4f + 0.1f * i;
                 main.postDelayed(() -> {
                     synchronized (Alerts.class) {
-                        if (player == mp) mp.setVolume(v, v);
+                        if (player == playing) playing.setVolume(v, v);
                     }
                 }, i * 5000L);
             }
@@ -277,6 +279,31 @@ final class Alerts {
             long[] pattern = {0, 800, 400, 800, 400, 1500, 1200};
             vib.vibrate(VibrationEffect.createWaveform(pattern, 0), attrs);
         }
+    }
+
+    private static MediaPlayer prepare(Context c, AudioAttributes attrs, Uri uri) throws Exception {
+        MediaPlayer mp = new MediaPlayer();
+        try {
+            mp.setAudioAttributes(attrs);
+            mp.setDataSource(c, uri);
+            mp.setLooping(true);
+            mp.prepare();
+            return mp;
+        } catch (Exception e) {
+            mp.release();
+            throw e;
+        }
+    }
+
+    static Uri defaultSound() {
+        Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        return uri != null ? uri : RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+    }
+
+    /** The tone picked in the app, or the system alarm sound. */
+    static Uri soundUri(Context c) {
+        String s = Store.p(c).getString(Store.SOUND, "");
+        return s.isEmpty() ? defaultSound() : Uri.parse(s);
     }
 
     static synchronized void stopSound(Context c) {

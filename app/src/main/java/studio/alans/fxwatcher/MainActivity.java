@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -141,6 +142,13 @@ public class MainActivity extends Activity {
         CheckBox launch = box("Reopen CamAPS automatically when something's wrong",
                 p.getBoolean(Store.AUTO_LAUNCH, true));
         CheckBox maxVol = box("Alarm at full alarm volume", p.getBoolean(Store.MAX_VOLUME, true));
+        String tone;
+        try {
+            tone = RingtoneManager.getRingtone(this, Alerts.soundUri(this)).getTitle(this);
+        } catch (Exception e) {
+            tone = "default";
+        }
+        root.addView(button("Alarm tone: " + tone, this::pickTone));
         CheckBox statusN = box("Quiet status notification", p.getBoolean(Store.STATUS_NOTIF, true));
         root.addView(text("Home Assistant webhook (optional)", 14));
         EditText url = new EditText(this);
@@ -171,6 +179,31 @@ public class MainActivity extends Activity {
         root.addView(log);
 
         setContentView(sv);
+    }
+
+    private static final int PICK_TONE = 2;
+
+    private void pickTone() {
+        Intent i = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE,
+                        RingtoneManager.TYPE_ALARM | RingtoneManager.TYPE_RINGTONE)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "FX Watcher alarm tone")
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, Alerts.defaultSound())
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                .putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Alerts.soundUri(this));
+        startActivityForResult(i, PICK_TONE);
+    }
+
+    @Override
+    protected void onActivityResult(int req, int result, Intent data) {
+        super.onActivityResult(req, result, data);
+        if (req != PICK_TONE || result != RESULT_OK || data == null) return;
+        Uri uri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+        boolean isDefault = uri == null || uri.equals(Alerts.defaultSound())
+                || Settings.System.DEFAULT_ALARM_ALERT_URI.equals(uri);
+        Store.p(this).edit().putString(Store.SOUND, isDefault ? "" : uri.toString()).apply();
+        Store.log(this, "Alarm tone set to " + (isDefault ? "system default" : uri));
     }
 
     private void appNotificationSettings() {

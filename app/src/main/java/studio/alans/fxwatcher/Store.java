@@ -23,6 +23,7 @@ final class Store {
     static final String LOW_MMOL = "low_mmol";          // urgent low threshold, 0 = off
     static final String AUTO_LAUNCH = "auto_launch";
     static final String MAX_VOLUME = "max_volume";
+    static final String SOUND = "sound";                // alarm tone URI, "" = system alarm sound
     static final String STATUS_NOTIF = "status_notif";
 
     static final int DEF_SIGNAL_MIN = 20;
