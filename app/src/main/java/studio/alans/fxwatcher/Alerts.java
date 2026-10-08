@@ -189,10 +189,18 @@ final class Alerts {
         }
         channels(c);
         long now = System.currentTimeMillis();
-        String title = summary(c, now);
+        // Kept free of glucose, times and minute counts so it only changes when the state does:
+        // Garmin re-announces the notification every time its text changes.
+        String title;
+        if (pr == null) title = p.getBoolean(Store.PRESENT, false) ? "CamAPS OK" : summary(c, now);
+        else if ("PUMP".equals(pr.code)) title = (now < pr.warnAt ? "Pump link quiet since " : "Pump link off since ")
+                + Store.hm(pr.since);
+        else title = pr.title;
         long snooze = p.getLong(Store.SNOOZE_UNTIL, 0);
-        String text = snooze > now ? "Signal alarms snoozed until " + Store.hm(snooze)
-                : pr != null ? pr.title : "Watching CamAPS";
+        String text = snooze > now ? "Snoozed until " + Store.hm(snooze) : "FX Watcher is watching";
+        String key = title + "|" + text;
+        if (key.equals(lastStatus) && isShowing(nm, ID_STATUS)) return;
+        lastStatus = key;
         Notification.Builder b = new Notification.Builder(c, CH_STATUS)
                 .setSmallIcon(R.drawable.ic_stat)
                 .setContentTitle(title)
@@ -211,6 +219,17 @@ final class Alerts {
                     "Snooze 3h", action(c, ActionReceiver.SNOOZE, 32, 3)).build());
         }
         nm.notify(ID_STATUS, b.build());
+    }
+
+    private static String lastStatus;
+
+    private static boolean isShowing(NotificationManager nm, int id) {
+        try {
+            for (android.service.notification.StatusBarNotification s : nm.getActiveNotifications()) {
+                if (s.getId() == id) return true;
+            }
+        } catch (Exception ignored) { }
+        return false;
     }
 
     /** One line: "Auto mode On · 12.4 · 18:48" or what's wrong. */

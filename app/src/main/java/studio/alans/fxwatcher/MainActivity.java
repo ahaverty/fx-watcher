@@ -152,6 +152,8 @@ public class MainActivity extends Activity {
                 p.getFloat(Store.LOW_MMOL, Store.DEF_LOW_MMOL), true);
         EditText pumpMin = number("Pump link off: warn and reopen CamAPS after (min, alarm 10 min later, 0 = off)",
                 p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN), false);
+        EditText pumpNudge = number("Pump link off: wake the screen to help it reconnect after (min, then every 8, 0 = off)",
+                p.getInt(Store.PUMP_NUDGE, Store.DEF_PUMP_NUDGE), false);
         root.addView(text("Pump Bluetooth name (or part of it)", 14));
         EditText pumpName = new EditText(this);
         pumpName.setSingleLine(true);
@@ -187,6 +189,7 @@ public class MainActivity extends Activity {
                     .putInt(Store.REALARM_MIN, Math.max(1, intOf(realarm, Store.DEF_REALARM_MIN)))
                     .putFloat(Store.LOW_MMOL, floatOf(low, Store.DEF_LOW_MMOL))
                     .putInt(Store.PUMP_MIN, intOf(pumpMin, Store.DEF_PUMP_MIN))
+                    .putInt(Store.PUMP_NUDGE, intOf(pumpNudge, Store.DEF_PUMP_NUDGE))
                     .putString(Store.PUMP_NAME, pumpName.getText().toString().trim())
                     .putInt(Store.BATT_NAG, Math.min(100, intOf(battNag, Store.DEF_BATT_NAG)))
                     .putInt(Store.BATT_ALARM, Math.min(100, intOf(battAlarm, Store.DEF_BATT_ALARM)))

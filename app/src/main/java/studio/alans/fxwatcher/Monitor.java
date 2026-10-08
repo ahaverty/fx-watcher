@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.os.PowerManager;
 import android.provider.Settings;
 
 import java.util.List;
@@ -283,9 +284,33 @@ final class Monitor {
             launchCamaps(c, "auto");
         }
 
+        nudgePump(c, now);
         Alerts.status(c, pr, level, snoozed);
         schedule(c, pr, level, now);
         report(c, pr, level, snoozed, now);
+    }
+
+    static final long NUDGE_EVERY = 8 * 60_000L;
+
+    /** When the next screen wake for a quiet pump link is due, or 0 if none is. */
+    private static long nextNudge(Context c) {
+        SharedPreferences p = Store.p(c);
+        int after = p.getInt(Store.PUMP_NUDGE, Store.DEF_PUMP_NUDGE);
+        long down = p.getLong(Store.PUMP_DOWN_SINCE, 0);
+        if (after <= 0 || down == 0 || p.getInt(Store.PUMP_STATE, Phone.UNKNOWN) != Phone.DOWN) return 0;
+        return Math.max(down + after * 60_000L, p.getLong(Store.LAST_NUDGE, 0) + NUDGE_EVERY);
+    }
+
+    /** The pump link tends to come back when the phone wakes, so wake the screen briefly to help it. */
+    private static void nudgePump(Context c, long now) {
+        long due = nextNudge(c);
+        SharedPreferences p = Store.p(c);
+        if (due == 0 || now < due || p.getLong(Store.SIM_UNTIL, 0) > now) return;
+        if (c.getSystemService(PowerManager.class).isInteractive()) return; // screen's already on
+        p.edit().putLong(Store.LAST_NUDGE, now).apply();
+        Store.log(c, "Pump link off " + Store.ago(p.getLong(Store.PUMP_DOWN_SINCE, now), now).replace(" ago", "")
+                + ": waking the screen to help it reconnect");
+        WakeActivity.nudge(c);
     }
 
     /** At night, a phone under the nag level and not charging is a problem (it has to last till morning). */
@@ -342,6 +367,8 @@ final class Monitor {
         if (lastSeen > 0 && staleAt > now) next = Math.min(next, staleAt + 1000);
         long test = p.getLong(Store.TEST_UNTIL, 0);
         if (test > now) next = Math.min(next, test);
+        long nudge = nextNudge(c);
+        if (nudge > now) next = Math.min(next, nudge);
         long pumpDown = p.getLong(Store.PUMP_DOWN_SINCE, 0);
         if (pumpDown > 0) {
             long pumpWarn = pumpDown + p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN) * 60_000L;

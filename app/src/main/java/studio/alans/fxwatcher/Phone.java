@@ -104,7 +104,10 @@ final class Phone {
         if (now == UP) e.putLong(Store.PUMP_UP_AT, t);
         e.apply();
         if (old != now) {
-            Store.log(c, "Pump Bluetooth link " + new String[]{"unknown", "off", "on"}[now + 1]);
+            long nudged = p.getLong(Store.LAST_NUDGE, 0);
+            String after = now == UP && t - nudged < 3 * 60_000L
+                    ? " (" + (t - nudged) / 1000 + " s after FX woke the screen)" : "";
+            Store.log(c, "Pump Bluetooth link " + new String[]{"unknown", "off", "on"}[now + 1] + after);
         }
     }
 

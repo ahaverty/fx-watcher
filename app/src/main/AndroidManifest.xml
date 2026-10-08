@@ -53,6 +53,16 @@
             android:turnScreenOn="true"
             android:taskAffinity="studio.alans.fxwatcher.alarm" />
 
+        <activity
+            android:name=".WakeActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:taskAffinity="studio.alans.fxwatcher.wake" />
+
         <service
             android:name=".CamapsListener"
             android:exported="true"

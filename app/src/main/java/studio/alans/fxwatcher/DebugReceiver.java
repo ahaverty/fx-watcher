@@ -34,6 +34,7 @@ public class DebugReceiver extends BroadcastReceiver {
                 case "silence": Monitor.silence(c); break;
                 case "snooze": Monitor.snooze(c, i.getDoubleExtra("hours", 2)); break;
                 case "unsnooze": Monitor.unsnooze(c); break;
+                case "wake": WakeActivity.nudge(c); break;
                 default: break;
             }
             return;
