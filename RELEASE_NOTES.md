@@ -11,4 +11,4 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
-**New in v2.5:** the pump link warning now comes after 25 min (was 30). CamAPS normally connects to the pump every 10-11 min, so that is two missed rounds.
+**New in v2.6:** a CamAPS low alert no longer makes auto mode show as "Unknown". CamAPS shows the alert as a second notification next to its status one; FX Watcher now ignores it and keeps reading the status.

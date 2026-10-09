@@ -97,7 +97,7 @@ public class CamapsListener extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        if (isCamaps(sbn)) handle(sbn);
+        if (isCamaps(sbn) && !handle(sbn, false)) logIgnored(sbn);
     }
 
     @Override
@@ -111,14 +111,20 @@ public class CamapsListener extends NotificationListenerService {
     /** Reports whatever CamAPS is showing right now. Returns true if its notification is present. */
     private boolean scanActive() {
         try {
+            // CamAPS can show more than one ongoing notification (e.g. a low alert next to the
+            // status one), so use the one that actually carries the status.
             StatusBarNotification[] active = getActiveNotifications();
+            StatusBarNotification other = null;
             if (active != null) {
                 for (StatusBarNotification sbn : active) {
-                    if (isCamaps(sbn)) {
-                        handle(sbn);
-                        return true;
-                    }
+                    if (!isCamaps(sbn)) continue;
+                    if (handle(sbn, false)) return true;
+                    other = sbn;
                 }
+            }
+            if (other != null) {
+                handle(other, true); // CamAPS is there, but nothing readable
+                return true;
             }
             Monitor.onCamaps(this, false, null, null, new ArrayList<>(), null, false);
         } catch (Exception e) {
@@ -127,7 +133,12 @@ public class CamapsListener extends NotificationListenerService {
         return false;
     }
 
-    private void handle(StatusBarNotification sbn) {
+    /**
+     * Reports this notification to the Monitor if it is CamAPS's status notification (has the
+     * "Auto mode" label or a glucose value). Returns false and reports nothing otherwise, unless
+     * force is set.
+     */
+    private boolean handle(StatusBarNotification sbn, boolean force) {
         List<String> texts = new ArrayList<>();
         try {
             Notification n = sbn.getNotification();
@@ -158,9 +169,21 @@ public class CamapsListener extends NotificationListenerService {
                 glucose = s;
             }
         }
+        if (status == null && glucose == null && !force) return false;
         if (status == null) status = "Unknown";
         String pkg = sbn.getPackageName();
         Monitor.onCamaps(this, true, status, glucose, texts, pkg, false);
+        return true;
+    }
+
+    /** Notes a CamAPS notification that isn't the status one, so we can see what it was. */
+    private void logIgnored(StatusBarNotification sbn) {
+        Notification n = sbn.getNotification();
+        CharSequence t = n.extras.getCharSequence(Notification.EXTRA_TITLE);
+        CharSequence x = n.extras.getCharSequence(Notification.EXTRA_TEXT);
+        Store.log(this, "Ignored other CamAPS notification (id " + sbn.getId()
+                + ", channel " + n.getChannelId() + ", category " + n.category
+                + (t != null ? ", \"" + t + "\"" : "") + (x != null ? ", \"" + x + "\"" : "") + ")");
     }
 
     private static void collect(View v, List<String> out) {
