@@ -35,7 +35,7 @@ final class Store {
 
     static final int DEF_SIGNAL_MIN = 20;
     static final String DEF_PUMP_NAME = "YpsoPump";
-    static final int DEF_PUMP_MIN = 30;
+    static final int DEF_PUMP_MIN = 25;
     static final int DEF_PUMP_NUDGE = 12;
     static final int DEF_BATT_NAG = 30;
     static final int DEF_BATT_ALARM = 15;

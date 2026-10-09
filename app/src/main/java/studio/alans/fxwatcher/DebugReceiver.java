@@ -17,6 +17,7 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es status clear (back to the real CamAPS state)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd test|check|silence|snooze|unsnooze
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es url https://...   (webhook)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ei pump_min 25   (pump link warning, minutes)
  */
 public class DebugReceiver extends BroadcastReceiver {
     @Override
@@ -25,6 +26,12 @@ public class DebugReceiver extends BroadcastReceiver {
         if (url != null) {
             Store.p(c).edit().putString(Store.URL, url.trim()).apply();
             Store.log(c, "Webhook URL set over adb");
+        }
+        int pumpMin = i.getIntExtra("pump_min", 0);
+        if (pumpMin > 0) {
+            Store.p(c).edit().putInt(Store.PUMP_MIN, pumpMin).apply();
+            Store.log(c, "Pump link warning set to " + pumpMin + " min over adb");
+            Monitor.check(c);
         }
         String cmd = i.getStringExtra("cmd");
         if (cmd != null) {

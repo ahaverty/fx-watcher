@@ -17,7 +17,7 @@ No server, no account, no internet needed.
 | CamAPS FX not running (its notification is gone) | alarm after 5 min |
 | FX Watcher can't see CamAPS (lost notification access) | alarm after 15 min |
 | Urgent low (3.0 mmol/L / 54 mg/dL) | alarm at once, can't be snoozed |
-| Pump Bluetooth link off (YpsoPump by default; short gaps are normal) | warning at 30 min, alarm at 40 min |
+| Pump Bluetooth link off (YpsoPump by default; short gaps are normal) | warning at 25 min, alarm at 35 min |
 | Phone battery at night (23:00-08:00) and not charging | warning below 30 %, alarm below 15 % |
 
 All times and thresholds can be changed in the app.
