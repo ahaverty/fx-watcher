@@ -39,8 +39,43 @@ All times and thresholds can be changed in the app.
    battery unrestricted, and Bluetooth (for the pump link).
 3. Tap **Test alarm in 20 s**, lock the phone, and check it wakes you.
 
+4. Do every step in **Keep it running** below. Skipping them is the most likely way for FX Watcher
+   to fail silently.
+
 Needs Android 10 or later. CamAPS FX must be set to **English** for the auto mode check
 (otherwise FX Watcher still alarms on missing glucose and CamAPS stopping, and tells you so).
+
+## Keep it running
+
+Android shuts down background apps to save battery. If it shuts down FX Watcher, **nothing alarms
+and nothing tells you**. Do all of these for **both FX Watcher and CamAPS FX**. CamAPS needs them
+just as much, and many signal losses start with CamAPS being put to sleep.
+
+Samsung (One UI; names differ a little between versions):
+
+1. **Settings > Apps > (app) > Battery > Unrestricted.** FX Watcher's Setup list covers this
+   for FX Watcher. Do it by hand for CamAPS FX.
+2. **Settings > Battery (or Device care > Battery) > Background usage limits:**
+   - turn **off** "Put unused apps to sleep"
+   - add both apps to **Never sleeping apps** (also called "Never auto sleeping apps")
+   - make sure neither app is in "Sleeping apps" or "Deep sleeping apps"
+3. **Settings > Apps > (app):** turn **off** "Pause app activity if unused" (or "Remove
+   permissions if app is unused").
+4. **Recent apps screen:** tap the app's icon at the top of its card and choose **Keep open**.
+   "Close all" then leaves it alone.
+5. **Notifications:** don't turn off or silence FX Watcher's notifications, including its
+   status notification. Do Not Disturb, Sleep mode and Bedtime mode must still allow
+   **Alarms**.
+6. **After the phone restarts** (including Samsung's "Auto restart"/"Auto optimise"), unlock it
+   once. Android only lets FX Watcher read notifications again after the first unlock.
+
+Other brands (Xiaomi, OnePlus, Huawei, Oppo, Pixel...): see
+[dontkillmyapp.com](https://dontkillmyapp.com) for your phone's equivalent steps, then do the
+same for both apps.
+
+**Check it works:** tap **Test alarm in 20 s**, lock the phone and put it down. Repeat after a
+night where the phone sat locked for hours. If the status notification "FX Watcher is watching"
+ever disappears, open the app and go through the Setup list again.
 
 ## Home Assistant (optional, advanced)
 
