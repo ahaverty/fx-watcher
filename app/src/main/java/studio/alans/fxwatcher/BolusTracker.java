@@ -16,15 +16,17 @@ import java.util.regex.Pattern;
  * bolus at 20:56 was sent again at 20:59, 181 s later, past the old 180 s window). So:
  *   1. A popup counts only when it appears: if the previous CamAPS screen read already showed
  *      the same popup, it is stale and ignored.
- *   2. The same amount within 15 min of the last bolus is that bolus, unless there is evidence of
- *      a new delivery since: CamAPS's "Delivery will start in" countdown was seen after it, the
- *      carbs differ, or it is a second, separate CamAPS notification.
+ *   2. The same amount as the last bolus is that bolus, however much later, unless there is
+ *      evidence of a new delivery since: CamAPS's "Delivery will start in" countdown (every
+ *      in-app bolus shows it) was on screen after it, the carbs differ, or it is a second,
+ *      separate CamAPS notification. No timers: CamAPS can be reopened hours later. (This covers
+ *      a reopen that reads another CamAPS screen before the popup, so the popup seems to appear.)
  *   3. A repeat that brings carbs the first one lacked updates that bolus (same created_at, which
  *      Nightscout upserts on); a repeat without carbs never removes them.
+ * A different amount is always a new bolus.
  */
 final class BolusTracker {
 
-    static final long SAME_BOLUS_MS = 15 * 60_000L;
     static final String SCREEN = "screen", NOTIFICATION = "notification";
     private static final Pattern DELIVERED =
             Pattern.compile("Delivered\\s+(\\d+(?:[.,]\\d+)?)\\s*U", Pattern.CASE_INSENSITIVE);
@@ -93,8 +95,9 @@ final class BolusTracker {
     }
 
     private Result decide(double units, long at, double carbs, String via, String text) {
-        boolean same = lastUnits >= 0 && Math.abs(units - lastUnits) < 0.001
-                && Math.abs(at - lastAt) < SAME_BOLUS_MS;
+        // No time window: how long ago the last bolus was says nothing (a popup can sit there for
+        // hours). Only events count: a new delivery countdown, other carbs, another notification.
+        boolean same = lastUnits >= 0 && Math.abs(units - lastUnits) < 0.001;
         boolean newDelivery = deliveringAt > lastAt;
         boolean otherCarbs = !Double.isNaN(carbs) && !Double.isNaN(lastCarbs) && carbs != lastCarbs;
         boolean secondNotification = NOTIFICATION.equals(via) && NOTIFICATION.equals(lastVia);

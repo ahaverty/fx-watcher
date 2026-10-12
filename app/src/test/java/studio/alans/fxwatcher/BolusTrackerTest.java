@@ -75,7 +75,7 @@ public class BolusTrackerTest {
     @Test
     public void reopenThatShowsHomeBeforeThePopupIsStillOneBolus() {
         // If the activity is read before the popup on reopening, the popup "appears" again;
-        // the 15 min same-amount rule catches it (no delivery countdown since the bolus).
+        // same amount with no delivery countdown since the bolus = the same bolus.
         Phone p = new Phone();
         p.screen(COUNTDOWN, 0, 35);
         p.screen(POPUP_44, 28_000, 35);
@@ -141,18 +141,40 @@ public class BolusTrackerTest {
     }
 
     @Test
-    public void sameAmountAfterFifteenMinutesIsANewBolus() {
+    public void popupReappearingHoursLaterWithoutADeliveryIsStillOneBolus() {
+        // Flick away, come back hours later, and the reopen reads another screen first.
         Phone p = new Phone();
-        p.screen(POPUP_44, 0, NONE);
+        p.screen(COUNTDOWN, 0, NONE);
+        p.screen(POPUP_44, 30_000, NONE);
+        p.screen(HOME, 5 * 60 * MIN, NONE);
+        p.screen(POPUP_44, 5 * 60 * MIN + 500, NONE);
+        assertEquals(1, p.created);
+    }
+
+    @Test
+    public void popupLeftUpForHoursIsStillOneBolus() {
+        Phone p = new Phone();
+        p.screen(COUNTDOWN, 0, NONE);
+        p.screen(POPUP_44, 30_000, NONE);
+        p.screen(POPUP_44, 8 * 60 * MIN, NONE);
+        assertEquals(1, p.created);
+    }
+
+    @Test
+    public void sameAmountHoursLaterWithADeliveryIsANewBolus() {
+        Phone p = new Phone();
+        p.screen(COUNTDOWN, 0, NONE);
+        p.screen(POPUP_44, 30_000, NONE);
         p.screen(HOME, MIN, NONE);
-        p.screen(POPUP_44, 16 * MIN, NONE);
+        p.screen(COUNTDOWN, 4 * 60 * MIN, NONE);
+        p.screen(POPUP_44, 4 * 60 * MIN + 30_000, NONE);
         assertEquals(2, p.created);
     }
 
     @Test
     public void twoSeparateNotificationsAreTwoBoluses() {
         Phone p = new Phone();
-        p.notification("Delivered 4.4 U of insulin.", 0, NONE);
+        p.notification("Delivered 4.4 U of insulin.", 0, NONE);   // a post at time 0 still counts
         p.notification("Delivered 4.4 U of insulin.", 0, NONE);   // the same post seen twice
         p.notification("Delivered 4.4 U of insulin.", 5 * MIN, NONE);
         assertEquals(2, p.created);
