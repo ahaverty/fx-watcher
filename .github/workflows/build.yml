@@ -41,7 +41,7 @@ jobs:
         env:
           FX_KEYSTORE_PASSWORD: ${{ secrets.FX_KEYSTORE_PASSWORD }}
         run: |
-          gradle :app:assembleRelease --no-daemon
+          gradle :app:testReleaseUnitTest :app:assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk fx-watcher.apk
       - uses: actions/upload-artifact@v4
         with:
