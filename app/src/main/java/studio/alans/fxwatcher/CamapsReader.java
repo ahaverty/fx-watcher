@@ -2,7 +2,16 @@ package studio.alans.fxwatcher;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Rect;
+import android.hardware.HardwareBuffer;
+import android.hardware.display.DisplayManager;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
+import android.view.Display;
+import android.view.Surface;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
@@ -232,6 +241,13 @@ public class CamapsReader extends AccessibilityService {
             }
         }
 
+        // Landscape chart: read its basal line once the view settles (scrolling, zooming)
+        if (indexOf(items, "Rotate screen") >= 0 && indexOf(items, "CGM data by Dexcom") >= 0) {
+            known = true;
+            main.removeCallbacks(chartShot);
+            main.postDelayed(chartShot, 1500);
+        }
+
         if (!known) unknownScreen(items);
     }
 
@@ -401,6 +417,102 @@ public class CamapsReader extends AccessibilityService {
         } catch (Exception ex) {
             Log.w(TAG, "iob", ex);
         }
+    }
+
+    // ── Chart basal ──────────────────────────────────────────────────────────────
+
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final java.util.concurrent.ExecutorService chartWork = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private final Runnable chartShot = this::chartShot;
+    private volatile boolean shooting;
+    private long lastShot;
+
+    /** Screenshot (memory only) of the chart view, parsed off the main thread, then dropped. */
+    @android.annotation.TargetApi(Build.VERSION_CODES.R)
+    private void chartShot() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || shooting) return;
+        long now = System.currentTimeMillis();
+        if (now - lastShot < 5000) {
+            main.postDelayed(chartShot, 5000 - (now - lastShot));
+            return;
+        }
+        DisplayManager dm = getSystemService(DisplayManager.class);
+        Display d = dm == null ? null : dm.getDisplay(Display.DEFAULT_DISPLAY);
+        if (d == null || d.getRotation() == Surface.ROTATION_0 || d.getRotation() == Surface.ROTATION_180) return;
+        Rect bounds = chartBounds();
+        if (bounds == null) return;
+        shooting = true;
+        lastShot = now;
+        takeScreenshot(Display.DEFAULT_DISPLAY, chartWork, new TakeScreenshotCallback() {
+            @Override
+            public void onSuccess(ScreenshotResult shot) {
+                long at = System.currentTimeMillis();
+                HardwareBuffer hb = shot.getHardwareBuffer();
+                try {
+                    Bitmap hw = Bitmap.wrapHardwareBuffer(hb, shot.getColorSpace());
+                    if (hw == null) return;
+                    Bitmap sw = hw.copy(Bitmap.Config.ARGB_8888, false);
+                    hw.recycle();
+                    Rect c = new Rect(bounds);
+                    if (!c.intersect(0, 0, sw.getWidth(), sw.getHeight()) || c.width() < bounds.width() * 0.9) {
+                        String size = sw.getWidth() + "x" + sw.getHeight();
+                        sw.recycle();
+                        chartLog("Chart not read: screenshot " + size + ", chart at " + bounds);
+                        return;
+                    }
+                    int[] px = new int[c.width() * c.height()];
+                    sw.getPixels(px, 0, c.width(), c.left, c.top, c.width(), c.height());
+                    sw.recycle();
+                    ChartParser.Result r = ChartParser.parse(px, c.width(), c.height(), at, java.time.ZoneId.systemDefault());
+                    ChartBasal.handle(CamapsReader.this, r, at);
+                    chartLog(null);
+                } catch (ChartParser.Fail f) {
+                    chartLog("Chart not read: " + f.getMessage());
+                } catch (Exception ex) {
+                    Log.w(TAG, "chart", ex);
+                } finally {
+                    hb.close();
+                    shooting = false;
+                }
+            }
+
+            @Override
+            public void onFailure(int code) {
+                shooting = false;
+                Log.w(TAG, "chart screenshot failed: " + code);
+            }
+        });
+    }
+
+    /** The chart: CamAPS's largest text-less View on screen. */
+    private Rect chartBounds() {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null || root.getPackageName() == null || !root.getPackageName().toString().startsWith("com.camdiab.")) return null;
+        Rect[] best = {null};
+        findChart(root, best, 0);
+        return best[0];
+    }
+
+    private static void findChart(AccessibilityNodeInfo n, Rect[] best, int depth) {
+        if (n == null || depth > 40) return;
+        if ("android.view.View".contentEquals(n.getClassName() == null ? "" : n.getClassName())
+                && n.getText() == null && n.getContentDescription() == null && n.isVisibleToUser()) {
+            Rect r = new Rect();
+            n.getBoundsInScreen(r);
+            if (best[0] == null || r.width() * r.height() > best[0].width() * best[0].height()) best[0] = r;
+        }
+        for (int i = 0; i < n.getChildCount(); i++) findChart(n.getChild(i), best, depth + 1);
+    }
+
+    /** Logs why the chart wasn't read, once per reason (it is retried on every look). */
+    private void chartLog(String why) {
+        SharedPreferences p = Store.p(this);
+        String last = p.getString(Store.CHART_LAST, "");
+        if (why == null) { if (!last.isEmpty()) p.edit().putString(Store.CHART_LAST, "").apply(); return; }
+        Log.i(TAG, why);
+        if (why.equals(last)) return;
+        p.edit().putString(Store.CHART_LAST, why).apply();
+        Store.log(this, why);
     }
 
     // ── Discovery ────────────────────────────────────────────────────────────────

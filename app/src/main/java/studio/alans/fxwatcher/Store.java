@@ -113,6 +113,8 @@ final class Store {
     static final String BED_SET = "bed_set";                  // what it was set to
     static final String RD_DUMP = "rd_dump";           // log full text of unknown CamAPS screens (debug, adb only)
     static final String RD_IOB = "rd_iob";             // last active insulin sent, as "value@time"
+    static final String CHART_SENT = "chart_sent";     // chart basal bins sent (ChartBasal.Ledger)
+    static final String CHART_LAST = "chart_last";     // last chart outcome logged (no repeats)
 
     static SharedPreferences p(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);

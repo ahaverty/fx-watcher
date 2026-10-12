@@ -21,7 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Sends what FX Watcher learns about CamAPS (boluses, Boost/Ease-off, active insulin) to
+ * Sends what FX Watcher learns about CamAPS (boluses, Boost/Ease-off, active insulin, basal) to
  * Nightscout as treatments / devicestatus, with the token of a Nightscout subject that may only
  * create and read those. Events wait in a queue that survives restarts and are retried until
  * Nightscout takes them (dropped after 3 days). Nightscout v1 upserts treatments on
@@ -64,6 +64,11 @@ final class Nightscout {
         enqueue(c, "/api/v1/treatments", t);
     }
 
+    /** Several treatments in one request (Nightscout v1 takes an array; each one is upserted). */
+    static void postTreatments(Context c, JSONArray t) {
+        enqueue(c, "/api/v1/treatments", t);
+    }
+
     static void postDeviceStatus(Context c, JSONObject d) {
         enqueue(c, "/api/v1/devicestatus", d);
     }
@@ -84,7 +89,7 @@ final class Nightscout {
         c.getSharedPreferences(QPREFS, Context.MODE_PRIVATE).edit().putString(Q, q.toString()).apply();
     }
 
-    private static synchronized void enqueue(Context c, String path, JSONObject body) {
+    private static synchronized void enqueue(Context c, String path, Object body) {
         try {
             JSONArray q = load(c);
             JSONObject item = new JSONObject();
@@ -93,7 +98,9 @@ final class Nightscout {
             item.put("queued", System.currentTimeMillis());
             q.put(item);
             save(c, q);
-            Store.log(c, "Nightscout: queued " + body.optString("eventType", "device status"));
+            Store.log(c, "Nightscout: queued " + (body instanceof JSONArray
+                    ? ((JSONArray) body).length() + " x " + ((JSONArray) body).optJSONObject(0).optString("eventType")
+                    : ((JSONObject) body).optString("eventType", "device status")));
         } catch (Exception e) {
             Log.w(TAG, "enqueue", e);
         }
@@ -121,7 +128,7 @@ final class Nightscout {
                     continue;
                 }
             }
-            int code = send(c, item.optString("path"), item.optJSONObject("body"), true);
+            int code = send(c, item.optString("path"), item.opt("body"), true);
             if (code >= 200 && code < 300 || code == 400 || code == 422) {
                 // Sent, or Nightscout will never take it (bad request): either way, next.
                 synchronized (Nightscout.class) {
@@ -166,7 +173,7 @@ final class Nightscout {
         }
     }
 
-    private static int send(Context c, String path, JSONObject body, boolean retryAuth) {
+    private static int send(Context c, String path, Object body, boolean retryAuth) {
         String token = jwt(c, false);
         if (token == null) return -1;
         HttpURLConnection conn = null;
