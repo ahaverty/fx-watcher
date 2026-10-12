@@ -150,6 +150,9 @@ Nightscout can't be reached. Every event has `enteredBy: fx-watcher`.
 
 ## Home Assistant (optional, advanced)
 
+**Step-by-step guide with copy-paste YAML: [docs/home-assistant.md](docs/home-assistant.md)**
+(dashboard, escalating to lights and speakers, a backup alarm, and snooze both ways).
+
 Leave the webhook empty and nothing leaves the phone. If you set a Home Assistant webhook URL,
 FX Watcher POSTs to it:
 
