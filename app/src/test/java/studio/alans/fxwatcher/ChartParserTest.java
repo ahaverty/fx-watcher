@@ -6,15 +6,15 @@ import static org.junit.Assert.fail;
 
 import org.junit.Test;
 
-import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-
-import javax.imageio.ImageIO;
+import java.util.zip.Inflater;
 
 /**
  * CamAPS landscape chart screenshots (S23 Ultra, CamAPS 1.4(192), 12-13 Oct 2026), cropped to
@@ -34,11 +34,71 @@ public class ChartParserTest {
 
     private static ChartParser.Result parse(int n, String captured) throws Exception {
         try (InputStream in = ChartParserTest.class.getResourceAsStream("/chart/chart" + n + ".png")) {
-            BufferedImage im = ImageIO.read(in);
-            int w = im.getWidth(), h = im.getHeight();
-            int[] px = im.getRGB(0, 0, w, h, null, 0, w);
-            return ChartParser.parse(px, w, h, at(captured), DUBLIN);
+            int[] wh = new int[2];
+            int[] px = png(in, wh);
+            return ChartParser.parse(px, wh[0], wh[1], at(captured), DUBLIN);
         }
+    }
+
+    /** ARGB pixels of an 8-bit RGB / RGBA, non-interlaced PNG (unit tests have no ImageIO). */
+    private static int[] png(InputStream raw, int[] wh) throws Exception {
+        DataInputStream in = new DataInputStream(raw);
+        in.readLong();                                          // signature
+        ByteArrayOutputStream idat = new ByteArrayOutputStream();
+        int w = 0, h = 0, type = 0;
+        while (true) {
+            int len = in.readInt();
+            byte[] t = new byte[4];
+            in.readFully(t);
+            byte[] d = new byte[len];
+            in.readFully(d);
+            in.readInt();                                       // crc
+            String kind = new String(t, "US-ASCII");
+            if (kind.equals("IHDR")) {
+                w = ((d[0] & 0xff) << 24) | ((d[1] & 0xff) << 16) | ((d[2] & 0xff) << 8) | (d[3] & 0xff);
+                h = ((d[4] & 0xff) << 24) | ((d[5] & 0xff) << 16) | ((d[6] & 0xff) << 8) | (d[7] & 0xff);
+                type = d[9];
+                if (d[8] != 8 || (type != 2 && type != 6) || d[12] != 0) throw new IllegalArgumentException("unsupported PNG");
+            } else if (kind.equals("IDAT")) idat.write(d);
+            else if (kind.equals("IEND")) break;
+        }
+        int bpp = type == 6 ? 4 : 3, stride = w * bpp;
+        byte[] data = new byte[(stride + 1) * h];
+        Inflater inf = new Inflater();
+        inf.setInput(idat.toByteArray());
+        int got = 0;
+        while (got < data.length && !inf.finished()) got += inf.inflate(data, got, data.length - got);
+        inf.end();
+        byte[] prev = new byte[stride], cur = new byte[stride];
+        int[] px = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            int f = data[y * (stride + 1)];
+            System.arraycopy(data, y * (stride + 1) + 1, cur, 0, stride);
+            for (int i = 0; i < stride; i++) {
+                int a = i >= bpp ? cur[i - bpp] & 0xff : 0, b = prev[i] & 0xff, c = i >= bpp ? prev[i - bpp] & 0xff : 0;
+                int x = cur[i] & 0xff;
+                switch (f) {
+                    case 1: x += a; break;
+                    case 2: x += b; break;
+                    case 3: x += (a + b) / 2; break;
+                    case 4: {
+                        int p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+                        x += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+                        break;
+                    }
+                    default: break;
+                }
+                cur[i] = (byte) x;
+            }
+            for (int x = 0; x < w; x++) {
+                int o = x * bpp;
+                px[y * w + x] = 0xff000000 | (cur[o] & 0xff) << 16 | (cur[o + 1] & 0xff) << 8 | (cur[o + 2] & 0xff);
+            }
+            byte[] t = prev; prev = cur; cur = t;
+        }
+        wh[0] = w;
+        wh[1] = h;
+        return px;
     }
 
     /** Units delivered over [from, to) by the 5-min bins, asserting every bin is there. */
