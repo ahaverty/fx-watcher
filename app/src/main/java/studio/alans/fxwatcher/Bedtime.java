@@ -244,6 +244,9 @@ final class Bedtime {
             next = now + 12 * 3600_000L;
             int fb = fallback(p, ev.get(Calendar.DAY_OF_WEEK));
             if (IDLE.equals(st) && fb >= 0 && at(ev, fb) > now) next = Math.min(next, at(ev, fb));
+            // At "earliest", look again: sleep / DND mode may already be on by then.
+            int earliest = minutes(p.getString(Store.BED_EARLIEST, Store.DEF_BED_EARLIEST));
+            if (IDLE.equals(st) && earliest >= 0 && at(ev, earliest) > now) next = Math.min(next, at(ev, earliest));
             int morning = minutes(p.getString(Store.BED_MORNING, Store.DEF_BED_MORNING));
             if (APPLIED.equals(st) && morning >= 0 && at(ev, morning) > now) next = Math.min(next, at(ev, morning));
             Calendar tomorrow = (Calendar) ev.clone();
