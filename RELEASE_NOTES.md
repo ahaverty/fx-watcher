@@ -11,6 +11,8 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
+**New in v3.0.2:** fixes a bolus being sent to Nightscout twice when CamAPS's "Delivered" message was still on screen after reopening CamAPS. Only matters if you use the optional Nightscout and screen reader features.
+
 **New in v3.0:** optional extras, all off until you turn them on:
 - **Bedtime media volume.** CamAPS plays most alerts on the media volume, so they're silent if media is turned down. FX Watcher can raise it when you go to bed (after your phone's sleep mode or a set time, once the phone has been put down for 10 min with nothing playing) and put it back in the morning. Fully adjustable, including per day of the week.
 - **CamAPS screen reader (read-only).** Records Boost, Ease-off, meals, bolus deliveries and active insulin while you use CamAPS. It cannot tap or change anything.
