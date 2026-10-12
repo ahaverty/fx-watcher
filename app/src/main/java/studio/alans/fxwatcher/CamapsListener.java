@@ -126,29 +126,45 @@ public class CamapsListener extends NotificationListenerService {
         Store.log(this, "CamAPS: " + (title.isEmpty() ? "" : title + ": ") + text);
         if (!Nightscout.configured(this)) return;
         try {
-            java.util.regex.Matcher m = DELIVERED.matcher(text);
-            JSONObject tr;
-            if (m.find()) {
-                double units = Double.parseDouble(m.group(1).replace(',', '.'));
-                tr = Nightscout.treatment("Bolus", at, "camaps-notification");
-                tr.put("insulin", units);
-                JSONObject calc = new JSONObject(p.getString(Store.RD_CALC, "{}"));
-                if (calc.has("carbs") && calc.optDouble("carbs") > 0
-                        && at - calc.optLong("time") < 600_000L && at >= calc.optLong("time") - 60_000L) {
-                    tr.put("carbs", calc.optDouble("carbs"));
-                    if (calc.has("meal_size")) tr.put("meal_size", calc.optString("meal_size"));
-                    tr.put("calculator_units", calc.optDouble("units"));
-                    tr.put("source", "camaps-notification+screen");
-                    p.edit().remove(Store.RD_CALC).apply();
-                }
-            } else {
-                tr = Nightscout.treatment("CamAPS Info", at, "camaps-notification");
-            }
+            if (delivered(this, text, at, "camaps-notification")) return;
+            JSONObject tr = Nightscout.treatment("CamAPS Info", at, "camaps-notification");
             tr.put("notes", (title.isEmpty() || title.equalsIgnoreCase("Information") ? "" : title + ": ") + text);
             Nightscout.postTreatment(this, tr);
         } catch (Exception e) {
             Log.w(TAG, "info notification", e);
         }
+    }
+
+    /**
+     * "Delivered X U of insulin." -> one Nightscout Bolus. CamAPS shows it as a notification when
+     * it is in the background and as an in-app dialog when open (CamapsReader), maybe both: the
+     * same amount within 3 min counts once. Adds the bolus calculator's carbs if seen in the last
+     * 10 min. Returns false if the text is not a delivery.
+     */
+    static synchronized boolean delivered(Context c, String text, long at, String source) throws Exception {
+        java.util.regex.Matcher m = DELIVERED.matcher(text);
+        if (!m.find()) return false;
+        double units = Double.parseDouble(m.group(1).replace(',', '.'));
+        SharedPreferences p = Store.p(c);
+        String[] last = p.getString(Store.LAST_DELIVERED, "-1@0").split("@");
+        if (Double.parseDouble(last[0]) == units && Math.abs(at - Long.parseLong(last[1])) < 180_000L) return true;
+        p.edit().putString(Store.LAST_DELIVERED, units + "@" + at).apply();
+        Store.log(c, "Bolus delivered: " + units + " U (" + source + ")");
+        if (!Nightscout.configured(c)) return true;
+        JSONObject tr = Nightscout.treatment("Bolus", at, source);
+        tr.put("insulin", units);
+        JSONObject calc = new JSONObject(p.getString(Store.RD_CALC, "{}"));
+        if (calc.has("carbs") && calc.optDouble("carbs") > 0
+                && at - calc.optLong("time") < 600_000L && at >= calc.optLong("time") - 60_000L) {
+            tr.put("carbs", calc.optDouble("carbs"));
+            if (calc.has("meal_size")) tr.put("meal_size", calc.optString("meal_size"));
+            tr.put("calculator_units", calc.optDouble("units"));
+            tr.put("source", source + "+screen");
+            p.edit().remove(Store.RD_CALC).apply();
+        }
+        tr.put("notes", text);
+        Nightscout.postTreatment(c, tr);
+        return true;
     }
 
     @Override

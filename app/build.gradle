@@ -10,8 +10,8 @@ android {
         applicationId 'studio.alans.fxwatcher'
         minSdk 29
         targetSdk 34
-        versionCode 10
-        versionName '2.7.1'
+        versionCode 11
+        versionName '2.8'
     }
 
     // Release builds are signed in CI from repository secrets (FX_KEYSTORE / FX_KEYSTORE_PASSWORD).

@@ -105,7 +105,26 @@ public class CamapsReader extends AccessibilityService {
         long now = System.currentTimeMillis();
         boolean known = false;
 
-        // Active insulin (calculator info panel)
+        // "Delivered 0.1 U of insulin." as an in-app dialog (CamAPS open; a notification otherwise)
+        for (Item it : items) {
+            if (!it.text.startsWith("Delivered")) continue;
+            try {
+                if (CamapsListener.delivered(this, it.text, now, "camaps-screen")) known = true;
+            } catch (Exception ex) {
+                Log.w(TAG, "delivered", ex);
+            }
+        }
+
+        // Active insulin: side menu, as two items "Active insulin" | "0.9 U"
+        int ai = indexOf(items, "Active insulin");
+        if (ai >= 0 && ai + 1 < items.size()) {
+            Matcher m = Pattern.compile("^(\\d+(?:[.,]\\d+)?)\\s*U$").matcher(items.get(ai + 1).text);
+            if (m.find()) {
+                activeInsulin(num(m.group(1)), now, null);
+                known = true;
+            }
+        }
+        // Active insulin: the info panels, one text block each
         for (Item it : items) {
             Matcher m = IOB.matcher(it.text);
             if (m.find()) {
@@ -114,17 +133,37 @@ public class CamapsReader extends AccessibilityService {
             }
         }
 
-        // Boost / Ease-off picker: remember the duration on screen; a confirming click uses it.
-        for (int i = 0; i < items.size(); i++) {
-            String t = items.get(i).text;
-            if (t.endsWith(" duration") && (t.startsWith("Boost") || t.startsWith("Ease-off"))) {
-                int h = indexOf(items, "Hrs"), m = indexOf(items, "Mins");
-                if (h > 0 && m > 0 && NUM.matcher(items.get(h - 1).text).matches()
-                        && NUM.matcher(items.get(m - 1).text).matches()) {
-                    int minutes = (int) (num(items.get(h - 1).text) * 60 + num(items.get(m - 1).text));
-                    picker = new String[]{t.startsWith("Boost") ? "Boost" : "Ease-off", String.valueOf(minutes)};
-                }
+        // Boost / Ease-off setup, three dialogs (CamAPS 192, 12 Oct 2026):
+        //   "Boost duration"  hours "Hrs" : minutes "Mins"           -> Next
+        //   "Boost start"     "Now" | "Later", or "Now" + a time wheel (3 visible values per
+        //                     wheel, the middle one is selected: "18 19 20 : 17 32 47" = 19:32)
+        //                     -> Confirm
+        //   "Planned boost" / "Boost" with "Off" -> Confirm cancels a planned / running one
+        // The dialog on screen is remembered; the click handler acts on Confirm.
+        dialog = null;
+        if (!items.isEmpty()) {
+            String t = items.get(0).text;
+            String kind = t.startsWith("Boost") || t.startsWith("Planned boost") ? "Boost"
+                    : t.startsWith("Ease-off") || t.startsWith("Planned ease-off") ? "Ease-off" : null;
+            if (kind != null) {
                 known = true;
+                if (t.endsWith(" duration")) {
+                    int h = indexOf(items, "Hrs"), m = indexOf(items, "Mins");
+                    if (h > 0 && m > 0 && NUM.matcher(items.get(h - 1).text).matches()
+                            && NUM.matcher(items.get(m - 1).text).matches()) {
+                        setupKind = kind;
+                        setupMinutes = (int) (num(items.get(h - 1).text) * 60 + num(items.get(m - 1).text));
+                    }
+                    dialog = "duration";
+                } else if (t.endsWith(" start")) {
+                    setupKind = kind;
+                    setupAt = wheelTime(items, now);
+                    dialog = "start";
+                } else if (t.startsWith("Planned")) {
+                    dialog = "cancel-planned:" + kind;
+                } else if (indexOf(items, "Off") >= 0) {
+                    dialog = "stop:" + kind;
+                }
             }
         }
 
@@ -142,6 +181,12 @@ public class CamapsReader extends AccessibilityService {
                     if (it.selected && it.text.toLowerCase(Locale.UK).endsWith("meal size")) {
                         calc.put("meal_size", it.text.replace(" meal size", "").toLowerCase(Locale.UK));
                     }
+                }
+                String shown = calc.optDouble("carbs", 0) + " g, " + calc.optDouble("units") + " U"
+                        + (calc.has("meal_size") ? ", " + calc.optString("meal_size") + " meal" : "");
+                if (!shown.equals(lastCalc)) {
+                    lastCalc = shown;
+                    Store.log(this, "Bolus calculator: " + shown);
                 }
                 Store.p(this).edit().putString(Store.RD_CALC, calc.toString()).apply();
             } catch (Exception ignored) {
@@ -170,24 +215,76 @@ public class CamapsReader extends AccessibilityService {
         if (!known) unknownScreen(items);
     }
 
-    /** Latest Boost/Ease-off picker on screen: {kind, minutes}. */
-    private String[] picker;
+    private String lastCalc;
+
+    /** The Boost/Ease-off dialog on screen ("duration", "start", "cancel-planned:K", "stop:K"). */
+    private String dialog;
+    /** What the setup dialogs showed: kind, duration in minutes (-1 unknown), start (0 = now). */
+    private String setupKind;
+    private int setupMinutes = -1;
+    private long setupAt;
+
+    /** The time on the start dialog's wheels (middle value of each), as the next such time; 0 if none. */
+    private static long wheelTime(List<Item> items, long now) {
+        int colon = indexOf(items, ":");
+        if (colon < 0) return 0;
+        List<String> hh = new ArrayList<>(), mm = new ArrayList<>();
+        for (int i = colon - 1; i >= 0 && NUM.matcher(items.get(i).text).matches(); i--) hh.add(0, items.get(i).text);
+        for (int i = colon + 1; i < items.size() && NUM.matcher(items.get(i).text).matches(); i++) mm.add(items.get(i).text);
+        if (hh.isEmpty() || mm.isEmpty()) return 0;
+        int h = Integer.parseInt(hh.get(hh.size() == 3 ? 1 : 0)), m = Integer.parseInt(mm.get(mm.size() == 3 ? 1 : 0));
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTimeInMillis(now);
+        c.set(java.util.Calendar.HOUR_OF_DAY, h);
+        c.set(java.util.Calendar.MINUTE, m);
+        c.set(java.util.Calendar.SECOND, 0);
+        c.set(java.util.Calendar.MILLISECOND, 0);
+        if (c.getTimeInMillis() < now - 120_000L) c.add(java.util.Calendar.DAY_OF_MONTH, 1);
+        return c.getTimeInMillis();
+    }
 
     private void onClick(AccessibilityEvent e) {
         String label = e.getText() != null && !e.getText().isEmpty() ? String.valueOf(e.getText().get(0))
                 : e.getContentDescription() != null ? e.getContentDescription().toString() : "";
-        Log.i(TAG, "click: " + label);
-        if (picker != null && label.matches("(?i)next|start|ok|confirm|yes")) {
-            try {
-                JSONObject p = new JSONObject();
-                p.put("kind", picker[0]);
-                p.put("minutes", Integer.parseInt(picker[1]));
-                p.put("time", System.currentTimeMillis());
-                Store.p(this).edit().putString(Store.RD_PENDING, p.toString()).apply();
-                Log.i(TAG, "pending " + p);
-            } catch (Exception ignored) { }
+        Log.i(TAG, "click: " + label + " (dialog " + dialog + ")");
+        if (!label.equalsIgnoreCase("Confirm") || dialog == null) return;
+        long now = System.currentTimeMillis();
+        SharedPreferences p = Store.p(this);
+        try {
+            if (dialog.equals("start") && setupKind != null) {
+                JSONObject pend = new JSONObject();
+                pend.put("kind", setupKind);
+                pend.put("time", now);
+                pend.put("minutes", setupMinutes);
+                pend.put("planned", setupAt > now + 60_000L ? setupAt : 0);
+                p.edit().putString(Store.RD_PENDING, pend.toString()).apply();
+                Log.i(TAG, "confirmed " + pend);
+                if (setupAt > now + 60_000L && setupMinutes > 0) {
+                    // Planned for later: send it now, it may start with the phone in a pocket.
+                    JSONObject a = new JSONObject();
+                    a.put("kind", setupKind);
+                    a.put("start", setupAt);
+                    a.put("end", setupAt + setupMinutes * 60_000L);
+                    a.put("start_known", true);
+                    Store.log(this, setupKind + " planned " + Store.hm(setupAt) + "-" + Store.hm(setupAt + setupMinutes * 60_000L));
+                    send(a, "planned");
+                }
+            } else if (dialog.startsWith("cancel-planned:")) {
+                JSONObject pend = new JSONObject(p.getString(Store.RD_PENDING, "{}"));
+                if (pend.optLong("planned") > 0) {
+                    JSONObject a = new JSONObject();
+                    a.put("kind", pend.getString("kind"));
+                    a.put("start", pend.getLong("planned"));
+                    a.put("end", pend.getLong("planned"));
+                    a.put("start_known", true);
+                    Store.log(this, "Planned " + pend.getString("kind") + " at " + Store.hm(pend.getLong("planned")) + " cancelled");
+                    send(a, "cancelled");
+                }
+                p.edit().remove(Store.RD_PENDING).apply();
+            }
+        } catch (Exception ex) {
+            Log.w(TAG, "click", ex);
         }
-        if (label.matches("(?i)cancel")) picker = null;
     }
 
     // ── Boost / Ease-off ─────────────────────────────────────────────────────────
@@ -209,12 +306,14 @@ public class CamapsReader extends AccessibilityService {
             long start = now;
             boolean known = false;
             JSONObject pend = new JSONObject(p.getString(Store.RD_PENDING, "{}"));
-            if (pend.optString("kind").equals(kind) && now - pend.optLong("time") < 180_000L) {
-                start = pend.optLong("time");
+            long planned = pend.optLong("planned");
+            if (pend.optString("kind").equals(kind) && planned > 0 && planned <= now + 60_000L
+                    && now - planned < 12 * 3600_000L) {
+                start = planned;                    // a planned one that has now started
                 known = true;
-            } else if (remaining > 0 && pend.optString("kind").equals(kind)
-                    && Math.abs(pend.optInt("minutes") * 60_000L - remaining) < 120_000L) {
-                start = now;
+            } else if (pend.optString("kind").equals(kind) && planned == 0
+                    && now - pend.optLong("time") < 180_000L) {
+                start = pend.optLong("time");       // confirmed "Now" just before
                 known = true;
             }
             JSONObject n = new JSONObject();

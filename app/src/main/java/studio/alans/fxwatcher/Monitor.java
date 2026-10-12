@@ -83,7 +83,20 @@ final class Monitor {
             e.apply();
 
             if (!wasPresent) Store.log(c, "CamAPS notification present: " + joined);
-            else if (!status.equals(oldStatus)) Store.log(c, "Auto mode " + oldStatus + " -> " + status);
+            else if (!status.equals(oldStatus)) {
+                Store.log(c, "Auto mode " + oldStatus + " -> " + status);
+                if (!simulated && Nightscout.configured(c)) {
+                    try {
+                        org.json.JSONObject t = Nightscout.treatment("CamAPS Auto mode", now, "camaps-notification");
+                        t.put("status", status);
+                        t.put("previous", oldStatus);
+                        t.put("notes", "Auto mode " + oldStatus + " -> " + status);
+                        Nightscout.postTreatment(c, t);
+                    } catch (Exception ignored) {
+                        // logged locally above; Nightscout is best effort
+                    }
+                }
+            }
             if (!simulated && (!joined.equals(oldTexts) || !wasPresent)) {
                 Double g = mmol < 0 || glucose == null ? null : parse(glucose);
                 CamapsListener.forward(c, status, g, texts, pkg);
