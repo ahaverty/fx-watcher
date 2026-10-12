@@ -41,7 +41,7 @@ public class CamapsReader extends AccessibilityService {
     private static final String TAG = "FXReader";
     private static final Pattern COUNTDOWN = Pattern.compile("^(\\d{1,2}):(\\d{2}):(\\d{2})$");
     private static final Pattern NUM = Pattern.compile("^\\d+([.,]\\d+)?$");
-    private static final Pattern IOB = Pattern.compile("Active insulin\\s*\\n?\\s*(\\d+(?:[.,]\\d+)?)\\s*U");
+    private static final Pattern IOB = Pattern.compile("Active insulin:?\\s*(\\d+(?:[.,]\\d+)?)\\s*U");
     private static final Set<String> seenScreens = new HashSet<>();
 
     /** One visible node: its text or description, and whether it is selected. */
@@ -109,7 +109,7 @@ public class CamapsReader extends AccessibilityService {
         for (Item it : items) {
             Matcher m = IOB.matcher(it.text);
             if (m.find()) {
-                activeInsulin(num(m.group(1)), now);
+                activeInsulin(num(m.group(1)), now, it.text.contains("infusion rate") ? it.text : null);
                 known = true;
             }
         }
@@ -260,12 +260,47 @@ public class CamapsReader extends AccessibilityService {
 
     // ── Active insulin ───────────────────────────────────────────────────────────
 
-    private void activeInsulin(double iob, long now) {
-        SharedPreferences p = Store.p(this);
-        String[] last = p.getString(Store.RD_IOB, "-1@0").split("@");
-        if (Double.parseDouble(last[0]) == iob && now - Long.parseLong(last[1]) < 300_000L) return;
-        p.edit().putString(Store.RD_IOB, iob + "@" + now).apply();
+    /**
+     * Home screen info panel (the (i) on the glucose card), one text block, CamAPS 192:
+     * "Active insulin: 0.90 U  Insulin infusion rate: 0.00 U/h  Pump reservoir: 129 U
+     *  Pump battery: 100 %   Bolus: 1.30 U 55 min ago   Pump connect: 1 min ago
+     *  Sensor data: 2 min ago  Target glucose: 6.1 mmol/L  Insulin today: 34.8 U
+     *  Insulin yesterday: 48.5 U   Glucose today: 8.1 mmol/L  Glucose yesterday: 9.1 mmol/L"
+     * The bolus calculator's info panel only has "Active insulin \n1.2 U" (no colon).
+     */
+    private static final String[][] PANEL = {
+            {"infusion_rate_u_h", "Insulin infusion rate:\\s*(\\d+(?:[.,]\\d+)?)\\s*U/h"},
+            {"reservoir_u", "Pump reservoir:\\s*(\\d+(?:[.,]\\d+)?)\\s*U"},
+            {"battery_pct", "Pump battery:\\s*(\\d+)\\s*%"},
+            {"last_bolus_u", "Bolus:\\s*(\\d+(?:[.,]\\d+)?)\\s*U"},
+            {"last_bolus_min_ago", "Bolus:\\s*\\d+(?:[.,]\\d+)?\\s*U\\s*(\\d+)\\s*min ago"},
+            {"pump_connect_min_ago", "Pump connect:\\s*(\\d+)\\s*min ago"},
+            {"sensor_data_min_ago", "Sensor data:\\s*(\\d+)\\s*min ago"},
+            {"target_mmol", "Target glucose:\\s*(\\d+(?:[.,]\\d+)?)"},
+            {"insulin_today_u", "Insulin today:\\s*(\\d+(?:[.,]\\d+)?)\\s*U"},
+            {"insulin_yesterday_u", "Insulin yesterday:\\s*(\\d+(?:[.,]\\d+)?)\\s*U"},
+            {"glucose_today_mmol", "Glucose today:\\s*(\\d+(?:[.,]\\d+)?)"},
+            {"glucose_yesterday_mmol", "Glucose yesterday:\\s*(\\d+(?:[.,]\\d+)?)"},
+    };
+
+    private void activeInsulin(double iob, long now, String text) {
         try {
+            JSONObject camaps = new JSONObject();
+            if (text != null) {
+                for (String[] f : PANEL) {
+                    Matcher m = Pattern.compile(f[1]).matcher(text);
+                    if (m.find()) camaps.put(f[0], num(m.group(1)));
+                }
+            }
+            // Same values within 5 min: already sent.
+            String key = iob + "|" + camaps;
+            SharedPreferences p = Store.p(this);
+            String last = p.getString(Store.RD_IOB, "");
+            int at = last.lastIndexOf('@');
+            if (at > 0 && last.substring(0, at).equals(key)
+                    && now - Long.parseLong(last.substring(at + 1)) < 300_000L) return;
+            p.edit().putString(Store.RD_IOB, key + "@" + now).apply();
+
             JSONObject d = new JSONObject();
             d.put("device", "fx-watcher");
             d.put("created_at", Nightscout.iso(now));
@@ -273,10 +308,18 @@ public class CamapsReader extends AccessibilityService {
             io.put("iob", iob);
             io.put("timestamp", Nightscout.iso(now));
             pump.put("iob", io);
+            if (camaps.has("reservoir_u")) pump.put("reservoir", camaps.get("reservoir_u"));
+            if (camaps.has("battery_pct")) {
+                JSONObject b = new JSONObject();
+                b.put("percent", camaps.get("battery_pct"));
+                pump.put("battery", b);
+            }
             d.put("pump", pump);
-            d.put("source", "camaps-screen");
+            if (camaps.length() > 0) d.put("camaps", camaps);
+            d.put("source", text != null && camaps.length() > 0 ? "camaps-screen:status" : "camaps-screen:calculator");
             Nightscout.postDeviceStatus(this, d);
-            Store.log(this, "Active insulin " + iob + " U");
+            Store.log(this, "Active insulin " + iob + " U"
+                    + (camaps.has("infusion_rate_u_h") ? ", rate " + camaps.get("infusion_rate_u_h") + " U/h" : ""));
         } catch (Exception ex) {
             Log.w(TAG, "iob", ex);
         }
