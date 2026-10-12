@@ -134,6 +134,9 @@ Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS s
   skipped, never guessed. Zoom so about 9 hours or less fill the screen: further out the line
   is too crowded to read reliably, and it is skipped. One look backfills the whole view, so
   scrolling back over a day fills that day in.
+- **Slowly absorbed meals from the chart.** A slow meal's carb box on the chart stretches to
+  when CamAPS expects it absorbed. It reads when you entered it, the slow amount and that end
+  time (matched Glooko's slow-meal portions to the minute in tests).
 - Nothing it reads leaves the phone unless you set up Nightscout. It does not keep or send your
   account details or other CamAPS screens.
 - Turning it off in Accessibility settings stops it at once.
@@ -151,6 +154,7 @@ within a minute, long before the same data reaches Glooko or other clouds:
 | `CamAPS Auto mode` treatment (On, Off, Attempting...) | notification |
 | device status with active insulin (`pump.iob`), reservoir, battery | screen reader |
 | `Temp Basal` treatment per 5 min (`absolute` U/h, `duration` 5, `source: camaps-chart`) | the landscape chart (screen reader) |
+| `CamAPS Slow meal` treatment (`slow_carbs_g`, `duration` until absorbed, `absorbed_by`) | the landscape chart (screen reader); no `carbs` field, so it never counts the carbs twice |
 
 Set **Nightscout address** and **access token** under Settings. Make a Nightscout subject whose
 role can only `api:treatments:create`, `api:treatments:read`, `api:devicestatus:create` and

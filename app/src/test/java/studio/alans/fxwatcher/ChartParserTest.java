@@ -220,6 +220,49 @@ public class ChartParserTest {
         }
     }
 
+    /**
+     * Slowly absorbed meals: the stretched carb box. Glooko logs the slow part as equal portions
+     * every 30 min; absorption ends 30 min after the last one.
+     */
+    @Test
+    public void slowMeals() throws Exception {
+        // 11 Oct: 24 g slow (6 x 4 g, 12:18 ... 14:48)
+        List<ChartParser.SlowMeal> m = parse(7, "2026-10-13 00:05:57").slowMeals;
+        assertEquals(1, m.size());
+        assertEquals(24, m.get(0).grams);
+        assertEquals(at("2026-10-11 12:18"), m.get(0).start, 2 * 60_000L);
+        assertEquals(at("2026-10-11 15:18"), m.get(0).end, 2 * 60_000L);
+        // 12 Oct: "1 g" slow (6 x 0.2 g, 19:37 ... 22:07; entered with the 19:35 bolus), a normal
+        // 35 g box drawn over it at 20:55
+        m = parse(5, "2026-10-13 00:00:54").slowMeals;
+        assertEquals(1, m.size());
+        assertEquals(1, m.get(0).grams);
+        assertEquals(at("2026-10-12 19:36"), m.get(0).start, 3 * 60_000L);
+        assertEquals(at("2026-10-12 22:37"), m.get(0).end, 2 * 60_000L);
+        // normal meals only, or the slow box's start cut off by the left edge: nothing
+        assertEquals(0, parse(6, "2026-10-13 00:04:24").slowMeals.size());
+        assertEquals(0, parse(1, "2026-10-12 23:56:24").slowMeals.size());
+        assertEquals(0, parse(2, "2026-10-12 23:57:58").slowMeals.size());
+    }
+
+    @Test
+    public void mealLedgerSendsOnceUnderTheFirstTime() {
+        long t = at("2026-10-11 12:18");
+        ChartBasal.MealLedger l = new ChartBasal.MealLedger();
+        List<long[]> a = l.take(Arrays.asList(new ChartParser.SlowMeal(t, t + 180 * 60_000L, 24)), 6.2, t);
+        assertEquals(1, a.size());
+        // read again at another zoom: tick 1 min off, same end -> nothing
+        assertEquals(0, l.take(Arrays.asList(new ChartParser.SlowMeal(t + 60_000L, t + 181 * 60_000L, 24)), 17.1, t).size());
+        // end moved, coarser zoom -> nothing; finer -> resent under the first time
+        assertEquals(0, l.take(Arrays.asList(new ChartParser.SlowMeal(t, t + 200 * 60_000L, 24)), 2.0, t).size());
+        List<long[]> b = l.take(Arrays.asList(new ChartParser.SlowMeal(t + 60_000L, t + 200 * 60_000L, 24)), 17.1, t);
+        assertEquals(1, b.size());
+        assertEquals(t, b.get(0)[0]);
+        assertEquals(l.save(), ChartBasal.MealLedger.load(l.save()).save());
+        // a different meal
+        assertEquals(1, l.take(Arrays.asList(new ChartParser.SlowMeal(t + 60_000L, t + 120 * 60_000L, 10)), 6.2, t).size());
+    }
+
     @Test
     public void ledgerSendsOnlyNewOrFiner() {
         ChartBasal.Ledger l = new ChartBasal.Ledger();
