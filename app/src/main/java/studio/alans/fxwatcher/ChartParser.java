@@ -381,8 +381,8 @@ final class ChartParser {
         res.pxPerMin = 1 / b;
         res.left = ms.applyAsLong(lx);
         res.right = Math.min(ms.applyAsLong(rx), cutoff);
-        for (double[] m : slowMeals(I, lx, rx, top, res.pxPerMin)) {
-            res.slowMeals.add(new SlowMeal(ms.applyAsLong(m[0]), ms.applyAsLong(m[1]), (int) m[2]));
+        for (double[] sm : slowMeals(I, lx, rx, top, res.pxPerMin)) {
+            res.slowMeals.add(new SlowMeal(ms.applyAsLong(sm[0]), ms.applyAsLong(sm[1]), (int) sm[2]));
         }
         for (double[] st : trace(I, lx, rx, top, bot, res.pxPerMin)) {
             double v = Math.max(0.0, vb + (yb - st[2]) * upp);
