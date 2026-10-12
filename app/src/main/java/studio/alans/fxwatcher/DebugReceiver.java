@@ -20,6 +20,7 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ei pump_min 25   (pump link warning, minutes)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es ns_url https://... --es ns_token ...   (Nightscout)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd ns_flush   (send queued events now)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ez reader_dump true|false   (full CamAPS screen text to logcat)
  */
 public class DebugReceiver extends BroadcastReceiver {
     @Override
@@ -37,6 +38,11 @@ public class DebugReceiver extends BroadcastReceiver {
             e.apply();
             Store.log(c, "Nightscout set over adb (" + Store.p(c).getString(Store.NS_URL, "") + ")");
             Nightscout.flush(c);
+        }
+        if (i.hasExtra("reader_dump")) {
+            boolean on = i.getBooleanExtra("reader_dump", false);
+            Store.p(c).edit().putBoolean(Store.RD_DUMP, on).apply();
+            Store.log(c, "CamAPS screen text dumps " + (on ? "ON (logcat; turn off after)" : "off"));
         }
         int pumpMin = i.getIntExtra("pump_min", 0);
         if (pumpMin > 0) {

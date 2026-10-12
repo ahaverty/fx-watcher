@@ -165,6 +165,19 @@ public class CamapsReader extends AccessibilityService {
                     dialog = "stop:" + kind;
                 }
             }
+
+            // Add meal (side menu), CamAPS 192: "Add meal" screen with the amount before "g CHO"
+            // and three types, the one tapped last is used (none shows as selected) -> Next ->
+            // "Meal" dialog: amount, "g CHO", Cancel, Confirm.
+            int gcho = indexOf(items, "g CHO");
+            if (indexOf(items, "Add meal") >= 0 && indexOf(items, "Meal or snack") >= 0) {
+                known = true;
+                if (gcho > 0 && NUM.matcher(items.get(gcho - 1).text).matches()) mealAmount = num(items.get(gcho - 1).text);
+            } else if (t.equals("Meal") && gcho > 0 && indexOf(items, "Confirm") >= 0) {
+                known = true;
+                if (NUM.matcher(items.get(gcho - 1).text).matches()) mealAmount = num(items.get(gcho - 1).text);
+                dialog = "meal";
+            }
         }
 
         // Bolus calculator
@@ -216,6 +229,9 @@ public class CamapsReader extends AccessibilityService {
     }
 
     private String lastCalc;
+    /** Add meal: amount on screen and the type tapped last. */
+    private double mealAmount = -1;
+    private String mealType = "meal";
 
     /** The Boost/Ease-off dialog on screen ("duration", "start", "cancel-planned:K", "stop:K"). */
     private String dialog;
@@ -247,10 +263,25 @@ public class CamapsReader extends AccessibilityService {
         String label = e.getText() != null && !e.getText().isEmpty() ? String.valueOf(e.getText().get(0))
                 : e.getContentDescription() != null ? e.getContentDescription().toString() : "";
         Log.i(TAG, "click: " + label + " (dialog " + dialog + ")");
+        if (label.equals("Add meal")) { mealType = "meal"; mealAmount = -1; }
+        else if (label.equals("Meal or snack")) mealType = "meal";
+        else if (label.equals("Hypoglycaemia treatment")) mealType = "hypo";
+        else if (label.equals("Slowly absorbed meal")) mealType = "slow";
         if (!label.equalsIgnoreCase("Confirm") || dialog == null) return;
         long now = System.currentTimeMillis();
         SharedPreferences p = Store.p(this);
         try {
+            if (dialog.equals("meal") && mealAmount > 0) {
+                JSONObject t = Nightscout.treatment("Carbs", now, "camaps-screen");
+                t.put("carbs", mealAmount);
+                t.put("meal_type", mealType);    // meal | hypo | slow (slowly absorbed)
+                t.put("notes", "Add meal: " + mealAmount + " g, " + ("hypo".equals(mealType)
+                        ? "hypo treatment" : "slow".equals(mealType) ? "slowly absorbed meal" : "meal or snack"));
+                Store.log(this, t.getString("notes"));
+                Nightscout.postTreatment(this, t);
+                mealAmount = -1;
+                return;
+            }
             if (dialog.equals("start") && setupKind != null) {
                 JSONObject pend = new JSONObject();
                 pend.put("kind", setupKind);
@@ -426,15 +457,26 @@ public class CamapsReader extends AccessibilityService {
 
     // ── Discovery ────────────────────────────────────────────────────────────────
 
+    /**
+     * A screen no rule knows. Logs only its title (first two labels): CamAPS screens also show
+     * the account email, PE number, Dexcom username, pairing code and serials. The full text goes
+     * to logcat only while debug dumps are on (adb: DebugReceiver --ez reader_dump true), for
+     * writing new rules, and should be switched off after.
+     */
     private void unknownScreen(List<Item> items) {
         StringBuilder sig = new StringBuilder();
-        for (int i = 0; i < items.size() && i < 8; i++) {
-            if (NUM.matcher(items.get(i).text).matches()) continue;
-            sig.append(items.get(i).text.length() > 30 ? items.get(i).text.substring(0, 30) : items.get(i).text).append(" | ");
+        int n = 0;
+        for (int i = 0; i < items.size() && n < 2; i++) {
+            String t = items.get(i).text;
+            if (NUM.matcher(t).matches() || t.equals("Acknowledge and dismiss")) continue;
+            sig.append(t.length() > 30 ? t.substring(0, 30) : t).append(" | ");
+            n++;
         }
-        StringBuilder all = new StringBuilder();
-        for (Item it : items) all.append(it.text.replace('\n', ' ')).append(it.selected ? "[sel]" : "").append(" | ");
-        Log.i(TAG, "screen: " + all);
-        if (seenScreens.add(sig.toString())) Store.log(this, "New CamAPS screen: " + sig);
+        if (Store.p(this).getBoolean(Store.RD_DUMP, false)) {
+            StringBuilder all = new StringBuilder();
+            for (Item it : items) all.append(it.text.replace('\n', ' ')).append(it.selected ? "[sel]" : "").append(" | ");
+            Log.i(TAG, "screen: " + all);
+        }
+        if (seenScreens.add(sig.toString())) Log.i(TAG, "new screen: " + sig);
     }
 }

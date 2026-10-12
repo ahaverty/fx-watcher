@@ -86,7 +86,8 @@ final class Store {
     static final String RD_ACTIVE = "rd_active";        // Boost/Ease-off running, as JSON (CamapsReader)
     static final String RD_PENDING = "rd_pending";      // Boost/Ease-off duration just confirmed, as JSON
     static final String RD_CALC = "rd_calc";            // last bolus calculator values seen, as JSON
-    static final String RD_IOB = "rd_iob";              // last active insulin sent, as "value@time"
+    static final String RD_DUMP = "rd_dump";            // log full text of unknown CamAPS screens (debug, adb only)
+    static final String RD_IOB = "rd_iob";             // last active insulin sent, as "value@time"
 
     static SharedPreferences p(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
