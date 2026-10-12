@@ -4,10 +4,22 @@ An extra, phone-local alarm for people who use **CamAPS FX** on Android: it wake
 CamAPS loses signal, drops out of auto mode, or stops running, as long as the phone has power.
 No server, no account, no internet needed.
 
+## ⬇️ Download
+
+**[Download the latest FX Watcher (fx-watcher.apk)](https://github.com/ahaverty/fx-watcher/releases/latest/download/fx-watcher.apk)**
+· [What's new in each version](https://github.com/ahaverty/fx-watcher/releases)
+
+![Latest version](https://img.shields.io/github/v/release/ahaverty/fx-watcher?label=latest%20version)
+
+Open that link on your Android phone, then follow **[Install](#install)** and
+**[Keep it running](#keep-it-running)** below. To update later, download and open it again:
+your settings are kept. The app's version is shown in Android's Settings > Apps > FX Watcher.
+
 > **Unofficial and not a medical device.** FX Watcher is not made by or affiliated with CamDiab
 > or Ypsomed. It can fail (phone off, battery dead, a CamAPS update changing its notification).
-> Keep CamAPS FX's own alerts on. FX Watcher only *reads* CamAPS's notification and may reopen the
-> app; it never changes CamAPS settings or insulin delivery.
+> Keep CamAPS FX's own alerts on. FX Watcher only *reads* CamAPS (its notification, and its
+> screen if you turn on the optional screen reader) and may reopen the app; it never taps
+> anything in CamAPS, never changes CamAPS settings and never touches insulin delivery.
 
 ## What it alarms on
 
@@ -32,8 +44,8 @@ All times and thresholds can be changed in the app.
 
 ## Install
 
-1. Download `fx-watcher.apk` from the [latest release](../../releases/latest) on your phone and open it
-   (allow installing from your browser when asked).
+1. [Download fx-watcher.apk](https://github.com/ahaverty/fx-watcher/releases/latest/download/fx-watcher.apk)
+   on your phone and open it (allow installing from your browser when asked).
 2. Open FX Watcher, accept the notice, and tap **Fix** on each line under **Setup**:
    notification access, notifications, full-screen alarms, display over other apps,
    battery unrestricted, and Bluetooth (for the pump link).
@@ -76,6 +88,65 @@ same for both apps.
 **Check it works:** tap **Test alarm in 20 s**, lock the phone and put it down. Repeat after a
 night where the phone sat locked for hours. If the status notification "FX Watcher is watching"
 ever disappears, open the app and go through the Setup list again.
+
+## Optional extras
+
+All of these are **off until you turn them on** in the app. Without them FX Watcher is just the
+alarm described above.
+
+### Bedtime media volume
+
+CamAPS FX plays most of its alerts (everything except Urgent Low) on the **media** volume. If
+you turn media down in the evening, those alerts are silent all night. With this on, FX Watcher
+raises media volume when you go to bed and puts it back in the morning.
+
+- **When it starts:** whichever comes first: your phone's Sleep / Bedtime / Do not disturb mode
+  turning on (counted from 21:00), Google's sleep detection (optional), or a set time (midnight).
+- **It waits until you've put the phone down:** screen off for 10 minutes and nothing playing,
+  so it never blasts a video or podcast you're listening to in bed. A quiet notification says
+  it's waiting, with **Not tonight** and **Set it now** buttons.
+- **It only ever raises the volume**, never lowers it.
+- **In the morning**, the first time you unlock after 07:00, it puts the volume back where it
+  was (unless you changed it during the night).
+
+Everything is adjustable under **Settings > Bedtime media volume**: the level, which signals
+start it, the times, the idle minutes, the morning restore, and (Advanced) a different start
+time for each day of the week, or "off" for nights you don't want it.
+Google sleep detection asks for the *Physical activity* permission, only if you turn it on.
+
+### CamAPS screen reader (read-only)
+
+CamAPS's notification doesn't show Boost, Ease-off, meals or active insulin. The screen reader
+reads them from the CamAPS screen **while you use CamAPS**, to send them to Nightscout (below).
+Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS screen reader**
+(the app's Setup list links there).
+
+- It only listens to CamAPS FX and only **reads**: it can't tap, type or change anything, and
+  every build is checked automatically for code that could.
+- It records: Boost and Ease-off (start, length, planned, cancelled), Add meal entries (meal,
+  hypo treatment, slowly absorbed), carbs from the bolus calculator, bolus deliveries, and
+  active insulin, infusion rate, reservoir and pump battery from CamAPS's info panels.
+- Nothing it reads leaves the phone unless you set up Nightscout. It does not keep or send your
+  account details or other CamAPS screens.
+- Turning it off in Accessibility settings stops it at once.
+
+### Nightscout
+
+If you use [Nightscout](https://nightscout.github.io/), FX Watcher can send what it sees to it
+within a minute, long before the same data reaches Glooko or other clouds:
+
+| Sent as | From |
+|---|---|
+| `Bolus` treatment (insulin, plus carbs if the bolus calculator was used) | CamAPS's "Delivered X U" message |
+| `Carbs` treatment with `meal_type` meal / hypo / slow | Add meal (screen reader) |
+| `CamAPS Boost` / `CamAPS Ease-off` treatment with `duration` | screen reader |
+| `CamAPS Auto mode` treatment (On, Off, Attempting...) | notification |
+| device status with active insulin (`pump.iob`), reservoir, battery | screen reader |
+
+Set **Nightscout address** and **access token** under Settings. Make a Nightscout subject whose
+role can only `api:treatments:create`, `api:treatments:read`, `api:devicestatus:create` and
+`api:devicestatus:read`, and use its token. Events wait on the phone and are retried if
+Nightscout can't be reached. Every event has `enteredBy: fx-watcher`.
 
 ## Home Assistant (optional, advanced)
 
