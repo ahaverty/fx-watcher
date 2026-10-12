@@ -63,6 +63,20 @@
             </intent-filter>
         </service>
 
+        <!-- Optional, off until enabled in Accessibility settings. Reads the CamAPS screen only. -->
+        <service
+            android:name=".CamapsReader"
+            android:exported="false"
+            android:label="@string/reader_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/camaps_reader" />
+        </service>
+
         <!-- Notification buttons, Android Auto replies and the watchdog timer. -->
         <receiver
             android:name=".ActionReceiver"

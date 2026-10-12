@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CamapsReader: READ-ONLY. Only CamAPS FX's packages, only window/content/click events, window
+  content readable, and nothing else: no gesture or key-filter capability,
+  no touch exploration, no magnification, no fingerprint gestures.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/reader_description"
+    android:packageNames="com.camdiab.fx_alert.mmoll,com.camdiab.fx_alert.mgdl,com.camdiab.fx_alert.hx.mmoll,com.camdiab.fx_alert.hx.mgdl"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="false"
+    android:notificationTimeout="500" />

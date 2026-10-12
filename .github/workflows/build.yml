@@ -21,6 +21,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: CamAPS stays read-only
+        # FX Watcher must never act on CamAPS (it runs an insulin pump): no accessibility
+        # actions, gestures or text input anywhere in the app.
+        run: |
+          if grep -rnE "performAction|dispatchGesture|performGlobalAction|ACTION_SET_TEXT|ACTION_CLICK|canPerformGestures=\"true\"|flagRequestFilterKeyEvents|flagRequestTouchExploration" app/src/main; then
+            echo "::error::An acting accessibility API appeared in the source. FX Watcher must stay read-only."
+            exit 1
+          fi
       - name: Signing key
         env:
           KEYSTORE_B64: ${{ secrets.FX_KEYSTORE_B64 }}

@@ -18,6 +18,8 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd test|check|silence|snooze|unsnooze
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es url https://...   (webhook)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ei pump_min 25   (pump link warning, minutes)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es ns_url https://... --es ns_token ...   (Nightscout)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd ns_flush   (send queued events now)
  */
 public class DebugReceiver extends BroadcastReceiver {
     @Override
@@ -26,6 +28,15 @@ public class DebugReceiver extends BroadcastReceiver {
         if (url != null) {
             Store.p(c).edit().putString(Store.URL, url.trim()).apply();
             Store.log(c, "Webhook URL set over adb");
+        }
+        String nsUrl = i.getStringExtra("ns_url"), nsToken = i.getStringExtra("ns_token");
+        if (nsUrl != null || nsToken != null) {
+            android.content.SharedPreferences.Editor e = Store.p(c).edit().remove(Store.NS_JWT);
+            if (nsUrl != null) e.putString(Store.NS_URL, nsUrl.trim());
+            if (nsToken != null) e.putString(Store.NS_TOKEN, nsToken.trim());
+            e.apply();
+            Store.log(c, "Nightscout set over adb (" + Store.p(c).getString(Store.NS_URL, "") + ")");
+            Nightscout.flush(c);
         }
         int pumpMin = i.getIntExtra("pump_min", 0);
         if (pumpMin > 0) {
@@ -40,7 +51,9 @@ public class DebugReceiver extends BroadcastReceiver {
                 case "check": Monitor.check(c); break;
                 case "silence": Monitor.silence(c); break;
                 case "snooze": Monitor.snooze(c, i.getDoubleExtra("hours", 2)); break;
-                case "unsnooze": Monitor.unsnooze(c); break;                default: break;
+                case "unsnooze": Monitor.unsnooze(c); break;
+                case "ns_flush": Nightscout.flush(c); break;
+                default: break;
             }
             return;
         }

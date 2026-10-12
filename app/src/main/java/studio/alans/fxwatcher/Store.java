@@ -32,6 +32,8 @@ final class Store {
     static final String BATT_ALARM = "batt_alarm";      // at night, alarm below this % when not charging
     static final String NIGHT_FROM = "night_from";      // hour
     static final String NIGHT_TO = "night_to";          // hour
+    static final String NS_URL = "ns_url";              // optional Nightscout to send CamAPS events to
+    static final String NS_TOKEN = "ns_token";          // its access token (subject with treatments create/read)
 
     static final int DEF_SIGNAL_MIN = 20;
     static final String DEF_PUMP_NAME = "YpsoPump";
@@ -76,6 +78,14 @@ final class Store {
     static final String REPORTED = "reported";          // what it said, to report changes at once
     static final String LOG = "log";
     static final String ACCEPTED = "accepted";          // first-run disclaimer accepted
+    static final String NS_JWT = "ns_jwt";              // Nightscout bearer token from the access token
+    static final String NS_JWT_EXP = "ns_jwt_exp";
+    static final String NS_LAST_SENT = "ns_last_sent";
+    static final String LAST_INFO = "last_info";        // last CamAPS info notification handled (dedupe)
+    static final String RD_ACTIVE = "rd_active";        // Boost/Ease-off running, as JSON (CamapsReader)
+    static final String RD_PENDING = "rd_pending";      // Boost/Ease-off duration just confirmed, as JSON
+    static final String RD_CALC = "rd_calc";            // last bolus calculator values seen, as JSON
+    static final String RD_IOB = "rd_iob";              // last active insulin sent, as "value@time"
 
     static SharedPreferences p(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);

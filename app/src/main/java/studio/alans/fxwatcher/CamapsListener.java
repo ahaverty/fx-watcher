@@ -98,6 +98,57 @@ public class CamapsListener extends NotificationListenerService {
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (isCamaps(sbn) && !handle(sbn, false)) logIgnored(sbn);
+        else if (sbn != null && sbn.getPackageName() != null
+                && sbn.getPackageName().startsWith("com.camdiab.") && !sbn.isOngoing()) info(sbn);
+    }
+
+    private static final java.util.regex.Pattern DELIVERED =
+            java.util.regex.Pattern.compile("Delivered\\s+(\\d+(?:[.,]\\d+)?)\\s*U", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * CamAPS's one-off "Information" notifications, e.g. "Delivered 1.3 U of insulin." (posted
+     * when the pump has delivered a bolus). A delivered bolus goes to Nightscout as a Bolus,
+     * with the carbs from the bolus calculator if CamapsReader saw it in the last 10 min;
+     * anything else as "CamAPS Info" so new kinds of message show up. Read only.
+     */
+    private void info(StatusBarNotification sbn) {
+        Notification n = sbn.getNotification();
+        CharSequence t = n.extras.getCharSequence(Notification.EXTRA_TITLE);
+        CharSequence x = n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT);
+        if (x == null) x = n.extras.getCharSequence(Notification.EXTRA_TEXT);
+        String title = t == null ? "" : t.toString().trim(), text = x == null ? "" : x.toString().trim();
+        if (title.isEmpty() && text.isEmpty()) return;
+        long at = sbn.getPostTime();
+        SharedPreferences p = Store.p(this);
+        String key = at + "|" + text;
+        if (key.equals(p.getString(Store.LAST_INFO, ""))) return;   // the same post seen twice
+        p.edit().putString(Store.LAST_INFO, key).apply();
+        Store.log(this, "CamAPS: " + (title.isEmpty() ? "" : title + ": ") + text);
+        if (!Nightscout.configured(this)) return;
+        try {
+            java.util.regex.Matcher m = DELIVERED.matcher(text);
+            JSONObject tr;
+            if (m.find()) {
+                double units = Double.parseDouble(m.group(1).replace(',', '.'));
+                tr = Nightscout.treatment("Bolus", at, "camaps-notification");
+                tr.put("insulin", units);
+                JSONObject calc = new JSONObject(p.getString(Store.RD_CALC, "{}"));
+                if (calc.has("carbs") && calc.optDouble("carbs") > 0
+                        && at - calc.optLong("time") < 600_000L && at >= calc.optLong("time") - 60_000L) {
+                    tr.put("carbs", calc.optDouble("carbs"));
+                    if (calc.has("meal_size")) tr.put("meal_size", calc.optString("meal_size"));
+                    tr.put("calculator_units", calc.optDouble("units"));
+                    tr.put("source", "camaps-notification+screen");
+                    p.edit().remove(Store.RD_CALC).apply();
+                }
+            } else {
+                tr = Nightscout.treatment("CamAPS Info", at, "camaps-notification");
+            }
+            tr.put("notes", (title.isEmpty() || title.equalsIgnoreCase("Information") ? "" : title + ": ") + text);
+            Nightscout.postTreatment(this, tr);
+        } catch (Exception e) {
+            Log.w(TAG, "info notification", e);
+        }
     }
 
     @Override

@@ -100,6 +100,7 @@ final class Monitor {
                 }
             }
         }
+        if (!simulated) Nightscout.flush(c);   // retry queued CamAPS events every ~5 min
         evaluate(c);
     }
 
