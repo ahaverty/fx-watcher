@@ -126,6 +126,14 @@ Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS s
 - It records: Boost and Ease-off (start, length, planned, cancelled), Add meal entries (meal,
   hypo treatment, slowly absorbed), carbs from the bolus calculator, bolus deliveries, and
   active insulin, infusion rate, reservoir and pump battery from CamAPS's info panels.
+- **Basal from the chart.** When you turn the phone sideways to CamAPS's chart, it reads the
+  blue "insulin infusion" line: every auto-mode rate step on screen, with its time. It takes a
+  screenshot of the chart (Android 11+) once you stop scrolling, reads it in memory and drops
+  it: nothing is saved to your gallery or storage. Everything it reads is checked (the time and
+  rate labels, the date, the "now" line against the clock) and a view it can't verify is
+  skipped, never guessed. Zoom so about 9 hours or less fill the screen: further out the line
+  is too crowded to read reliably, and it is skipped. One look backfills the whole view, so
+  scrolling back over a day fills that day in.
 - Nothing it reads leaves the phone unless you set up Nightscout. It does not keep or send your
   account details or other CamAPS screens.
 - Turning it off in Accessibility settings stops it at once.
@@ -142,6 +150,7 @@ within a minute, long before the same data reaches Glooko or other clouds:
 | `CamAPS Boost` / `CamAPS Ease-off` treatment with `duration` | screen reader |
 | `CamAPS Auto mode` treatment (On, Off, Attempting...) | notification |
 | device status with active insulin (`pump.iob`), reservoir, battery | screen reader |
+| `Temp Basal` treatment per 5 min (`absolute` U/h, `duration` 5, `source: camaps-chart`) | the landscape chart (screen reader) |
 
 Set **Nightscout address** and **access token** under Settings. Make a Nightscout subject whose
 role can only `api:treatments:create`, `api:treatments:read`, `api:devicestatus:create` and

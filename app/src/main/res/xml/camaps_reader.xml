@@ -3,6 +3,8 @@
   CamapsReader: READ-ONLY. Only CamAPS FX's packages, only window/content/click events, window
   content readable, and nothing else: no gesture or key-filter capability,
   no touch exploration, no magnification, no fingerprint gestures.
+  canTakeScreenshot: only while CamAPS's landscape chart is on screen, to read the basal line
+  (ChartParser). The image stays in memory and is dropped after parsing; nothing is saved.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/reader_description"
@@ -12,4 +14,5 @@
     android:accessibilityFlags="flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="false"
+    android:canTakeScreenshot="true"
     android:notificationTimeout="500" />
