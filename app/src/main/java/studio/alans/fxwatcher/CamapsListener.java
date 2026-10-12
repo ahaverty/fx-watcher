@@ -133,7 +133,9 @@ public class CamapsListener extends NotificationListenerService {
         if (x == null) x = n.extras.getCharSequence(Notification.EXTRA_TEXT);
         String title = t == null ? "" : t.toString().trim(), text = x == null ? "" : x.toString().trim();
         if (title.isEmpty() && text.isEmpty()) return;
-        long at = sbn.getPostTime();
+        // CamAPS's own time for the message: unlike the post time, it stays the same if CamAPS
+        // updates or re-posts the notification, so a re-post is not taken as a second bolus.
+        long at = n.when > 0 ? n.when : sbn.getPostTime();
         SharedPreferences p = Store.p(this);
         String key = at + "|" + text;
         if (key.equals(p.getString(Store.LAST_INFO, ""))) return;   // the same post seen twice

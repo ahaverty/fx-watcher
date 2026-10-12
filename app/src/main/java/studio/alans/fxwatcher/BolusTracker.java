@@ -81,7 +81,10 @@ final class BolusTracker {
         String before = popup;
         popup = found;
         if (found.isEmpty() || found.equals(before)) return Result.NOTHING;   // none, or stale
-        return decide(units(found), now, carbs, SCREEN, found);
+        // The bolus happened when its countdown ended, not when the popup is read: leave CamAPS
+        // during the countdown, come back 20 min later, and the popup is read 20 min late.
+        long at = deliveringAt > lastAt && deliveringAt > 0 && deliveringAt <= now ? deliveringAt : now;
+        return decide(units(found), at, carbs, SCREEN, found);
     }
 
     /** CamAPS's "Delivered" notification, at its post time. */

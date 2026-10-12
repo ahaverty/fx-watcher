@@ -83,14 +83,18 @@ final class Monitor {
             e.apply();
 
             if (!wasPresent) Store.log(c, "CamAPS notification present: " + joined);
-            else if (!status.equals(oldStatus)) {
-                Store.log(c, "Auto mode " + oldStatus + " -> " + status);
-                if (!simulated && Nightscout.configured(c)) {
+            else if (!status.equals(oldStatus)) Store.log(c, "Auto mode " + oldStatus + " -> " + status);
+            // Nightscout gets changes of the REAL status only, compared with the last real one:
+            // an adb simulation overwrites STATUS, and must not show up as an auto mode change.
+            String lastReal = p.getString(Store.NS_AUTO_MODE, "");
+            if (!simulated && !status.equals(lastReal)) {
+                p.edit().putString(Store.NS_AUTO_MODE, status).apply();
+                if (!lastReal.isEmpty() && Nightscout.configured(c)) {
                     try {
                         org.json.JSONObject t = Nightscout.treatment("CamAPS Auto mode", now, "camaps-notification");
                         t.put("status", status);
-                        t.put("previous", oldStatus);
-                        t.put("notes", "Auto mode " + oldStatus + " -> " + status);
+                        t.put("previous", lastReal);
+                        t.put("notes", "Auto mode " + lastReal + " -> " + status);
                         Nightscout.postTreatment(c, t);
                     } catch (Exception ignored) {
                         // logged locally above; Nightscout is best effort
