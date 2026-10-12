@@ -21,6 +21,8 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es ns_url https://... --es ns_token ...   (Nightscout)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd ns_flush   (send queued events now)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ez reader_dump true|false   (full CamAPS screen text to logcat)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ez bed_on true --ei bed_level 67   (bedtime media volume)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd bed_tick   (re-check bedtime volume now)
  */
 public class DebugReceiver extends BroadcastReceiver {
     @Override
@@ -38,6 +40,15 @@ public class DebugReceiver extends BroadcastReceiver {
             e.apply();
             Store.log(c, "Nightscout set over adb (" + Store.p(c).getString(Store.NS_URL, "") + ")");
             Nightscout.flush(c);
+        }
+        if (i.hasExtra("bed_on") || i.hasExtra("bed_level")) {
+            android.content.SharedPreferences.Editor e = Store.p(c).edit();
+            if (i.hasExtra("bed_on")) e.putBoolean(Store.BED_ON, i.getBooleanExtra("bed_on", false));
+            if (i.hasExtra("bed_level")) e.putInt(Store.BED_LEVEL_PCT, i.getIntExtra("bed_level", Store.DEF_BED_LEVEL_PCT));
+            e.apply();
+            Store.log(c, "Bedtime volume set over adb: " + (Bedtime.on(c) ? "on, " : "off, ")
+                    + Store.p(c).getInt(Store.BED_LEVEL_PCT, Store.DEF_BED_LEVEL_PCT) + "%");
+            Bedtime.tick(c);
         }
         if (i.hasExtra("reader_dump")) {
             boolean on = i.getBooleanExtra("reader_dump", false);
@@ -59,6 +70,7 @@ public class DebugReceiver extends BroadcastReceiver {
                 case "snooze": Monitor.snooze(c, i.getDoubleExtra("hours", 2)); break;
                 case "unsnooze": Monitor.unsnooze(c); break;
                 case "ns_flush": Nightscout.flush(c); break;
+                case "bed_tick": Bedtime.tick(c); break;
                 default: break;
             }
             return;

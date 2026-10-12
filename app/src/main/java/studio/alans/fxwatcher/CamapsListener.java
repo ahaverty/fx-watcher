@@ -62,6 +62,10 @@ public class CamapsListener extends NotificationListenerService {
     private final android.content.BroadcastReceiver screen = new android.content.BroadcastReceiver() {
         @Override
         public void onReceive(Context c, android.content.Intent i) {
+            String act = i.getAction();
+            if (android.content.Intent.ACTION_SCREEN_OFF.equals(act)) { Bedtime.onScreen(c, false); return; }
+            if (android.content.Intent.ACTION_SCREEN_ON.equals(act)) Bedtime.onScreen(c, true);
+            if (android.content.Intent.ACTION_USER_PRESENT.equals(act)) Bedtime.onUnlock(c);
             SharedPreferences p = Store.p(c);
             long down = p.getLong(Store.PUMP_DOWN_SINCE, 0);
             if (down == 0) return;
@@ -78,10 +82,21 @@ public class CamapsListener extends NotificationListenerService {
         if (!screenRegistered) {
             android.content.IntentFilter f = new android.content.IntentFilter(android.content.Intent.ACTION_SCREEN_ON);
             f.addAction(android.content.Intent.ACTION_USER_PRESENT);
+            f.addAction(android.content.Intent.ACTION_SCREEN_OFF);
             registerReceiver(screen, f);
             screenRegistered = true;
         }
         scanActive();
+        SleepReceiver.sync(this);
+        onInterruptionFilterChanged(getCurrentInterruptionFilter());
+        Bedtime.tick(this);
+    }
+
+    /** Sleep / bedtime / do-not-disturb mode on or off: bedtime media volume listens for it. */
+    @Override
+    public void onInterruptionFilterChanged(int filter) {
+        boolean quiet = filter != INTERRUPTION_FILTER_ALL && filter != INTERRUPTION_FILTER_UNKNOWN;
+        Bedtime.onQuietMode(this, quiet);
     }
 
     @Override

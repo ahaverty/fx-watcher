@@ -10,8 +10,8 @@ android {
         applicationId 'studio.alans.fxwatcher'
         minSdk 29
         targetSdk 34
-        versionCode 12
-        versionName '2.9'
+        versionCode 13
+        versionName '3.0'
     }
 
     // Release builds are signed in CI from repository secrets (FX_KEYSTORE / FX_KEYSTORE_PASSWORD).
@@ -40,4 +40,9 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    // Sleep API for the optional Google sleep detection (bedtime media volume)
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 }

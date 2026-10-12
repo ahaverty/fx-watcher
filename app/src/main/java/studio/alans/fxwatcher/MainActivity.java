@@ -136,6 +136,10 @@ public class MainActivity extends Activity {
                         Uri.parse("package:" + getPackageName()))));
         check("See the pump's Bluetooth link", Phone.canSeeBluetooth(this), () ->
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 1));
+        String a11y = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        check("Optional: read the CamAPS screen (Boost, Ease-off, meals, active insulin; read-only)",
+                a11y != null && a11y.contains(getPackageName() + "/"),
+                () -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         PowerManager pm = getSystemService(PowerManager.class);
         check("Battery: unrestricted", pm.isIgnoringBatteryOptimizations(getPackageName()), () ->
                 startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
@@ -194,6 +198,33 @@ public class MainActivity extends Activity {
         }
         root.addView(button("Alarm tone: " + tone, this::pickTone));
         CheckBox statusN = box("Quiet status notification", p.getBoolean(Store.STATUS_NOTIF, true));
+
+        // ---- Bedtime media volume
+        header("Bedtime media volume");
+        root.addView(text("CamAPS plays most of its alerts (all but Urgent Low) on the MEDIA volume, so if "
+                + "media is turned down they are silent all night. This raises media volume at bedtime, "
+                + "once the phone has been put down, and puts it back in the morning.", 14));
+        CheckBox bedOn = box("Raise media volume at bedtime", p.getBoolean(Store.BED_ON, false));
+        if (Bedtime.on(this)) root.addView(text(bedtimeStatus(p), 14));
+        EditText bedLevel = number("Media volume to set (% of max; only ever raised)",
+                p.getInt(Store.BED_LEVEL_PCT, Store.DEF_BED_LEVEL_PCT), false);
+        CheckBox bedMode = box("Start when sleep / bedtime / do-not-disturb mode turns on",
+                p.getBoolean(Store.BED_USE_MODE, true));
+        CheckBox bedGoogle = box("Start when Google sleep detection thinks I'm asleep (needs Physical activity)",
+                p.getBoolean(Store.BED_USE_GOOGLE, false));
+        EditText bedEarliest = field("Those only count after (HH:MM)", p.getString(Store.BED_EARLIEST, Store.DEF_BED_EARLIEST));
+        EditText bedFallback = field("Otherwise start at (HH:MM)", p.getString(Store.BED_FALLBACK, Store.DEF_BED_FALLBACK));
+        EditText bedIdle = number("Then wait for the phone to be unused, with nothing playing, for (min)",
+                p.getInt(Store.BED_IDLE_MIN, Store.DEF_BED_IDLE_MIN), false);
+        CheckBox bedRestore = box("Put the volume back in the morning (first unlock after the time below, "
+                + "unless I changed it)", p.getBoolean(Store.BED_RESTORE, true));
+        EditText bedMorning = field("Morning from (HH:MM)", p.getString(Store.BED_MORNING, Store.DEF_BED_MORNING));
+        root.addView(text("Advanced", 15));
+        EditText bedDays = field("Start time per evening, Mon to Sun, comma separated; \"off\" skips that night; "
+                + "empty = the time above", p.getString(Store.BED_FALLBACK_DAYS, ""));
+        bedDays.setHint("00:00,00:00,00:00,00:00,01:00,off,00:00");
+        EditText bedConf = number("Google sleep confidence needed (%)",
+                p.getInt(Store.BED_GOOGLE_CONF, Store.DEF_BED_GOOGLE_CONF), false);
         root.addView(text("Advanced, optional: Home Assistant webhook. Leave empty unless you use Home "
                 + "Assistant; nothing leaves the phone without it.", 14));
         EditText url = new EditText(this);
@@ -201,6 +232,18 @@ public class MainActivity extends Activity {
         url.setText(p.getString(Store.URL, ""));
         url.setHint("https://…/api/webhook/…");
         root.addView(url);
+        root.addView(text("Advanced, optional: Nightscout. Sends boluses, carbs, Boost/Ease-off and active "
+                + "insulin seen in CamAPS (the screen reader adds the ones only shown on screen). Use a "
+                + "Nightscout access token whose role can create treatments and device status.", 14));
+        EditText nsUrl = field("Nightscout address", p.getString(Store.NS_URL, ""));
+        nsUrl.setHint("https://my-nightscout.example");
+        EditText nsToken = field("Nightscout access token", p.getString(Store.NS_TOKEN, ""));
+        nsToken.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        if (Nightscout.configured(this)) {
+            long sent = p.getLong(Store.NS_LAST_SENT, 0);
+            root.addView(text("Nightscout: " + Nightscout.queued(this) + " waiting"
+                    + (sent > 0 ? " · last sent " + Store.ago(sent, now) : ""), 14));
+        }
         root.addView(button("Save settings", () -> {
             p.edit().putInt(Store.SIGNAL_MIN, intOf(signal, Store.DEF_SIGNAL_MIN))
                     .putInt(Store.MISSING_MIN, intOf(missing, Store.DEF_MISSING_MIN))
@@ -218,7 +261,27 @@ public class MainActivity extends Activity {
                     .putBoolean(Store.MAX_VOLUME, maxVol.isChecked())
                     .putBoolean(Store.STATUS_NOTIF, statusN.isChecked())
                     .putString(Store.URL, url.getText().toString().trim())
+                    .putString(Store.NS_URL, nsUrl.getText().toString().trim())
+                    .putString(Store.NS_TOKEN, nsToken.getText().toString().trim())
+                    .putBoolean(Store.BED_ON, bedOn.isChecked())
+                    .putInt(Store.BED_LEVEL_PCT, Math.max(1, Math.min(100, intOf(bedLevel, Store.DEF_BED_LEVEL_PCT))))
+                    .putBoolean(Store.BED_USE_MODE, bedMode.isChecked())
+                    .putBoolean(Store.BED_USE_GOOGLE, bedGoogle.isChecked())
+                    .putString(Store.BED_EARLIEST, time(bedEarliest, Store.DEF_BED_EARLIEST))
+                    .putString(Store.BED_FALLBACK, time(bedFallback, Store.DEF_BED_FALLBACK))
+                    .putInt(Store.BED_IDLE_MIN, Math.max(1, intOf(bedIdle, Store.DEF_BED_IDLE_MIN)))
+                    .putBoolean(Store.BED_RESTORE, bedRestore.isChecked())
+                    .putString(Store.BED_MORNING, time(bedMorning, Store.DEF_BED_MORNING))
+                    .putString(Store.BED_FALLBACK_DAYS, days(bedDays))
+                    .putInt(Store.BED_GOOGLE_CONF, Math.min(100, intOf(bedConf, Store.DEF_BED_GOOGLE_CONF)))
                     .apply();
+            if (bedOn.isChecked() && bedGoogle.isChecked() && !SleepReceiver.permitted(this)) {
+                requestPermissions(new String[]{Manifest.permission.ACTIVITY_RECOGNITION}, 3);
+            }
+            p.edit().remove(Store.NS_JWT).apply();   // re-exchange, in case the token changed
+            Nightscout.flush(this);
+            SleepReceiver.sync(this);
+            Bedtime.tick(this);
             Store.log(this, "Settings saved");
             Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         }));
@@ -320,6 +383,53 @@ public class MainActivity extends Activity {
         b.setChecked(checked);
         root.addView(b);
         return b;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int req, String[] perms, int[] results) {
+        super.onRequestPermissionsResult(req, perms, results);
+        if (req == 3) SleepReceiver.sync(this);
+    }
+
+    private EditText field(String label, String value) {
+        root.addView(text(label, 14));
+        EditText e = new EditText(this);
+        e.setSingleLine(true);
+        e.setText(value);
+        root.addView(e);
+        return e;
+    }
+
+    /** A valid "HH:MM" from the field, else the default. */
+    private static String time(EditText e, String def) {
+        int m = Bedtime.minutes(e.getText().toString());
+        return m < 0 ? def : Bedtime.hhmm(m);
+    }
+
+    /** "Mon..Sun" times: 7 valid entries ("HH:MM" or "off"), else empty (= use the single time). */
+    private static String days(EditText e) {
+        String[] a = e.getText().toString().split(",");
+        if (a.length != 7) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String d : a) {
+            String t = d.trim();
+            if (t.equalsIgnoreCase("off")) sb.append("off");
+            else if (Bedtime.minutes(t) >= 0) sb.append(Bedtime.hhmm(Bedtime.minutes(t)));
+            else return "";
+            sb.append(',');
+        }
+        return sb.substring(0, sb.length() - 1);
+    }
+
+    private static String bedtimeStatus(SharedPreferences p) {
+        String st = p.getString(Store.BED_STATE, "idle");
+        int prev = p.getInt(Store.BED_PREV, -1), set = p.getInt(Store.BED_SET, -1);
+        switch (st) {
+            case "armed": return "Tonight: waiting for the phone to be put down";
+            case "applied": return "Tonight: " + (set >= 0 ? "media volume set " + prev + " → " + set : "volume was already high enough");
+            case "skipped": return "Tonight: skipped";
+            default: return "Tonight: not started yet";
+        }
     }
 
     private static int intOf(EditText e, int def) {

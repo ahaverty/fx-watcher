@@ -12,6 +12,8 @@ public class SystemReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(a) || Intent.ACTION_MY_PACKAGE_REPLACED.equals(a)) {
             Store.log(c, Intent.ACTION_BOOT_COMPLETED.equals(a) ? "Phone restarted" : "App updated");
             Monitor.check(c);
+            SleepReceiver.sync(c);
+            Bedtime.tick(c);
         }
     }
 }

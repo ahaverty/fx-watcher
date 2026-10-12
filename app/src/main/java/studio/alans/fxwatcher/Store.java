@@ -32,7 +32,25 @@ final class Store {
     static final String BATT_ALARM = "batt_alarm";      // at night, alarm below this % when not charging
     static final String NIGHT_FROM = "night_from";      // hour
     static final String NIGHT_TO = "night_to";          // hour
-    static final String NS_URL = "ns_url";              // optional Nightscout to send CamAPS events to
+    // Bedtime media volume (Bedtime.java)
+    static final String BED_ON = "bed_on";
+    static final String BED_LEVEL_PCT = "bed_level_pct";      // target media volume, % of max
+    static final String BED_EARLIEST = "bed_earliest";        // "HH:MM": sleep signals count from here
+    static final String BED_FALLBACK = "bed_fallback";        // "HH:MM": arm anyway at this time
+    static final String BED_FALLBACK_DAYS = "bed_fallback_days"; // optional "Mon,..,Sun" times or "off"
+    static final String BED_IDLE_MIN = "bed_idle_min";        // screen off this long, nothing playing
+    static final String BED_USE_MODE = "bed_use_mode";        // sleep / DND mode arms it
+    static final String BED_USE_GOOGLE = "bed_use_google";    // Google sleep detection arms it
+    static final String BED_GOOGLE_CONF = "bed_google_conf";  // confidence needed (0-100)
+    static final String BED_RESTORE = "bed_restore";          // put it back in the morning
+    static final String BED_MORNING = "bed_morning";          // "HH:MM": restore on first unlock after
+    static final int DEF_BED_LEVEL_PCT = 60;
+    static final String DEF_BED_EARLIEST = "21:00";
+    static final String DEF_BED_FALLBACK = "00:00";
+    static final int DEF_BED_IDLE_MIN = 10;
+    static final int DEF_BED_GOOGLE_CONF = 80;
+    static final String DEF_BED_MORNING = "07:00";
+    static final String NS_URL = "ns_url";             // optional Nightscout to send CamAPS events to
     static final String NS_TOKEN = "ns_token";          // its access token (subject with treatments create/read)
 
     static final int DEF_SIGNAL_MIN = 20;
@@ -86,7 +104,12 @@ final class Store {
     static final String RD_ACTIVE = "rd_active";        // Boost/Ease-off running, as JSON (CamapsReader)
     static final String RD_PENDING = "rd_pending";      // Boost/Ease-off duration just confirmed, as JSON
     static final String RD_CALC = "rd_calc";            // last bolus calculator values seen, as JSON
-    static final String RD_DUMP = "rd_dump";            // log full text of unknown CamAPS screens (debug, adb only)
+    static final String BED_NIGHT = "bed_night";              // which evening BED_STATE is for
+    static final String BED_STATE = "bed_state";
+    static final String BED_SCREEN_OFF = "bed_screen_off";    // when the screen went off, 0 = on
+    static final String BED_PREV = "bed_prev";                // media volume before, -1 = untouched
+    static final String BED_SET = "bed_set";                  // what it was set to
+    static final String RD_DUMP = "rd_dump";           // log full text of unknown CamAPS screens (debug, adb only)
     static final String RD_IOB = "rd_iob";             // last active insulin sent, as "value@time"
 
     static SharedPreferences p(Context c) {
