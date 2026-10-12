@@ -181,6 +181,23 @@ public class BolusTrackerTest {
     }
 
     @Test
+    public void popupReadLateIsTimedAtItsCountdown() {
+        // Left CamAPS during the countdown, came back 20 min later: the bolus is at the countdown.
+        Phone p = new Phone();
+        p.screen(COUNTDOWN, 10 * MIN, NONE);
+        BolusTracker.Result r = p.screen(POPUP_44, 30 * MIN, NONE);
+        assertEquals(1, p.created);
+        assertEquals(10 * MIN, r.at);
+    }
+
+    @Test
+    public void popupWithoutASeenCountdownIsTimedWhenRead() {
+        Phone p = new Phone();
+        BolusTracker.Result r = p.screen(POPUP_44, 30 * MIN, NONE);
+        assertEquals(30 * MIN, r.at);
+    }
+
+    @Test
     public void stateSurvivesSaveAndLoad() {
         BolusTracker t = new BolusTracker();
         t.screen(POPUP_44, 1_000, 35);

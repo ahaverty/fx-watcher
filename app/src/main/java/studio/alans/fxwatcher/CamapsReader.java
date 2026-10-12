@@ -224,8 +224,12 @@ public class CamapsReader extends AccessibilityService {
                 boolean boost = indexOf(items, "Boost") >= 0, ease = indexOf(items, "Ease-off") >= 0;
                 if (boost != ease) kind = boost ? "Boost" : "Ease-off";
             }
-            if (kind != null) running(kind, now, remaining);
-            else if (indexOf(items, "Boost") >= 0 && indexOf(items, "Ease-off") >= 0) notRunning(now);
+            final String k = kind;
+            final long rem = remaining;
+            if (k != null) boost(t -> t.bar(k, rem, now));
+            else if (indexOf(items, "Boost") >= 0 && indexOf(items, "Ease-off") >= 0) {
+                boost(t -> { t.noBar(now); return new ArrayList<>(); });
+            }
         }
 
         if (!known) unknownScreen(items);
@@ -286,35 +290,13 @@ public class CamapsReader extends AccessibilityService {
                 return;
             }
             if (dialog.equals("start") && setupKind != null) {
-                JSONObject pend = new JSONObject();
-                pend.put("kind", setupKind);
-                pend.put("time", now);
-                pend.put("minutes", setupMinutes);
-                pend.put("planned", setupAt > now + 60_000L ? setupAt : 0);
-                p.edit().putString(Store.RD_PENDING, pend.toString()).apply();
-                Log.i(TAG, "confirmed " + pend);
-                if (setupAt > now + 60_000L && setupMinutes > 0) {
-                    // Planned for later: send it now, it may start with the phone in a pocket.
-                    JSONObject a = new JSONObject();
-                    a.put("kind", setupKind);
-                    a.put("start", setupAt);
-                    a.put("end", setupAt + setupMinutes * 60_000L);
-                    a.put("start_known", true);
-                    Store.log(this, setupKind + " planned " + Store.hm(setupAt) + "-" + Store.hm(setupAt + setupMinutes * 60_000L));
-                    send(a, "planned");
-                }
+                boost(t -> t.start(setupKind, setupMinutes, setupAt, now));
+            } else if (dialog.startsWith("stop:")) {
+                String kind = dialog.substring(5);
+                boost(t -> t.stop(kind, now));
             } else if (dialog.startsWith("cancel-planned:")) {
-                JSONObject pend = new JSONObject(p.getString(Store.RD_PENDING, "{}"));
-                if (pend.optLong("planned") > 0) {
-                    JSONObject a = new JSONObject();
-                    a.put("kind", pend.getString("kind"));
-                    a.put("start", pend.getLong("planned"));
-                    a.put("end", pend.getLong("planned"));
-                    a.put("start_known", true);
-                    Store.log(this, "Planned " + pend.getString("kind") + " at " + Store.hm(pend.getLong("planned")) + " cancelled");
-                    send(a, "cancelled");
-                }
-                p.edit().remove(Store.RD_PENDING).apply();
+                String kind = dialog.substring(15);
+                boost(t -> t.cancelPlanned(kind, now));
             }
         } catch (Exception ex) {
             Log.w(TAG, "click", ex);
@@ -323,71 +305,34 @@ public class CamapsReader extends AccessibilityService {
 
     // ── Boost / Ease-off ─────────────────────────────────────────────────────────
 
-    private void running(String kind, long now, long remaining) {
+    /** Runs one BoostTracker event against the saved state and sends what it decides. */
+    private synchronized void boost(java.util.function.Function<BoostTracker, List<BoostTracker.Post>> event) {
         SharedPreferences p = Store.p(this);
-        try {
-            JSONObject a = new JSONObject(p.getString(Store.RD_ACTIVE, "{}"));
-            long end = now + remaining;
-            if (a.optString("kind").equals(kind) && a.optLong("end") > now - 60_000L) {
-                // Same one still running: only re-send if its end moved (extended/shortened).
-                if (Math.abs(a.optLong("end") - end) > 90_000L) {
-                    a.put("end", end);
-                    p.edit().putString(Store.RD_ACTIVE, a.toString()).apply();
-                    send(a, "planned");
-                }
-                return;
+        BoostTracker t = BoostTracker.load(p.getString(Store.BOOST_TRACKER, ""));
+        String before = t.save();
+        List<BoostTracker.Post> posts = event.apply(t);
+        String after = t.save();
+        if (!after.equals(before)) p.edit().putString(Store.BOOST_TRACKER, after).apply();
+        for (BoostTracker.Post x : posts) {
+            try {
+                send(x);
+            } catch (Exception ex) {
+                Log.w(TAG, "boost", ex);
             }
-            long start = now;
-            boolean known = false;
-            JSONObject pend = new JSONObject(p.getString(Store.RD_PENDING, "{}"));
-            long planned = pend.optLong("planned");
-            if (pend.optString("kind").equals(kind) && planned > 0 && planned <= now + 60_000L
-                    && now - planned < 12 * 3600_000L) {
-                start = planned;                    // a planned one that has now started
-                known = true;
-            } else if (pend.optString("kind").equals(kind) && planned == 0
-                    && now - pend.optLong("time") < 180_000L) {
-                start = pend.optLong("time");       // confirmed "Now" just before
-                known = true;
-            }
-            JSONObject n = new JSONObject();
-            n.put("kind", kind);
-            n.put("start", start);
-            n.put("end", end);
-            n.put("start_known", known);
-            p.edit().putString(Store.RD_ACTIVE, n.toString()).remove(Store.RD_PENDING).apply();
-            Store.log(this, kind + " running until " + Store.hm(end)
-                    + (known ? ", started " + Store.hm(start) : " (start not seen)"));
-            send(n, "planned");
-        } catch (Exception ex) {
-            Log.w(TAG, "running", ex);
         }
     }
 
-    private void notRunning(long now) {
-        SharedPreferences p = Store.p(this);
-        try {
-            JSONObject a = new JSONObject(p.getString(Store.RD_ACTIVE, "{}"));
-            if (!a.has("kind")) return;
-            if (now < a.optLong("end") - 60_000L) {
-                a.put("end", now);
-                Store.log(this, a.optString("kind") + " cancelled at " + Store.hm(now));
-                send(a, "cancelled");
-            }
-            p.edit().remove(Store.RD_ACTIVE).apply();
-        } catch (Exception ex) {
-            Log.w(TAG, "notRunning", ex);
-        }
-    }
-
-    private void send(JSONObject a, String ended) throws Exception {
-        long start = a.getLong("start"), end = a.getLong("end");
-        JSONObject t = Nightscout.treatment("CamAPS " + a.getString("kind"), start, "camaps-screen");
-        t.put("duration", Math.round((end - start) / 600.0) / 100.0);
-        t.put("ended", ended);
-        t.put("start_known", a.optBoolean("start_known"));
-        t.put("notes", a.getString("kind") + " " + Store.hm(start) + "-" + Store.hm(end)
-                + ("cancelled".equals(ended) ? " (cancelled early)" : ""));
+    private void send(BoostTracker.Post x) throws Exception {
+        boolean cancelled = "cancelled".equals(x.ended);
+        Store.log(this, x.kind + (cancelled ? (x.end == x.start ? " planned for " + Store.hm(x.start) + " cancelled"
+                : " cancelled at " + Store.hm(x.end)) : " " + Store.hm(x.start) + "-" + Store.hm(x.end))
+                + (x.startKnown ? "" : " (start not seen)"));
+        JSONObject t = Nightscout.treatment("CamAPS " + x.kind, x.start, "camaps-screen");
+        t.put("duration", Math.round((x.end - x.start) / 600.0) / 100.0);
+        t.put("ended", x.ended);
+        t.put("start_known", x.startKnown);
+        t.put("notes", x.kind + " " + Store.hm(x.start) + "-" + Store.hm(x.end)
+                + (cancelled ? " (cancelled early)" : ""));
         Nightscout.postTreatment(this, t);
     }
 
