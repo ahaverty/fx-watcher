@@ -9,7 +9,7 @@ No server, no account, no internet needed.
 **[Download the latest FX Watcher (fx-watcher.apk)](https://github.com/ahaverty/fx-watcher/releases/latest/download/fx-watcher.apk)**
 · [What's new in each version](https://github.com/ahaverty/fx-watcher/releases)
 
-![Latest version](https://img.shields.io/github/v/release/ahaverty/fx-watcher?label=latest%20version)
+[![Latest version](https://img.shields.io/github/v/release/ahaverty/fx-watcher?label=latest%20version&cacheSeconds=300)](https://github.com/ahaverty/fx-watcher/releases/latest/download/fx-watcher.apk)
 
 Open that link on your Android phone, then follow **[Install](#install)** and
 **[Keep it running](#keep-it-running)** below. To update later, download and open it again:
