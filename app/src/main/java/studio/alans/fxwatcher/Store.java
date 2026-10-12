@@ -99,7 +99,7 @@ final class Store {
     static final String NS_JWT = "ns_jwt";              // Nightscout bearer token from the access token
     static final String NS_JWT_EXP = "ns_jwt_exp";
     static final String NS_LAST_SENT = "ns_last_sent";
-    static final String LAST_DELIVERED = "last_delivered"; // last bolus sent, "units@time" (dedupe)
+    static final String BOLUS_TRACKER = "bolus_tracker";   // BolusTracker state (bolus dedupe)
     static final String LAST_INFO = "last_info";       // last CamAPS info notification handled (dedupe)
     static final String RD_ACTIVE = "rd_active";        // Boost/Ease-off running, as JSON (CamapsReader)
     static final String RD_PENDING = "rd_pending";      // Boost/Ease-off duration just confirmed, as JSON

@@ -105,14 +105,17 @@ public class CamapsReader extends AccessibilityService {
         long now = System.currentTimeMillis();
         boolean known = false;
 
-        // "Delivered 0.1 U of insulin." as an in-app dialog (CamAPS open; a notification otherwise)
+        // "Delivered 0.1 U of insulin." as an in-app popup (CamAPS open; a notification otherwise).
+        // Every read goes to the tracker: it needs to see the popup appear, not just be there.
+        List<String> texts = new ArrayList<>();
         for (Item it : items) {
-            if (!it.text.startsWith("Delivered")) continue;
-            try {
-                if (CamapsListener.delivered(this, it.text, now, "camaps-screen")) known = true;
-            } catch (Exception ex) {
-                Log.w(TAG, "delivered", ex);
-            }
+            texts.add(it.text);
+            if (it.text.startsWith("Delivered")) known = true;
+        }
+        try {
+            CamapsListener.screen(this, texts, now);
+        } catch (Exception ex) {
+            Log.w(TAG, "delivered", ex);
         }
 
         // Active insulin: side menu, as two items "Active insulin" | "0.9 U"
