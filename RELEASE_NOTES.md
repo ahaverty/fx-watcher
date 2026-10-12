@@ -11,6 +11,8 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
+**New in v3.0.3:** more reliable Nightscout records from the optional screen reader: a Boost or Ease-off can no longer be logged as cancelled (and then twice) when CamAPS redraws its home screen, a planned Boost is recorded once, a bolus read late is timed when it was delivered, and an updated CamAPS notification can't count as a second bolus.
+
 **New in v3.0.2:** fixes a bolus being sent to Nightscout twice when CamAPS's "Delivered" message was still on screen after reopening CamAPS. Only matters if you use the optional Nightscout and screen reader features.
 
 **New in v3.0:** optional extras, all off until you turn them on:
