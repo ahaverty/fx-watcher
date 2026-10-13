@@ -14,8 +14,8 @@ import java.util.regex.Pattern;
 
 /**
  * Missed bolus check (MissedBolus), replaying FX Watcher log lines. The 13 Oct 2026 sequences are
- * rebuilt from Alan's account (12:32: 0 g, 38 g ... 46 g / 7.1 U, never delivered; 14:22-14:24:
- * 46 g, 23 g, 30 g, then "Delivered 4.6 U" for 30 g) in the app's own log format.
+ * copied from the app's log: 12:32, 46 g / 7.1 U never delivered (glucose 15.9 two hours later);
+ * 14:22-14:24, 46 g, 23 g, 30 g, then "Delivered 4.6 U" for 30 g.
  */
 public class MissedBolusTest {
 
@@ -75,36 +75,38 @@ public class MissedBolusTest {
         }
     }
 
-    // 12:32: entered, never delivered; the calculator then went back to 0.
+    // 12:32: entered, never delivered (FX Watcher's log, 13 Oct 2026, verbatim).
     private static final String[] MISSED_1232 = {
-            "12:32:01  Bolus calculator: 0.0 g, 0.0 U",
-            "12:32:04  Bolus calculator: 3.0 g, 0.5 U",
-            "12:32:04  Bolus calculator: 38.0 g, 5.9 U",
-            "12:32:05  Bolus calculator: 4.0 g, 0.6 U",
-            "12:32:06  Bolus calculator: 46.0 g, 7.1 U",
-            "12:32:31  Bolus calculator: 0.0 g, 0.0 U",
+            "13/10 12:32:00  Bolus calculator: 0.0 g, 0.0 U",
+            "13/10 12:32:01  Bolus calculator: 38.0 g, 5.9 U",
+            "13/10 12:32:02  Bolus calculator: 39.0 g, 6.0 U",
+            "13/10 12:32:02  Bolus calculator: 41.0 g, 6.3 U",
+            "13/10 12:32:02  Bolus calculator: 42.0 g, 6.4 U",
+            "13/10 12:32:02  Bolus calculator: 42.0 g, 6.5 U",
+            "13/10 12:32:02  Bolus calculator: 43.0 g, 6.6 U",
+            "13/10 12:32:03  Bolus calculator: 44.0 g, 6.7 U",
+            "13/10 12:32:03  Bolus calculator: 45.0 g, 6.9 U",
+            "13/10 12:32:03  Bolus calculator: 45.0 g, 7.0 U",
+            "13/10 12:32:03  Bolus calculator: 46.0 g, 7.1 U",
     };
 
-    // 14:22-14:24: retyped twice, 4.6 U for 30 g delivered; the calculator read again after it.
+    // 14:22-14:24: retyped twice, 4.6 U for 30 g delivered (verbatim).
     private static final String[] DELIVERED_1422 = {
-            "14:22:10  Bolus calculator: 0.0 g, 0.0 U",
-            "14:22:13  Bolus calculator: 4.0 g, 0.6 U",
-            "14:22:14  Bolus calculator: 46.0 g, 7.1 U",
-            "14:22:52  Bolus calculator: 2.0 g, 0.3 U",
-            "14:22:53  Bolus calculator: 23.0 g, 3.6 U",
-            "14:23:30  Bolus calculator: 3.0 g, 0.5 U",
-            "14:23:31  Bolus calculator: 30.0 g, 4.6 U",
-            "14:24:12  Bolus delivered: 4.6 U, 30.0 g (camaps-notification)",
-            "14:24:15  Bolus calculator: 0.0 g, 0.0 U",
-            "14:24:40  Bolus calculator: 30.0 g, 4.6 U",
+            "13/10 14:22:40  Bolus calculator: 0.0 g, 0.0 U",
+            "13/10 14:22:45  Bolus calculator: 46.0 g, 7.1 U",
+            "13/10 14:22:52  Bolus calculator: 23.0 g, 3.5 U",
+            "13/10 14:22:57  Bolus calculator: 30.0 g, 4.6 U",
+            "13/10 14:24:01  CamAPS: Information: Delivered 4.6 U of insulin.",
+            "13/10 14:24:01  Bolus delivered: 4.6 U, 30.0 g (camaps-notification)",
+            "13/10 14:24:01  Nightscout: queued Bolus",
     };
 
     @Test
     public void missedBolusAt1232AlertsBy1237() {
         Replay r = new Replay();
         r.run(MISSED_1232);
-        r.tick("12:32:31", "13:30:00");
-        assertEquals(Arrays.asList("12:32:04 STARTED", "12:37:06 ALERT"), r.events);
+        r.tick("12:32:03", "13:30:00");
+        assertEquals(Arrays.asList("12:32:01 STARTED", "12:37:03 ALERT"), r.events);
         MissedBolus t = r.t();
         assertEquals("Bolus not delivered? Calculator showed 46 g / 7.1 U at 12:32, no delivery seen.",
                 MissedBolus.message(t.carbs, t.units, "12:32"));
@@ -116,18 +118,28 @@ public class MissedBolusTest {
     public void deliveredAt1424ClearsWithoutAlert() {
         Replay r = new Replay();
         r.run(DELIVERED_1422);
-        r.tick("14:24:40", "15:30:00");
-        assertEquals(Arrays.asList("14:22:13 STARTED", "14:24:12 CLEARED"), r.events);
+        r.tick("14:24:01", "15:30:00");
+        assertEquals(Arrays.asList("14:22:45 STARTED", "14:24:01 CLEARED"), r.events);
+    }
+
+    @Test
+    public void calculatorStillShowingRightAfterTheDeliveryIsThatBolus() {
+        Replay r = new Replay();
+        r.run(DELIVERED_1422);
+        r.run("14:24:05  Bolus calculator: 0.0 g, 0.0 U",
+              "14:24:20  Bolus calculator: 30.0 g, 4.6 U");
+        r.tick("14:24:20", "15:00:00");
+        assertEquals(Arrays.asList("14:22:45 STARTED", "14:24:01 CLEARED"), r.events);
     }
 
     @Test
     public void bothSequencesInOneDay() {
         Replay r = new Replay();
         r.run(MISSED_1232);
-        r.tick("12:32:31", "14:22:00");
+        r.tick("12:32:03", "14:22:00");
         r.run(DELIVERED_1422);
-        r.tick("14:24:40", "15:30:00");
-        assertEquals(Arrays.asList("12:32:04 STARTED", "12:37:06 ALERT", "14:22:13 STARTED", "14:24:12 CLEARED"), r.events);
+        r.tick("14:24:01", "15:30:00");
+        assertEquals(Arrays.asList("12:32:01 STARTED", "12:37:03 ALERT", "14:22:45 STARTED", "14:24:01 CLEARED"), r.events);
     }
 
     @Test
@@ -170,10 +182,10 @@ public class MissedBolusTest {
     public void dismissedAfterAlertNeverRepeats() {
         Replay r = new Replay();
         r.run(MISSED_1232);
-        r.tick("12:32:31", "12:38:00");
+        r.tick("12:32:03", "12:38:00");
         r.dismiss();
         r.tick("12:38:00", "14:00:00");
-        assertEquals(Arrays.asList("12:32:04 STARTED", "12:37:06 ALERT", "DISMISSED"), r.events);
+        assertEquals(Arrays.asList("12:32:01 STARTED", "12:37:03 ALERT", "DISMISSED"), r.events);
     }
 
     @Test
@@ -191,7 +203,7 @@ public class MissedBolusTest {
         r.run(DELIVERED_1422);
         r.run("14:40:00  Bolus calculator: 30.0 g, 4.6 U");
         r.tick("14:40:00", "15:00:00");
-        assertEquals(Arrays.asList("14:22:13 STARTED", "14:24:12 CLEARED"), r.events);
+        assertEquals(Arrays.asList("14:22:45 STARTED", "14:24:01 CLEARED"), r.events);
     }
 
     @Test
@@ -200,7 +212,7 @@ public class MissedBolusTest {
         r.run(DELIVERED_1422);
         r.run("18:00:00  Bolus calculator: 60.0 g, 9.2 U");
         r.tick("18:00:00", "18:10:00");
-        assertEquals(Arrays.asList("14:22:13 STARTED", "14:24:12 CLEARED", "18:00:00 STARTED", "18:05:00 ALERT"), r.events);
+        assertEquals(Arrays.asList("14:22:45 STARTED", "14:24:01 CLEARED", "18:00:00 STARTED", "18:05:00 ALERT"), r.events);
     }
 
     @Test
