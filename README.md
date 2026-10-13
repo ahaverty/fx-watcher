@@ -144,6 +144,12 @@ Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS s
   delivered?" with Open CamAPS and "I didn't bolus (dismiss)". Any delivery clears it, whatever
   the amount, so retyping the calculator is fine. One alert per bolus. With Nightscout it also
   posts an `Announcement`; with Home Assistant, a `{type: missed_bolus}` webhook post.
+- **Faster check once Deliver is tapped.** CamAPS's "Delivery will start in" countdown only exists
+  after Deliver is tapped. If it was seen and nothing is delivered within 60 s plus 10 s per unit
+  (Settings, 0 = off), the alert comes then rather than after the full 5 minutes.
+- **Logs.** Settings has two logs, FX Watcher's own and "What FX Watcher saw in CamAPS". Both can
+  be copied (last hours, last 24 h or all, with the app version on top) or shared, e.g. to paste
+  into a chat. CamAPS's own internal log is private to CamAPS and cannot be read.
 - Nothing it reads leaves the phone unless you set up Nightscout. It does not keep or send your
   account details or other CamAPS screens.
 - Turning it off in Accessibility settings stops it at once.
