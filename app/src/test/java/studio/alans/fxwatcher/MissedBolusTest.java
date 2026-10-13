@@ -21,7 +21,7 @@ public class MissedBolusTest {
 
     private static final long MIN = 60_000L;
     private static final long TIMEOUT = 5 * MIN;
-    private static final Pattern LINE = Pattern.compile("(\\d\\d):(\\d\\d):(\\d\\d)\\s+(.*)");
+    private static final Pattern LINE = Pattern.compile("(?:\\d\\d/\\d\\d )?(\\d\\d):(\\d\\d):(\\d\\d)\\s+(.*)");
     private static final Pattern CALC = Pattern.compile("Bolus calculator: ([\\d.]+) g, ([\\d.]+) U.*");
     private static final Pattern DELIVERED = Pattern.compile("Bolus delivered: ([\\d.]+) U.*");
 
