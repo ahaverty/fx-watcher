@@ -24,8 +24,11 @@ import java.util.Calendar;
  *   - the fallback time for that evening's weekday (default midnight; a day can be "off").
  * Armed, it shows a quiet notification and sets the volume once the screen has been off for
  * the idle time (default 10 min) with nothing playing, so it never blasts a video or podcast
- * in bed. It only ever raises the volume. In the morning, on the first unlock after the morning
- * time, it puts the volume back where it was, unless it was changed in the meantime.
+ * in bed. It only ever raises the volume. If the volume is turned down again before morning (a
+ * video in bed at midnight), it is raised again every time the phone is put down for the idle
+ * time with nothing playing (12-13 Oct 2026: raised at 22:30, turned down to 2 for YouTube at
+ * 00:14, and stayed at 2 all night). In the morning, on the first unlock after the morning
+ * time, it puts the volume back where it was before bedtime, unless it was changed meanwhile.
  */
 final class Bedtime {
 
@@ -209,7 +212,7 @@ final class Bedtime {
         if (IDLE.equals(st) && fb >= 0 && now >= at(ev, fb) && !isMorning) arm(c, "fallback time " + hhmm(fb));
         st = state(p, key);
 
-        if (ARMED.equals(st)) {
+        if (ARMED.equals(st) || watching(st, isMorning, below(c))) {
             long off = p.getLong(Store.BED_SCREEN_OFF, 0);
             if (!interactive(c) && off == 0) {          // screen already off when armed
                 off = now;
@@ -219,8 +222,10 @@ final class Bedtime {
             if (!interactive(c) && off > 0 && now - off >= idle) {
                 if (musicPlaying(c)) {
                     Store.log(c, "Bedtime volume: something is playing, waiting");
-                } else {
+                } else if (ARMED.equals(st)) {
                     apply(c, key, "phone unused for " + (idle / 60_000L) + " min");
+                } else {
+                    raiseAgain(c, idle);
                 }
             }
         }
@@ -234,10 +239,14 @@ final class Bedtime {
         String key = key(ev);
         String st = state(p, key);
         long next;
-        if (ARMED.equals(st)) {
+        int mornMin = minutes(p.getString(Store.BED_MORNING, Store.DEF_BED_MORNING));
+        boolean isMorning = mornMin >= 0 && now >= at(ev, mornMin) && now < at(ev, 12 * 60 - 1);
+        if (ARMED.equals(st) || watching(st, isMorning, below(c))) {
             long off = p.getLong(Store.BED_SCREEN_OFF, 0);
             long idle = p.getInt(Store.BED_IDLE_MIN, Store.DEF_BED_IDLE_MIN) * 60_000L;
             next = off > 0 ? Math.max(off + idle, now + 60_000L) : now + 15 * 60_000L;
+            int morning = minutes(p.getString(Store.BED_MORNING, Store.DEF_BED_MORNING));
+            if (APPLIED.equals(st) && morning >= 0 && at(ev, morning) > now) next = Math.min(next, at(ev, morning));
             if (musicPlaying(c)) next = now + 5 * 60_000L;
         } else {
             // Next fallback time (tonight or tomorrow) or the morning time, whichever is first.
@@ -294,6 +303,39 @@ final class Bedtime {
         }
         setState(c, key, APPLIED);
         cancelNotification(c);
+    }
+
+    /**
+     * Applied tonight, still night, and the media volume is below the bedtime level again: watch
+     * for the phone being put down, to raise it again. Pure, for the unit tests.
+     */
+    static boolean watching(String state, boolean morning, boolean below) {
+        return APPLIED.equals(state) && !morning && below;
+    }
+
+    private static boolean below(Context c) {
+        return c.getSystemService(AudioManager.class).getStreamVolume(AudioManager.STREAM_MUSIC) < target(c);
+    }
+
+    /** Turned down since it was set: back up. The morning restore still goes to the pre-bedtime level. */
+    private static void raiseAgain(Context c, long idle) {
+        AudioManager a = c.getSystemService(AudioManager.class);
+        int cur = a.getStreamVolume(AudioManager.STREAM_MUSIC), tgt = target(c);
+        if (cur >= tgt) return;
+        try {
+            a.setStreamVolume(AudioManager.STREAM_MUSIC, tgt, 0);
+        } catch (SecurityException se) {
+            Store.log(c, "Bedtime volume: Android refused (" + se.getMessage() + ")");
+            return;
+        }
+        SharedPreferences p = Store.p(c);
+        SharedPreferences.Editor e = p.edit().putInt(Store.BED_SET, tgt);
+        // it was already loud enough at bedtime (nothing to restore then): the morning goes back
+        // to the level it was turned down to
+        if (p.getInt(Store.BED_PREV, -1) < 0) e.putInt(Store.BED_PREV, cur);
+        e.apply();
+        Store.log(c, "Bedtime volume: media was turned down to " + cur + ", back to " + tgt
+                + " (phone unused for " + (idle / 60_000L) + " min)");
     }
 
     private static void restore(Context c, String key) {

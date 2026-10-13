@@ -106,8 +106,10 @@ raises media volume when you go to bed and puts it back in the morning.
   so it never blasts a video or podcast you're listening to in bed. A quiet notification says
   it's waiting, with **Not tonight** and **Set it now** buttons.
 - **It only ever raises the volume**, never lowers it.
+- **Turned it down in the night?** If you turn media down again before morning (a video in bed),
+  it's raised again each time you put the phone down for 10 minutes with nothing playing.
 - **In the morning**, the first time you unlock after 07:00, it puts the volume back where it
-  was (unless you changed it during the night).
+  was before bedtime (unless you changed it after it was last raised).
 
 Everything is adjustable under **Settings > Bedtime media volume**: the level, which signals
 start it, the times, the idle minutes, the morning restore, and (Advanced) a different start
