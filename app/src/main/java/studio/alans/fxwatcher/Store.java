@@ -107,6 +107,7 @@ final class Store {
     static final String BOLUS_TRACKER = "bolus_tracker";   // BolusTracker state (bolus dedupe)
     static final String MISSED_BOLUS = "missed_bolus";     // MissedBolus state (missed bolus check)
     static final String LAST_INFO = "last_info";       // last CamAPS info notification handled (dedupe)
+    static final String SENSOR_EXPIRY = "sensor_expiry";   // CGM sensor expiry + grace end (SensorExpiry)
     static final String BOOST_TRACKER = "boost_tracker";   // BoostTracker state
     static final String RD_ACTIVE = "rd_active";        // Boost/Ease-off running, as JSON (CamapsReader)
     static final String RD_PENDING = "rd_pending";      // Boost/Ease-off duration just confirmed, as JSON
@@ -132,6 +133,10 @@ final class Store {
 
     static String hm(long t) {
         return new SimpleDateFormat("HH:mm", Locale.UK).format(new Date(t));
+    }
+
+    static String dayHm(long t) {
+        return new SimpleDateFormat("EEE d MMM HH:mm", Locale.UK).format(new Date(t));
     }
 
     static String ago(long t, long now) {

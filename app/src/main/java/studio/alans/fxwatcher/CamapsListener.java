@@ -148,6 +148,7 @@ public class CamapsListener extends NotificationListenerService {
         // Any fresh "Delivered" notification answers the missed bolus check, Nightscout or not.
         double u = BolusTracker.units(text);
         if (u >= 0) BolusWatch.delivered(this, u, System.currentTimeMillis());
+        sensorExpiry(this, text, at);
         if (!Nightscout.configured(this)) return;
         try {
             if (delivered(this, text, at, "camaps-notification")) return;
@@ -375,6 +376,28 @@ public class CamapsListener extends NotificationListenerService {
             j.put("carbs", carbs);
             j.put("units", units);
             j.put("message", message);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
+    /**
+     * "Sensor expires in less than 24 hours" -> remember the expiry and grace end for the app
+     * screen, and send them to Home Assistant {type: sensor_expiry, expires, grace_end} (ms).
+     */
+    static void sensorExpiry(Context c, String text, long at) {
+        SensorExpiry s = SensorExpiry.parse(text, at);
+        if (s == null) return;
+        Store.p(c).edit().putString(Store.SENSOR_EXPIRY, s.save()).apply();
+        Store.log(c, "Sensor expires " + Store.dayHm(s.expires) + ", grace until " + Store.dayHm(s.graceEnd));
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "sensor_expiry");
+            j.put("expires", s.expires);
+            j.put("grace_end", s.graceEnd);
+            j.put("text", text);
             j.put("ts", System.currentTimeMillis());
             post(c, j.toString());
         } catch (Exception ignored) {
