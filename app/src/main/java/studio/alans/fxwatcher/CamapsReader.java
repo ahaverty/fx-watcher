@@ -48,6 +48,7 @@ import java.util.regex.Pattern;
 public class CamapsReader extends AccessibilityService {
 
     private static final String TAG = "FXReader";
+    private static final Pattern DELIVERY_COUNTDOWN = Pattern.compile("^Delivery will start in(?:\\s*(\\d+))?");
     private static final Pattern COUNTDOWN = Pattern.compile("^(\\d{1,2}):(\\d{2}):(\\d{2})$");
     private static final Pattern NUM = Pattern.compile("^\\d+([.,]\\d+)?$");
     private static final Pattern IOB = Pattern.compile("Active insulin:?\\s*(\\d+(?:[.,]\\d+)?)\\s*U");
@@ -120,6 +121,9 @@ public class CamapsReader extends AccessibilityService {
         for (Item it : items) {
             texts.add(it.text);
             if (it.text.startsWith("Delivered")) known = true;
+            // "Delivery will start in 5 seconds": only on screen after Deliver was tapped.
+            Matcher cd = DELIVERY_COUNTDOWN.matcher(it.text);
+            if (cd.find()) BolusWatch.countdown(this, cd.group(1) == null ? -1 : Integer.parseInt(cd.group(1)), now);
         }
         try {
             CamapsListener.screen(this, texts, now);

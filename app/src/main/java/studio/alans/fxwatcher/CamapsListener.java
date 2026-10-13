@@ -63,7 +63,11 @@ public class CamapsListener extends NotificationListenerService {
         @Override
         public void onReceive(Context c, android.content.Intent i) {
             String act = i.getAction();
-            if (android.content.Intent.ACTION_SCREEN_OFF.equals(act)) { Bedtime.onScreen(c, false); return; }
+            if (android.content.Intent.ACTION_SCREEN_OFF.equals(act)) {
+                if (BolusWatch.pending(c)) Store.log(c, "Screen off (bolus waiting for delivery)");
+                Bedtime.onScreen(c, false);
+                return;
+            }
             if (android.content.Intent.ACTION_SCREEN_ON.equals(act)) Bedtime.onScreen(c, true);
             if (android.content.Intent.ACTION_USER_PRESENT.equals(act)) Bedtime.onUnlock(c);
             SharedPreferences p = Store.p(c);

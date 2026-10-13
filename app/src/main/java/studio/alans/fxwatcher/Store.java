@@ -54,6 +54,8 @@ final class Store {
     static final String NS_TOKEN = "ns_token";          // its access token (subject with treatments create/read)
     static final String MISSED_BOLUS_MIN = "missed_bolus_min"; // calculator bolus not delivered -> alert after (0 = off)
     static final int DEF_MISSED_BOLUS_MIN = 5;
+    static final String DELIVERY_FAST_SEC = "delivery_fast_sec"; // Deliver tapped, nothing delivered -> alert after (+10 s per U; 0 = off)
+    static final int DEF_DELIVERY_FAST_SEC = 60;
 
     static final int DEF_SIGNAL_MIN = 20;
     static final String DEF_PUMP_NAME = "YpsoPump";

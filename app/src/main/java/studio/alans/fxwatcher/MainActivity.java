@@ -178,6 +178,8 @@ public class MainActivity extends Activity {
                 p.getInt(Store.PUMP_NUDGE, Store.DEF_PUMP_NUDGE), false);
         EditText missedBolus = number("Bolus calculator used but nothing delivered: alert after (min, 0 = off)",
                 p.getInt(Store.MISSED_BOLUS_MIN, Store.DEF_MISSED_BOLUS_MIN), false);
+        EditText deliveryFast = number("Deliver tapped but no delivery confirmed: alert after (sec, +10 s per U, 0 = off)",
+                p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
         root.addView(text("Pump Bluetooth name (or part of it)", 14));
         EditText pumpName = new EditText(this);
         pumpName.setSingleLine(true);
@@ -255,6 +257,7 @@ public class MainActivity extends Activity {
                     .putInt(Store.PUMP_MIN, intOf(pumpMin, Store.DEF_PUMP_MIN))
                     .putInt(Store.PUMP_NUDGE, intOf(pumpNudge, Store.DEF_PUMP_NUDGE))
                     .putInt(Store.MISSED_BOLUS_MIN, intOf(missedBolus, Store.DEF_MISSED_BOLUS_MIN))
+                    .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
                     .putString(Store.PUMP_NAME, pumpName.getText().toString().trim())
                     .putInt(Store.BATT_NAG, Math.min(100, intOf(battNag, Store.DEF_BATT_NAG)))
                     .putInt(Store.BATT_ALARM, Math.min(100, intOf(battAlarm, Store.DEF_BATT_ALARM)))

@@ -55,13 +55,48 @@ final class BolusWatch {
         if (m.pending()) schedule(c, m.deadline);
     }
 
+    /** Seconds after the countdown starts before a missing delivery is flagged (0 = off). */
+    static int fastSec(Context c) {
+        return Store.p(c).getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC);
+    }
+
+    /** True while a calculator bolus is waiting for its delivery. */
+    static boolean pending(Context c) {
+        return load(Store.p(c)).pending();
+    }
+
+    /** "Delivery will start in n" read on the CamAPS screen: Deliver was tapped (CamapsReader). */
+    static synchronized void countdown(Context c, int secsLeft, long now) {
+        SharedPreferences p = Store.p(c);
+        MissedBolus m = load(p);
+        // One log line per tick, not per screen event (the same number is read many times a second).
+        if (secsLeft != p.getInt("cd_last_secs", -1) || now - p.getLong("cd_last_at", 0) > 15_000L) {
+            Store.log(c, secsLeft < 0 ? "Delivery countdown on screen" : "Delivery countdown " + secsLeft + " s");
+        }
+        p.edit().putInt("cd_last_secs", secsLeft).putLong("cd_last_at", now).apply();
+        MissedBolus.Event e = m.countdown(now, fastSec(c) * 1000L);
+        save(p, m);
+        if (e == MissedBolus.Event.STARTED) {
+            p.edit().putLong("cd_first_at", now).apply();
+            Store.log(c, "Deliver tapped (countdown seen): " + MissedBolus.num(m.units) + " U, alert at "
+                    + Store.hm(m.deadline) + " if not delivered");
+            schedule(c, m.deadline);
+        }
+    }
+
     /** A delivered bolus (CamapsListener), any amount. */
     static synchronized void delivered(Context c, double units, long now) {
         SharedPreferences p = Store.p(c);
         MissedBolus m = load(p);
         double carbs = m.carbs, calcUnits = m.units;
         long alerted = m.alertedAt;
+        boolean tapped = m.counting;
         MissedBolus.Event e = m.delivered(units, now);
+        if (tapped && e == MissedBolus.Event.CLEARED) {
+            long first = p.getLong("cd_first_at", 0);
+            if (first > 0) Store.log(c, "Delivery confirmed " + (now - first) / 1000 + " s after the countdown started ("
+                    + MissedBolus.num(units) + " U)");
+        }
         if (e == MissedBolus.Event.CLEARED) {
             Store.log(c, "Missed bolus check: cleared by delivery of " + MissedBolus.num(units) + " U (calculator "
                     + MissedBolus.num(carbs) + " g / " + MissedBolus.num(calcUnits) + " U)");
@@ -81,10 +116,12 @@ final class BolusWatch {
         SharedPreferences p = Store.p(c);
         MissedBolus m = load(p);
         long now = System.currentTimeMillis();
+        boolean tapped = m.counting;
         MissedBolus.Event e = m.tick(now);
         save(p, m);
         if (e == MissedBolus.Event.ALERT) {
-            String msg = MissedBolus.message(m.carbs, m.units, Store.hm(m.shownAt));
+            String msg = tapped ? MissedBolus.countdownMessage(m.carbs, m.units, Store.hm(m.shownAt))
+                    : MissedBolus.message(m.carbs, m.units, Store.hm(m.shownAt));
             Store.log(c, "Missed bolus check: ALERT. " + msg);
             alert(c, msg, now);
             announce(c, msg, now);
