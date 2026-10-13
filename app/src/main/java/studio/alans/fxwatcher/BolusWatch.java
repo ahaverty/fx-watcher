@@ -71,14 +71,14 @@ final class BolusWatch {
         MissedBolus m = load(p);
         // One log line per tick, not per screen event (the same number is read many times a second).
         if (secsLeft != p.getInt("cd_last_secs", -1) || now - p.getLong("cd_last_at", 0) > 15_000L) {
-            Store.log(c, secsLeft < 0 ? "Delivery countdown on screen" : "Delivery countdown " + secsLeft + " s");
+            Store.logCam(c, secsLeft < 0 ? "Delivery countdown on screen" : "Delivery countdown " + secsLeft + " s");
         }
         p.edit().putInt("cd_last_secs", secsLeft).putLong("cd_last_at", now).apply();
         MissedBolus.Event e = m.countdown(now, fastSec(c) * 1000L);
         save(p, m);
         if (e == MissedBolus.Event.STARTED) {
             p.edit().putLong("cd_first_at", now).apply();
-            Store.log(c, "Deliver tapped (countdown seen): " + MissedBolus.num(m.units) + " U, alert at "
+            Store.logCam(c, "Deliver tapped (countdown seen): " + MissedBolus.num(m.units) + " U, alert at "
                     + Store.hm(m.deadline) + " if not delivered");
             schedule(c, m.deadline);
         }
@@ -94,7 +94,7 @@ final class BolusWatch {
         MissedBolus.Event e = m.delivered(units, now);
         if (tapped && e == MissedBolus.Event.CLEARED) {
             long first = p.getLong("cd_first_at", 0);
-            if (first > 0) Store.log(c, "Delivery confirmed " + (now - first) / 1000 + " s after the countdown started ("
+            if (first > 0) Store.logCam(c, "Delivery confirmed " + (now - first) / 1000 + " s after the countdown started ("
                     + MissedBolus.num(units) + " U)");
         }
         if (e == MissedBolus.Event.CLEARED) {

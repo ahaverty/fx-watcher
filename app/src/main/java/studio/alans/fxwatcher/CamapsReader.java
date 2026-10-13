@@ -215,7 +215,7 @@ public class CamapsReader extends AccessibilityService {
                         + (calc.has("meal_size") ? ", " + calc.optString("meal_size") + " meal" : "");
                 if (!shown.equals(lastCalc)) {
                     lastCalc = shown;
-                    Store.log(this, "Bolus calculator: " + shown);
+                    Store.logCam(this, "Bolus calculator: " + shown);
                     BolusWatch.calculator(this, calc.optDouble("carbs", Double.NaN), calc.optDouble("units"), now);
                 }
                 Store.p(this).edit().putString(Store.RD_CALC, calc.toString()).apply();
@@ -305,7 +305,7 @@ public class CamapsReader extends AccessibilityService {
                 t.put("meal_type", mealType);    // meal | hypo | slow (slowly absorbed)
                 t.put("notes", "Add meal: " + mealAmount + " g, " + ("hypo".equals(mealType)
                         ? "hypo treatment" : "slow".equals(mealType) ? "slowly absorbed meal" : "meal or snack"));
-                Store.log(this, t.getString("notes"));
+                Store.logCam(this, t.getString("notes"));
                 Nightscout.postTreatment(this, t);
                 mealAmount = -1;
                 return;
@@ -345,7 +345,7 @@ public class CamapsReader extends AccessibilityService {
 
     private void send(BoostTracker.Post x) throws Exception {
         boolean cancelled = "cancelled".equals(x.ended);
-        Store.log(this, x.kind + (cancelled ? (x.end == x.start ? " planned for " + Store.hm(x.start) + " cancelled"
+        Store.logCam(this, x.kind + (cancelled ? (x.end == x.start ? " planned for " + Store.hm(x.start) + " cancelled"
                 : " cancelled at " + Store.hm(x.end)) : " " + Store.hm(x.start) + "-" + Store.hm(x.end))
                 + (x.startKnown ? "" : " (start not seen)"));
         JSONObject t = Nightscout.treatment("CamAPS " + x.kind, x.start, "camaps-screen");
@@ -417,7 +417,7 @@ public class CamapsReader extends AccessibilityService {
             if (camaps.length() > 0) d.put("camaps", camaps);
             d.put("source", text != null && camaps.length() > 0 ? "camaps-screen:status" : "camaps-screen:calculator");
             Nightscout.postDeviceStatus(this, d);
-            Store.log(this, "Active insulin " + iob + " U"
+            Store.logCam(this, "Active insulin " + iob + " U"
                     + (camaps.has("infusion_rate_u_h") ? ", rate " + camaps.get("infusion_rate_u_h") + " U/h" : ""));
         } catch (Exception ex) {
             Log.w(TAG, "iob", ex);

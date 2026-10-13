@@ -3,6 +3,8 @@ package studio.alans.fxwatcher;
 import android.Manifest;
 import android.app.Activity;
 import android.app.NotificationManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -18,6 +20,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.service.notification.NotificationListenerService;
 import android.text.InputType;
+import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -30,6 +33,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
 
     private LinearLayout root;
+    private LinearLayout cur;       // where the next field goes: root, or the open group
     private int pad;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -81,6 +85,7 @@ public class MainActivity extends Activity {
         long now = System.currentTimeMillis();
         ScrollView sv = new ScrollView(this);
         root = new LinearLayout(this);
+        cur = root;
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(pad, pad * 3, pad, pad * 2);
         sv.addView(root);
@@ -102,6 +107,9 @@ public class MainActivity extends Activity {
                 : pump == Phone.DOWN ? "off since " + Store.hm(p.getLong(Store.PUMP_DOWN_SINCE, now)) : "unknown")
                 + (pump != Phone.UP && upAt > 0 ? " (last on " + Store.hm(upAt) + ")" : "")
                 + " · battery " + Phone.battery(this) + "%" + (Phone.charging(this) ? " charging" : ""), 14));
+        TextView ver = text("FX Watcher " + version(), 12);
+        ver.setTextColor(0xFF888888);
+        root.addView(ver);
 
         long snooze = p.getLong(Store.SNOOZE_UNTIL, 0);
         if (snooze > now) {
@@ -119,80 +127,60 @@ public class MainActivity extends Activity {
             root.addView(button("Silence alarm", () -> Monitor.silence(this)));
         }
 
-        // ---- Setup checklist
-        header("Setup");
+        // ---- Setup checklist (open while anything is missing, folded away once all is well)
         String enabled = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
-        check("Read CamAPS notification", enabled != null && enabled.contains(getPackageName()),
-                () -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        boolean okListener = enabled != null && enabled.contains(getPackageName());
         NotificationManager nm = getSystemService(NotificationManager.class);
-        check("Show notifications", nm.areNotificationsEnabled(), this::appNotificationSettings);
+        boolean okNotif = nm.areNotificationsEnabled();
+        boolean okFull = Build.VERSION.SDK_INT < 34 || nm.canUseFullScreenIntent();
+        boolean okOverlay = Settings.canDrawOverlays(this);
+        boolean okBt = Phone.canSeeBluetooth(this);
+        String a11y = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        boolean okA11y = a11y != null && a11y.contains(getPackageName() + "/");
+        PowerManager pm = getSystemService(PowerManager.class);
+        boolean okBattery = pm.isIgnoringBatteryOptimizations(getPackageName());
+        boolean allOk = okListener && okNotif && okFull && okOverlay && okBt && okA11y && okBattery;
+        section(allOk ? "Setup  ✓ all set" : "Setup  ✗ needs attention", "setup", !allOk);
+        check("Read CamAPS notification", okListener,
+                () -> startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+        check("Show notifications", okNotif, this::appNotificationSettings);
         if (Build.VERSION.SDK_INT >= 34) {
-            check("Full-screen alarms over the lock screen", nm.canUseFullScreenIntent(), () ->
+            check("Full-screen alarms over the lock screen", okFull, () ->
                     startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
                             Uri.parse("package:" + getPackageName()))));
         }
-        check("Display over other apps (lets it reopen CamAPS)", Settings.canDrawOverlays(this), () ->
+        check("Display over other apps (lets it reopen CamAPS)", okOverlay, () ->
                 startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName()))));
-        check("See the pump's Bluetooth link", Phone.canSeeBluetooth(this), () ->
+        check("See the pump's Bluetooth link", okBt, () ->
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 1));
-        String a11y = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        check("Optional: read the CamAPS screen (Boost, Ease-off, meals, active insulin; read-only)",
-                a11y != null && a11y.contains(getPackageName() + "/"),
+        check("Read the CamAPS screen (Boost, meals, bolus checks; read-only)", okA11y,
                 () -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
-        PowerManager pm = getSystemService(PowerManager.class);
-        check("Battery: unrestricted", pm.isIgnoringBatteryOptimizations(getPackageName()), () ->
+        check("Battery: unrestricted", okBattery, () ->
                 startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                         Uri.parse("package:" + getPackageName()))));
         if ("Unknown".equals(p.getString(Store.STATUS, "")) && p.getBoolean(Store.PRESENT, false)) {
             TextView lang = text("FX Watcher can't read the auto mode from CamAPS (it looks for the English "
-                    + "label \"Auto mode\"). It will still alarm if glucose disappears or CamAPS stops, "
+                    + "label 'Auto mode'). It will still alarm if glucose disappears or CamAPS stops, "
                     + "but not when auto mode drops out.", 14);
             lang.setTextColor(0xFFEF6C00);
-            root.addView(lang);
+            cur.addView(lang);
         }
+        cur = root;
 
-        // ---- Test
-        header("Test");
-        root.addView(button("Test alarm now", () -> Monitor.test(this)));
-        root.addView(button("Test alarm in 20 s (lock the phone)", () -> {
-            Toast.makeText(this, "Lock the phone now", Toast.LENGTH_SHORT).show();
-            handler.postDelayed(() -> Monitor.test(getApplicationContext()), 20_000L);
-        }));
-
-        // ---- Settings
+        // ---- Settings, grouped. Every field exists even while its group is folded, so Save sees them all.
         header("Settings");
-        EditText signal = number("Signal loss / auto mode not On: alarm after (min)",
+        section("Alarms", "alarms", false);
+        EditText signal = number("Signal lost or auto mode off: alarm after (min)", null,
                 p.getInt(Store.SIGNAL_MIN, Store.DEF_SIGNAL_MIN), false);
-        EditText missing = number("CamAPS not running: alarm after (min)",
+        EditText missing = number("CamAPS not running: alarm after (min)", null,
                 p.getInt(Store.MISSING_MIN, Store.DEF_MISSING_MIN), false);
-        EditText stale = number("No word from CamAPS: alarm after (min)",
+        EditText stale = number("No word from CamAPS: alarm after (min)", "At least 6.",
                 p.getInt(Store.STALE_MIN, Store.DEF_STALE_MIN), false);
-        EditText realarm = number("Silenced alarm comes back after (min)",
-                p.getInt(Store.REALARM_MIN, Store.DEF_REALARM_MIN), false);
-        EditText low = number("Urgent low alarm at or below (mmol/L; 3.0 = 54 mg/dL; 0 = off)",
+        EditText low = number("Urgent low at or below (mmol/L)", "3.0 = 54 mg/dL. 0 turns it off.",
                 p.getFloat(Store.LOW_MMOL, Store.DEF_LOW_MMOL), true);
-        EditText pumpMin = number("Pump link off: warn and reopen CamAPS after (min, alarm 10 min later, 0 = off)",
-                p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN), false);
-        EditText pumpNudge = number("Pump link off: quietly reopen CamAPS after (min, then every 8, screen off only, 0 = off)",
-                p.getInt(Store.PUMP_NUDGE, Store.DEF_PUMP_NUDGE), false);
-        EditText missedBolus = number("Bolus calculator used but nothing delivered: alert after (min, 0 = off)",
-                p.getInt(Store.MISSED_BOLUS_MIN, Store.DEF_MISSED_BOLUS_MIN), false);
-        EditText deliveryFast = number("Deliver tapped but no delivery confirmed: alert after (sec, +10 s per U, 0 = off)",
-                p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
-        root.addView(text("Pump Bluetooth name (or part of it)", 14));
-        EditText pumpName = new EditText(this);
-        pumpName.setSingleLine(true);
-        pumpName.setText(p.getString(Store.PUMP_NAME, Store.DEF_PUMP_NAME));
-        root.addView(pumpName);
-        EditText battNag = number("At night, warn if battery below (%) and not charging",
-                p.getInt(Store.BATT_NAG, Store.DEF_BATT_NAG), false);
-        EditText battAlarm = number("At night, alarm if battery below (%) and not charging",
-                p.getInt(Store.BATT_ALARM, Store.DEF_BATT_ALARM), false);
-        EditText nightFrom = number("Night starts (hour)", p.getInt(Store.NIGHT_FROM, Store.DEF_NIGHT_FROM), false);
-        EditText nightTo = number("Night ends (hour)", p.getInt(Store.NIGHT_TO, Store.DEF_NIGHT_TO), false);
-        CheckBox launch = box("Reopen CamAPS automatically when something's wrong",
-                p.getBoolean(Store.AUTO_LAUNCH, true));
+        EditText realarm = number("Silenced alarm comes back after (min)", null,
+                p.getInt(Store.REALARM_MIN, Store.DEF_REALARM_MIN), false);
         CheckBox maxVol = box("Alarm at full alarm volume", p.getBoolean(Store.MAX_VOLUME, true));
         String tone;
         try {
@@ -200,54 +188,85 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             tone = "default";
         }
-        root.addView(button("Alarm tone: " + tone, this::pickTone));
+        cur.addView(button("Alarm tone: " + tone, this::pickTone));
         CheckBox statusN = box("Quiet status notification", p.getBoolean(Store.STATUS_NOTIF, true));
 
-        // ---- Bedtime media volume
-        header("Bedtime media volume");
-        root.addView(text("CamAPS plays most of its alerts (all but Urgent Low) on the MEDIA volume, so if "
-                + "media is turned down they are silent all night. This raises media volume at bedtime, "
-                + "once the phone has been put down, and puts it back in the morning.", 14));
+        section("Insulin delivery checks", "bolus", false);
+        EditText missedBolus = number("Bolus entered but never delivered: alert after (min)",
+                "Counted from the last value on the bolus calculator. 0 turns it off.",
+                p.getInt(Store.MISSED_BOLUS_MIN, Store.DEF_MISSED_BOLUS_MIN), false);
+        EditText deliveryFast = number("Deliver tapped but not delivered: alert after (sec)",
+                "Plus 10 s for each unit. Starts when the delivery countdown shows. 0 turns it off.",
+                p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
+
+        section("Pump link", "pump", false);
+        EditText pumpName = field("Pump Bluetooth name", "Or part of it, for example YpsoPump.",
+                p.getString(Store.PUMP_NAME, Store.DEF_PUMP_NAME));
+        EditText pumpMin = number("Link off: warn and reopen CamAPS after (min)",
+                "The alarm follows 10 min later. 0 turns it off.",
+                p.getInt(Store.PUMP_MIN, Store.DEF_PUMP_MIN), false);
+        EditText pumpNudge = number("Link off: quietly reopen CamAPS after (min)",
+                "Then every 8 min, only while the screen is off. 0 turns it off.",
+                p.getInt(Store.PUMP_NUDGE, Store.DEF_PUMP_NUDGE), false);
+        CheckBox launch = box("Reopen CamAPS automatically when something's wrong",
+                p.getBoolean(Store.AUTO_LAUNCH, true));
+
+        section("Night and battery", "night", false);
+        EditText nightFrom = number("Night starts (hour)", null, p.getInt(Store.NIGHT_FROM, Store.DEF_NIGHT_FROM), false);
+        EditText nightTo = number("Night ends (hour)", null, p.getInt(Store.NIGHT_TO, Store.DEF_NIGHT_TO), false);
+        EditText battNag = number("At night, warn below battery (%)", "Only when not charging.",
+                p.getInt(Store.BATT_NAG, Store.DEF_BATT_NAG), false);
+        EditText battAlarm = number("At night, alarm below battery (%)", "Only when not charging.",
+                p.getInt(Store.BATT_ALARM, Store.DEF_BATT_ALARM), false);
+
+        section("Bedtime media volume", "bedtime", false);
+        cur.addView(text("CamAPS plays most alerts (all but Urgent Low) on the media volume, so they are "
+                + "silent all night if media is turned down. This raises media volume at bedtime and puts "
+                + "it back in the morning.", 14));
         CheckBox bedOn = box("Raise media volume at bedtime", p.getBoolean(Store.BED_ON, false));
-        if (Bedtime.on(this)) root.addView(text(bedtimeStatus(p), 14));
-        EditText bedLevel = number("Media volume to set (% of max; only ever raised)",
+        if (Bedtime.on(this)) cur.addView(text(bedtimeStatus(p), 14));
+        EditText bedLevel = number("Media volume to set (% of max)", "Only ever raised, never lowered.",
                 p.getInt(Store.BED_LEVEL_PCT, Store.DEF_BED_LEVEL_PCT), false);
-        CheckBox bedMode = box("Start when sleep / bedtime / do-not-disturb mode turns on",
+        CheckBox bedMode = box("Start when sleep, bedtime or do-not-disturb mode turns on",
                 p.getBoolean(Store.BED_USE_MODE, true));
         CheckBox bedGoogle = box("Start when Google sleep detection thinks I'm asleep (needs Physical activity)",
                 p.getBoolean(Store.BED_USE_GOOGLE, false));
-        EditText bedEarliest = field("Those only count after (HH:MM)", p.getString(Store.BED_EARLIEST, Store.DEF_BED_EARLIEST));
-        EditText bedFallback = field("Otherwise start at (HH:MM)", p.getString(Store.BED_FALLBACK, Store.DEF_BED_FALLBACK));
-        EditText bedIdle = number("Then wait for the phone to be unused, with nothing playing, for (min)",
+        EditText bedEarliest = field("Those only count after (HH:MM)", null, p.getString(Store.BED_EARLIEST, Store.DEF_BED_EARLIEST));
+        EditText bedFallback = field("Otherwise start at (HH:MM)", null, p.getString(Store.BED_FALLBACK, Store.DEF_BED_FALLBACK));
+        EditText bedIdle = number("Then wait until the phone is unused for (min)", "With nothing playing.",
                 p.getInt(Store.BED_IDLE_MIN, Store.DEF_BED_IDLE_MIN), false);
-        CheckBox bedRestore = box("Put the volume back in the morning (first unlock after the time below, "
-                + "unless I changed it)", p.getBoolean(Store.BED_RESTORE, true));
-        EditText bedMorning = field("Morning from (HH:MM)", p.getString(Store.BED_MORNING, Store.DEF_BED_MORNING));
-        root.addView(text("Advanced", 15));
-        EditText bedDays = field("Start time per evening, Mon to Sun, comma separated; \"off\" skips that night; "
-                + "empty = the time above", p.getString(Store.BED_FALLBACK_DAYS, ""));
+        CheckBox bedRestore = box("Put the volume back in the morning (unless I changed it)",
+                p.getBoolean(Store.BED_RESTORE, true));
+        EditText bedMorning = field("Morning from (HH:MM)", "First unlock after this time.",
+                p.getString(Store.BED_MORNING, Store.DEF_BED_MORNING));
+        EditText bedDays = field("Advanced: start time for each evening, Mon to Sun",
+                "Seven entries separated by commas; 'off' skips that night; empty = the single time above.",
+                p.getString(Store.BED_FALLBACK_DAYS, ""));
         bedDays.setHint("00:00,00:00,00:00,00:00,01:00,off,00:00");
-        EditText bedConf = number("Google sleep confidence needed (%)",
+        EditText bedConf = number("Advanced: Google sleep confidence needed (%)", null,
                 p.getInt(Store.BED_GOOGLE_CONF, Store.DEF_BED_GOOGLE_CONF), false);
-        root.addView(text("Advanced, optional: Home Assistant webhook. Leave empty unless you use Home "
-                + "Assistant; nothing leaves the phone without it.", 14));
+
+        section("Connections (optional)", "connections", false);
+        cur.addView(text("Home Assistant webhook. Leave empty unless you use Home Assistant; nothing "
+                + "leaves the phone without it.", 14));
         EditText url = new EditText(this);
         url.setSingleLine(true);
         url.setText(p.getString(Store.URL, ""));
         url.setHint("https://…/api/webhook/…");
-        root.addView(url);
-        root.addView(text("Advanced, optional: Nightscout. Sends boluses, carbs, Boost/Ease-off and active "
-                + "insulin seen in CamAPS (the screen reader adds the ones only shown on screen). Use a "
-                + "Nightscout access token whose role can create treatments and device status.", 14));
-        EditText nsUrl = field("Nightscout address", p.getString(Store.NS_URL, ""));
+        cur.addView(url);
+        cur.addView(text("Nightscout. Sends boluses, carbs, Boost/Ease-off and active insulin seen in "
+                + "CamAPS. Use an access token whose role can create treatments and device status.", 14));
+        EditText nsUrl = field("Nightscout address", null, p.getString(Store.NS_URL, ""));
         nsUrl.setHint("https://my-nightscout.example");
-        EditText nsToken = field("Nightscout access token", p.getString(Store.NS_TOKEN, ""));
+        EditText nsToken = field("Nightscout access token", null, p.getString(Store.NS_TOKEN, ""));
         nsToken.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         if (Nightscout.configured(this)) {
             long sent = p.getLong(Store.NS_LAST_SENT, 0);
-            root.addView(text("Nightscout: " + Nightscout.queued(this) + " waiting"
+            cur.addView(text("Nightscout: " + Nightscout.queued(this) + " waiting"
                     + (sent > 0 ? " · last sent " + Store.ago(sent, now) : ""), 14));
         }
+        cur = root;
+
         root.addView(button("Save settings", () -> {
             p.edit().putInt(Store.SIGNAL_MIN, intOf(signal, Store.DEF_SIGNAL_MIN))
                     .putInt(Store.MISSING_MIN, intOf(missing, Store.DEF_MISSING_MIN))
@@ -291,15 +310,102 @@ public class MainActivity extends Activity {
             Store.log(this, "Settings saved");
             Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         }));
-        root.addView(button("Open CamAPS now", () -> Monitor.launchCamaps(this, "manual")));
 
-        // ---- Log
-        header("Log");
-        TextView log = text(p.getString(Store.LOG, ""), 12);
-        log.setTypeface(Typeface.MONOSPACE);
-        root.addView(log);
+        // ---- Tools
+        section("Test and tools", "tools", false);
+        cur.addView(button("Test alarm now", () -> Monitor.test(this)));
+        cur.addView(button("Test alarm in 20 s (lock the phone)", () -> {
+            Toast.makeText(this, "Lock the phone now", Toast.LENGTH_SHORT).show();
+            handler.postDelayed(() -> Monitor.test(getApplicationContext()), 20_000L);
+        }));
+        cur.addView(button("Open CamAPS now", () -> Monitor.launchCamaps(this, "manual")));
+        cur = root;
+
+        // ---- Logs: copy buttons always visible, the text itself folded away until opened
+        logSection("FX Watcher log", "log", Store.LOG, "FX Watcher log", 1);
+        logSection("What FX Watcher saw in CamAPS", "camlog", Store.CAMLOG, "CamAPS log (as seen by FX Watcher)", 3);
 
         setContentView(sv);
+    }
+
+    /** One log: copy / share buttons, and the text in a fold-away area. */
+    private void logSection(String title, String key, String prefKey, String label, int defaultHours) {
+        section(title, key, false);
+        String log = Store.p(this).getString(prefKey, "");
+        int n = LogExport.count(LogExport.lines(log, System.currentTimeMillis(), 0));
+        cur.addView(text(n + " lines kept. Copy gives oldest first, with the app version and phone on top, "
+                + "ready to paste to Claude.", 12));
+        LinearLayout r = new LinearLayout(this);
+        r.addView(copyButton("Copy last " + defaultHours + " h", prefKey, label, defaultHours),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        r.addView(copyButton("Copy last 24 h", prefKey, label, 24),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        r.addView(copyButton("Copy all", prefKey, label, 0),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        cur.addView(r);
+        Button share = new Button(this);
+        share.setText("Share…");
+        share.setAllCaps(false);
+        share.setOnClickListener(v -> {
+            String body = exportText(prefKey, label, 24);
+            startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(Intent.EXTRA_SUBJECT, label).putExtra(Intent.EXTRA_TEXT, body), "Share log"));
+        });
+        cur.addView(share);
+        TextView t = text(log.isEmpty() ? "(empty)" : log, 12);
+        t.setTypeface(Typeface.MONOSPACE);
+        t.setTextIsSelectable(true);
+        cur.addView(t);
+        cur = root;
+    }
+
+    private Button copyButton(String caption, String prefKey, String label, int hours) {
+        Button b = new Button(this);
+        b.setText(caption);
+        b.setAllCaps(false);
+        b.setOnClickListener(v -> {
+            String body = exportText(prefKey, label, hours);
+            ClipboardManager cm = getSystemService(ClipboardManager.class);
+            cm.setPrimaryClip(ClipData.newPlainText(label, body));
+            Toast.makeText(this, "Copied " + LogExport.count(body) + " lines", Toast.LENGTH_SHORT).show();
+        });
+        return b;
+    }
+
+    private String exportText(String prefKey, String label, double hours) {
+        long now = System.currentTimeMillis();
+        String lines = LogExport.lines(Store.p(this).getString(prefKey, ""), now, hours);
+        return label + "\n" + LogExport.header(version(), Build.MANUFACTURER + " " + Build.MODEL,
+                Build.VERSION.RELEASE, now) + "\n\n" + lines;
+    }
+
+    private String version() {
+        try {
+            android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return "v" + pi.versionName + " (build " + pi.getLongVersionCode() + ")";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** A fold-away group: tap the heading to open or close it; later fields go into it until reset to root. */
+    private void section(String title, String key, boolean openDefault) {
+        boolean open = Store.p(this).getBoolean("ui_open_" + key, openDefault);
+        TextView h = text((open ? "▾  " : "▸  ") + title, 17);
+        h.setTypeface(Typeface.DEFAULT_BOLD);
+        h.setPadding(0, pad, 0, pad / 2);
+        root.addView(h);
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setVisibility(open ? View.VISIBLE : View.GONE);
+        root.addView(body);
+        h.setOnClickListener(v -> {
+            boolean now = body.getVisibility() != View.VISIBLE;
+            body.setVisibility(now ? View.VISIBLE : View.GONE);
+            h.setText((now ? "▾  " : "▸  ") + title);
+            Store.p(this).edit().putBoolean("ui_open_" + key, now).apply();
+        });
+        cur = body;
     }
 
     private static final int PICK_TONE = 2;
@@ -359,7 +465,7 @@ public class MainActivity extends Activity {
             b.setOnClickListener(v -> fix.run());
             r.addView(b);
         }
-        root.addView(r);
+        cur.addView(r);
     }
 
     private Button button(String s, Runnable r) {
@@ -373,13 +479,20 @@ public class MainActivity extends Activity {
         return b;
     }
 
-    private EditText number(String label, float value, boolean decimal) {
-        root.addView(text(label, 14));
+    private TextView hint(String s) {
+        TextView t = text(s, 12);
+        t.setTextColor(0xFF888888);
+        return t;
+    }
+
+    private EditText number(String label, String hint, float value, boolean decimal) {
+        cur.addView(text(label, 14));
+        if (hint != null) cur.addView(hint(hint));
         EditText e = new EditText(this);
         e.setSingleLine(true);
         e.setInputType(InputType.TYPE_CLASS_NUMBER | (decimal ? InputType.TYPE_NUMBER_FLAG_DECIMAL : 0));
         e.setText(decimal ? String.valueOf(value) : String.valueOf((int) value));
-        root.addView(e);
+        cur.addView(e);
         return e;
     }
 
@@ -387,7 +500,7 @@ public class MainActivity extends Activity {
         CheckBox b = new CheckBox(this);
         b.setText(label);
         b.setChecked(checked);
-        root.addView(b);
+        cur.addView(b);
         return b;
     }
 
@@ -397,12 +510,13 @@ public class MainActivity extends Activity {
         if (req == 3) SleepReceiver.sync(this);
     }
 
-    private EditText field(String label, String value) {
-        root.addView(text(label, 14));
+    private EditText field(String label, String hint, String value) {
+        cur.addView(text(label, 14));
+        if (hint != null) cur.addView(hint(hint));
         EditText e = new EditText(this);
         e.setSingleLine(true);
         e.setText(value);
-        root.addView(e);
+        cur.addView(e);
         return e;
     }
 

@@ -144,7 +144,7 @@ public class CamapsListener extends NotificationListenerService {
         String key = at + "|" + text;
         if (key.equals(p.getString(Store.LAST_INFO, ""))) return;   // the same post seen twice
         p.edit().putString(Store.LAST_INFO, key).apply();
-        Store.log(this, "CamAPS: " + (title.isEmpty() ? "" : title + ": ") + text);
+        Store.logCam(this, "CamAPS: " + (title.isEmpty() ? "" : title + ": ") + text);
         // Any fresh "Delivered" notification answers the missed bolus check, Nightscout or not.
         double u = BolusTracker.units(text);
         if (u >= 0) BolusWatch.delivered(this, u, System.currentTimeMillis());
@@ -202,7 +202,7 @@ public class CamapsListener extends NotificationListenerService {
     private static void post(Context c, BolusTracker.Result r, String source) throws Exception {
         if (r.kind == BolusTracker.Kind.NONE) return;
         SharedPreferences p = Store.p(c);
-        Store.log(c, (r.kind == BolusTracker.Kind.NEW ? "Bolus delivered: " : "Bolus updated with carbs: ")
+        Store.logCam(c, (r.kind == BolusTracker.Kind.NEW ? "Bolus delivered: " : "Bolus updated with carbs: ")
                 + r.units + " U" + (Double.isNaN(r.carbs) ? "" : ", " + r.carbs + " g") + " (" + source + ")");
         if (!Nightscout.configured(c)) return;
         JSONObject tr = Nightscout.treatment("Bolus", r.at, source);
@@ -223,7 +223,7 @@ public class CamapsListener extends NotificationListenerService {
     public void onNotificationRemoved(StatusBarNotification sbn) {
         if (isCamaps(sbn)) {
             // Make sure it really is gone (CamAPS may have reposted under another id).
-            if (!scanActive()) Store.log(this, "CamAPS notification removed");
+            if (!scanActive()) Store.logCam(this, "CamAPS notification removed");
         }
     }
 
@@ -291,6 +291,7 @@ public class CamapsListener extends NotificationListenerService {
         if (status == null && glucose == null && !force) return false;
         if (status == null) status = "Unknown";
         String pkg = sbn.getPackageName();
+        Store.camLog(this, "Status notification: auto mode " + status + (glucose == null ? "" : ", glucose " + glucose));
         Monitor.onCamaps(this, true, status, glucose, texts, pkg, false);
         return true;
     }
@@ -300,7 +301,7 @@ public class CamapsListener extends NotificationListenerService {
         Notification n = sbn.getNotification();
         CharSequence t = n.extras.getCharSequence(Notification.EXTRA_TITLE);
         CharSequence x = n.extras.getCharSequence(Notification.EXTRA_TEXT);
-        Store.log(this, "Ignored other CamAPS notification (id " + sbn.getId()
+        Store.logCam(this, "Ignored other CamAPS notification (id " + sbn.getId()
                 + ", channel " + n.getChannelId() + ", category " + n.category
                 + (t != null ? ", \"" + t + "\"" : "") + (x != null ? ", \"" + x + "\"" : "") + ")");
     }

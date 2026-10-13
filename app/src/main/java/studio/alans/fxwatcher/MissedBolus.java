@@ -35,6 +35,9 @@ final class MissedBolus {
     double carbs, units;
     long deadline;
     boolean counting;        // CamAPS's "Delivery will start in" countdown was seen: Deliver was tapped
+    // The latest calculator read, kept even when it was recognised as a bolus already delivered
+    double calcCarbs, calcUnits;
+    long calcAt;
     // Calculator burst
     long burstStart, lastCalcAt;
     // Last delivery seen
@@ -54,6 +57,9 @@ final class MissedBolus {
         if (!sameBurst) burstStart = now;
         lastCalcAt = now;
         if (g <= 0 && units <= 0) return Event.NONE;         // 0 g / 0 U: neither start nor cancel
+        calcCarbs = g;
+        calcUnits = units;
+        calcAt = now;
         if (timeoutMs <= 0) return Event.NONE;
         // The calculator still showing after its bolus went in: same burst, or the same units.
         if (deliveredAt > 0 && deliveredAt >= burstStart) return Event.NONE;
@@ -76,7 +82,20 @@ final class MissedBolus {
      * Returns STARTED the first time (for the log). Nothing pending (calculator never read): ignored.
      */
     Event countdown(long now, long baseMs) {
-        if (!pending() || baseMs <= 0 || counting) return Event.NONE;
+        if (baseMs <= 0 || counting) return Event.NONE;
+        if (!pending()) {
+            // The calculator looked like a bolus already delivered (same units, e.g. the same 0.2 U
+            // twice), but a countdown is proof that Deliver was tapped again. Needs a recent
+            // calculator read, and not the tail of the previous delivery.
+            if (calcAt == 0 || now - calcAt > BURST_GAP) return Event.NONE;
+            if (deliveredAt > 0 && now - deliveredAt < 60_000L) return Event.NONE;
+            pendingAt = now;
+            shownAt = calcAt;
+            carbs = calcCarbs;
+            units = calcUnits;
+            alertedAt = 0;
+            deadline = Long.MAX_VALUE;
+        }
         counting = true;
         long fast = now + baseMs + Math.round(units * PER_UNIT);
         if (fast < deadline) deadline = fast;
@@ -130,8 +149,9 @@ final class MissedBolus {
     // ── Persistence (plain text, like BolusTracker) ──
 
     String save() {
-        return String.format(Locale.US, "%d|%s|%s|%d|%d|%d|%d|%s|%d|%d|%d", pendingAt, carbs, units, deadline,
-                burstStart, lastCalcAt, deliveredAt, deliveredUnits, alertedAt, shownAt, counting ? 1 : 0);
+        return String.format(Locale.US, "%d|%s|%s|%d|%d|%d|%d|%s|%d|%d|%d|%s|%s|%d", pendingAt, carbs, units, deadline,
+                burstStart, lastCalcAt, deliveredAt, deliveredUnits, alertedAt, shownAt, counting ? 1 : 0,
+                calcCarbs, calcUnits, calcAt);
     }
 
     static MissedBolus load(String s) {
@@ -150,6 +170,11 @@ final class MissedBolus {
             m.alertedAt = Long.parseLong(a[8]);
             m.shownAt = Long.parseLong(a[9]);
             m.counting = a.length > 10 && a[10].equals("1");
+            if (a.length > 13) {
+                m.calcCarbs = Double.parseDouble(a[11]);
+                m.calcUnits = Double.parseDouble(a[12]);
+                m.calcAt = Long.parseLong(a[13]);
+            }
         } catch (Exception e) {
             return new MissedBolus();
         }

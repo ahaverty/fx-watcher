@@ -84,6 +84,41 @@ public class DeliveryCountdownTest {
     }
 
     @Test
+    public void theSameTinyDoseTwiceStillArmsOnTheCountdown() {
+        // 13 Oct 15:15 and 15:23: 1 g / 0.2 U twice, 8 min apart. The second calculator read looks like
+        // the first delivery (same units), so only the countdown can arm the check.
+        MissedBolus t = new MissedBolus();
+        t.calculator(1, 0.2, at("15:15:00"), TIMEOUT);
+        t.delivered(0.2, at("15:15:21"));
+        assertEquals(MissedBolus.Event.NONE, t.calculator(1, 0.2, at("15:23:44"), TIMEOUT));
+        assertFalse(t.pending());
+        assertEquals(MissedBolus.Event.STARTED, t.countdown(at("15:23:47"), BASE));
+        assertTrue(t.pending());
+        assertEquals(at("15:23:47") + BASE + 2_000L, t.deadline);
+        assertEquals(MissedBolus.Event.CLEARED, t.delivered(0.2, at("15:24:04")));
+        assertEquals(MissedBolus.Event.NONE, t.tick(at("16:00:00")));
+    }
+
+    @Test
+    public void theSameDoseNeverDeliveredAlertsFromTheCountdown() {
+        MissedBolus t = new MissedBolus();
+        t.calculator(1, 0.2, at("15:15:00"), TIMEOUT);
+        t.delivered(0.2, at("15:15:21"));
+        t.calculator(1, 0.2, at("15:23:44"), TIMEOUT);
+        t.countdown(at("15:23:47"), BASE);
+        assertEquals(MissedBolus.Event.ALERT, t.tick(at("15:24:49")));
+    }
+
+    @Test
+    public void aCountdownRightAfterADeliveryIsItsTail() {
+        MissedBolus t = new MissedBolus();
+        t.calculator(1, 0.2, at("15:15:00"), TIMEOUT);
+        t.delivered(0.2, at("15:15:21"));
+        assertEquals(MissedBolus.Event.NONE, t.countdown(at("15:15:40"), BASE));
+        assertFalse(t.pending());
+    }
+
+    @Test
     public void countdownWithNoCalculatorReadIsIgnored() {
         MissedBolus t = new MissedBolus();
         assertEquals(MissedBolus.Event.NONE, t.countdown(at("10:00:00"), BASE));
