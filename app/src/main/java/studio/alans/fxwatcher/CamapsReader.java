@@ -48,6 +48,7 @@ import java.util.regex.Pattern;
 public class CamapsReader extends AccessibilityService {
 
     private static final String TAG = "FXReader";
+    private static final Pattern DELIVERY_COUNTDOWN = Pattern.compile("^Delivery will start in(?:\\s*(\\d+))?");
     private static final Pattern COUNTDOWN = Pattern.compile("^(\\d{1,2}):(\\d{2}):(\\d{2})$");
     private static final Pattern NUM = Pattern.compile("^\\d+([.,]\\d+)?$");
     private static final Pattern IOB = Pattern.compile("Active insulin:?\\s*(\\d+(?:[.,]\\d+)?)\\s*U");
@@ -120,6 +121,9 @@ public class CamapsReader extends AccessibilityService {
         for (Item it : items) {
             texts.add(it.text);
             if (it.text.startsWith("Delivered")) known = true;
+            // "Delivery will start in 5 seconds": only on screen after Deliver was tapped.
+            Matcher cd = DELIVERY_COUNTDOWN.matcher(it.text);
+            if (cd.find()) BolusWatch.countdown(this, cd.group(1) == null ? -1 : Integer.parseInt(cd.group(1)), now);
         }
         try {
             CamapsListener.screen(this, texts, now);
@@ -211,7 +215,8 @@ public class CamapsReader extends AccessibilityService {
                         + (calc.has("meal_size") ? ", " + calc.optString("meal_size") + " meal" : "");
                 if (!shown.equals(lastCalc)) {
                     lastCalc = shown;
-                    Store.log(this, "Bolus calculator: " + shown);
+                    Store.logCam(this, "Bolus calculator: " + shown);
+                    BolusWatch.calculator(this, calc.optDouble("carbs", Double.NaN), calc.optDouble("units"), now);
                 }
                 Store.p(this).edit().putString(Store.RD_CALC, calc.toString()).apply();
             } catch (Exception ignored) {
@@ -300,7 +305,7 @@ public class CamapsReader extends AccessibilityService {
                 t.put("meal_type", mealType);    // meal | hypo | slow (slowly absorbed)
                 t.put("notes", "Add meal: " + mealAmount + " g, " + ("hypo".equals(mealType)
                         ? "hypo treatment" : "slow".equals(mealType) ? "slowly absorbed meal" : "meal or snack"));
-                Store.log(this, t.getString("notes"));
+                Store.logCam(this, t.getString("notes"));
                 Nightscout.postTreatment(this, t);
                 mealAmount = -1;
                 return;
@@ -340,7 +345,7 @@ public class CamapsReader extends AccessibilityService {
 
     private void send(BoostTracker.Post x) throws Exception {
         boolean cancelled = "cancelled".equals(x.ended);
-        Store.log(this, x.kind + (cancelled ? (x.end == x.start ? " planned for " + Store.hm(x.start) + " cancelled"
+        Store.logCam(this, x.kind + (cancelled ? (x.end == x.start ? " planned for " + Store.hm(x.start) + " cancelled"
                 : " cancelled at " + Store.hm(x.end)) : " " + Store.hm(x.start) + "-" + Store.hm(x.end))
                 + (x.startKnown ? "" : " (start not seen)"));
         JSONObject t = Nightscout.treatment("CamAPS " + x.kind, x.start, "camaps-screen");
@@ -412,7 +417,7 @@ public class CamapsReader extends AccessibilityService {
             if (camaps.length() > 0) d.put("camaps", camaps);
             d.put("source", text != null && camaps.length() > 0 ? "camaps-screen:status" : "camaps-screen:calculator");
             Nightscout.postDeviceStatus(this, d);
-            Store.log(this, "Active insulin " + iob + " U"
+            Store.logCam(this, "Active insulin " + iob + " U"
                     + (camaps.has("infusion_rate_u_h") ? ", rate " + camaps.get("infusion_rate_u_h") + " U/h" : ""));
         } catch (Exception ex) {
             Log.w(TAG, "iob", ex);

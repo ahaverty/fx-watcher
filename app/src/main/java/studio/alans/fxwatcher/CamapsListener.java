@@ -63,7 +63,11 @@ public class CamapsListener extends NotificationListenerService {
         @Override
         public void onReceive(Context c, android.content.Intent i) {
             String act = i.getAction();
-            if (android.content.Intent.ACTION_SCREEN_OFF.equals(act)) { Bedtime.onScreen(c, false); return; }
+            if (android.content.Intent.ACTION_SCREEN_OFF.equals(act)) {
+                if (BolusWatch.pending(c)) Store.log(c, "Screen off (bolus waiting for delivery)");
+                Bedtime.onScreen(c, false);
+                return;
+            }
             if (android.content.Intent.ACTION_SCREEN_ON.equals(act)) Bedtime.onScreen(c, true);
             if (android.content.Intent.ACTION_USER_PRESENT.equals(act)) Bedtime.onUnlock(c);
             SharedPreferences p = Store.p(c);
@@ -140,7 +144,10 @@ public class CamapsListener extends NotificationListenerService {
         String key = at + "|" + text;
         if (key.equals(p.getString(Store.LAST_INFO, ""))) return;   // the same post seen twice
         p.edit().putString(Store.LAST_INFO, key).apply();
-        Store.log(this, "CamAPS: " + (title.isEmpty() ? "" : title + ": ") + text);
+        Store.logCam(this, "CamAPS: " + (title.isEmpty() ? "" : title + ": ") + text);
+        // Any fresh "Delivered" notification answers the missed bolus check, Nightscout or not.
+        double u = BolusTracker.units(text);
+        if (u >= 0) BolusWatch.delivered(this, u, System.currentTimeMillis());
         if (!Nightscout.configured(this)) return;
         try {
             if (delivered(this, text, at, "camaps-notification")) return;
@@ -173,6 +180,7 @@ public class CamapsListener extends NotificationListenerService {
         BolusTracker t = BolusTracker.load(p.getString(Store.BOLUS_TRACKER, ""));
         String before = t.save();
         BolusTracker.Result r = t.screen(texts, now, calcCarbs(p, now));
+        if (r.kind == BolusTracker.Kind.NEW) BolusWatch.delivered(c, r.units, now);
         String after = t.save();
         if (!after.equals(before)) p.edit().putString(Store.BOLUS_TRACKER, after).apply();
         post(c, r, "camaps-screen");
@@ -194,7 +202,7 @@ public class CamapsListener extends NotificationListenerService {
     private static void post(Context c, BolusTracker.Result r, String source) throws Exception {
         if (r.kind == BolusTracker.Kind.NONE) return;
         SharedPreferences p = Store.p(c);
-        Store.log(c, (r.kind == BolusTracker.Kind.NEW ? "Bolus delivered: " : "Bolus updated with carbs: ")
+        Store.logCam(c, (r.kind == BolusTracker.Kind.NEW ? "Bolus delivered: " : "Bolus updated with carbs: ")
                 + r.units + " U" + (Double.isNaN(r.carbs) ? "" : ", " + r.carbs + " g") + " (" + source + ")");
         if (!Nightscout.configured(c)) return;
         JSONObject tr = Nightscout.treatment("Bolus", r.at, source);
@@ -215,7 +223,7 @@ public class CamapsListener extends NotificationListenerService {
     public void onNotificationRemoved(StatusBarNotification sbn) {
         if (isCamaps(sbn)) {
             // Make sure it really is gone (CamAPS may have reposted under another id).
-            if (!scanActive()) Store.log(this, "CamAPS notification removed");
+            if (!scanActive()) Store.logCam(this, "CamAPS notification removed");
         }
     }
 
@@ -283,6 +291,7 @@ public class CamapsListener extends NotificationListenerService {
         if (status == null && glucose == null && !force) return false;
         if (status == null) status = "Unknown";
         String pkg = sbn.getPackageName();
+        Store.camLog(this, "Status notification: auto mode " + status + (glucose == null ? "" : ", glucose " + glucose));
         Monitor.onCamaps(this, true, status, glucose, texts, pkg, false);
         return true;
     }
@@ -292,7 +301,7 @@ public class CamapsListener extends NotificationListenerService {
         Notification n = sbn.getNotification();
         CharSequence t = n.extras.getCharSequence(Notification.EXTRA_TITLE);
         CharSequence x = n.extras.getCharSequence(Notification.EXTRA_TEXT);
-        Store.log(this, "Ignored other CamAPS notification (id " + sbn.getId()
+        Store.logCam(this, "Ignored other CamAPS notification (id " + sbn.getId()
                 + ", channel " + n.getChannelId() + ", category " + n.category
                 + (t != null ? ", \"" + t + "\"" : "") + (x != null ? ", \"" + x + "\"" : "") + ")");
     }
@@ -350,6 +359,22 @@ public class CamapsListener extends NotificationListenerService {
             j.put("pump", pump);
             j.put("battery", battery);
             j.put("charging", charging);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
+    /** The missed bolus check: state alert / cleared / dismissed, with the calculator's values. */
+    static void forwardMissedBolus(Context c, String state, double carbs, double units, String message) {
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "missed_bolus");
+            j.put("state", state);
+            j.put("carbs", carbs);
+            j.put("units", units);
+            j.put("message", message);
             j.put("ts", System.currentTimeMillis());
             post(c, j.toString());
         } catch (Exception ignored) {

@@ -10,7 +10,7 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Notification buttons, Android Auto replies and the watchdog timer. */
+/** Notification buttons, Android Auto replies, the watchdog timer and the missed bolus check. */
 public class ActionReceiver extends BroadcastReceiver {
 
     static final String CHECK = "studio.alans.fxwatcher.CHECK";
@@ -22,6 +22,9 @@ public class ActionReceiver extends BroadcastReceiver {
     static final String BED_TICK = "studio.alans.fxwatcher.BED_TICK";
     static final String BED_SKIP = "studio.alans.fxwatcher.BED_SKIP";
     static final String BED_NOW = "studio.alans.fxwatcher.BED_NOW";
+    static final String BOLUS_CHECK = "studio.alans.fxwatcher.BOLUS_CHECK";
+    static final String BOLUS_OPEN = "studio.alans.fxwatcher.BOLUS_OPEN";
+    static final String BOLUS_DISMISS = "studio.alans.fxwatcher.BOLUS_DISMISS";
 
     private static final String[] NUMBERS = {"zero", "one", "two", "three", "four", "five", "six",
             "seven", "eight", "nine", "ten", "eleven", "twelve"};
@@ -45,6 +48,9 @@ public class ActionReceiver extends BroadcastReceiver {
                 case BED_TICK: Bedtime.tick(c); break;
                 case BED_SKIP: Bedtime.skip(c); break;
                 case BED_NOW: Bedtime.now(c); break;
+                case BOLUS_CHECK: BolusWatch.check(c); break;
+                case BOLUS_OPEN: BolusWatch.openCamaps(c); break;
+                case BOLUS_DISMISS: BolusWatch.dismiss(c); break;
                 default: break;
             }
         } finally {

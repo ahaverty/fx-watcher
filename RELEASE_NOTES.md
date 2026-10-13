@@ -11,6 +11,14 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
+**New in v3.3:** missed bolus check. If CamAPS's bolus calculator showed a bolus (carbs or units above 0) and no "Delivered" follows within 5 minutes, FX Watcher sounds an alarm-style notification: "Bolus not delivered? Calculator showed 46 g / 7.1 U at 12:32, no delivery seen", with Open CamAPS and "I didn't bolus (dismiss)". Any delivery clears it, whatever the amount, so changing the numbers before bolusing is fine. One alert per bolus; the time is in Settings (0 = off). Needs the optional screen reader. With Nightscout it also posts an Announcement, and with Home Assistant a webhook post.
+
+Also in v3.3:
+- **Faster alert once Deliver is tapped.** CamAPS's "Delivery will start in" countdown only appears after Deliver is tapped. When FX Watcher sees it and no delivery follows within 60 s plus 10 s per unit (Settings, 0 = off), it alerts "Deliver was tapped at 12:32 but no delivery was confirmed" instead of waiting the full 5 minutes. It works even when the same dose is entered twice within half an hour.
+- **Delivery log.** Each countdown tick, the screen going off while a bolus waits, and how many seconds each delivery took after the countdown are logged, so a missed bolus can be traced.
+- **Two logs you can copy.** Settings now has a log of FX Watcher itself and a second log, "What FX Watcher saw in CamAPS" (notifications, status, bolus calculator, countdown, deliveries, Boost/Ease-off). Each has Copy last few hours, Copy last 24 h, Copy all and Share; copies come oldest first with the app version and phone on top, ready to paste to a chat or a bug report.
+- **Tidier Settings.** Fold-away groups with short labels and hints; the Setup checklist folds away once everything is granted; the app version shows under the status. Same options as before.
+
 **New in v3.2:** bedtime media volume is raised again if you turn it down in the night (say, for a video in bed) and then put the phone down for 10 minutes, instead of staying low until morning. The app's log now keeps about two days instead of the last 80 lines. And slowly absorbed meals from CamAPS's chart: when it was entered, the slow amount and when CamAPS expects it absorbed, sent to Nightscout as a "CamAPS Slow meal" (without a carbs field, so carbs are never counted twice).
 
 **New in v3.1:** basal from CamAPS's chart. Turn the phone sideways to CamAPS's chart and the optional screen reader reads the auto-mode basal line (every rate step on screen) and sends it to Nightscout as 5-minute Temp Basals, hours before Glooko has it. The chart is read from a screenshot that stays in memory and is dropped straight after; nothing is saved. Views it can't fully verify, or zoomed out past about 9 hours, are skipped. After updating, turn the screen reader off and on again in Accessibility settings so Android gives it the new screenshot permission.

@@ -52,6 +52,10 @@ final class Store {
     static final String DEF_BED_MORNING = "07:00";
     static final String NS_URL = "ns_url";             // optional Nightscout to send CamAPS events to
     static final String NS_TOKEN = "ns_token";          // its access token (subject with treatments create/read)
+    static final String MISSED_BOLUS_MIN = "missed_bolus_min"; // calculator bolus not delivered -> alert after (0 = off)
+    static final int DEF_MISSED_BOLUS_MIN = 5;
+    static final String DELIVERY_FAST_SEC = "delivery_fast_sec"; // Deliver tapped, nothing delivered -> alert after (+10 s per U; 0 = off)
+    static final int DEF_DELIVERY_FAST_SEC = 60;
 
     static final int DEF_SIGNAL_MIN = 20;
     static final String DEF_PUMP_NAME = "YpsoPump";
@@ -101,6 +105,7 @@ final class Store {
     static final String NS_LAST_SENT = "ns_last_sent";
     static final String NS_AUTO_MODE = "ns_auto_mode";  // last REAL auto mode sent (not simulations)
     static final String BOLUS_TRACKER = "bolus_tracker";   // BolusTracker state (bolus dedupe)
+    static final String MISSED_BOLUS = "missed_bolus";     // MissedBolus state (missed bolus check)
     static final String LAST_INFO = "last_info";       // last CamAPS info notification handled (dedupe)
     static final String BOOST_TRACKER = "boost_tracker";   // BoostTracker state
     static final String RD_ACTIVE = "rd_active";        // Boost/Ease-off running, as JSON (CamapsReader)
@@ -141,6 +146,33 @@ final class Store {
      * so a whole night can be looked back on (the pump link alone logs ~400 lines a day; 80
      * lines lost the evening's bedtime-volume events by 05:00).
      */
+    /** What FX Watcher saw CamAPS do (notifications, bolus calculator, countdown, deliveries), newest first. */
+    static final String CAMLOG = "cam_log";
+
+    /** Writes to the CamAPS log only; a line identical to the newest one is skipped. */
+    static synchronized void camLog(Context c, String msg) {
+        SharedPreferences p = p(c);
+        String old = p.getString(CAMLOG, "");
+        int nl = old.indexOf('\n');
+        String newest = nl < 0 ? old : old.substring(0, nl);
+        if (newest.length() > 16 && newest.substring(16).equals(msg)) return;
+        String line = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.UK).format(new Date()) + "  " + msg;
+        StringBuilder sb = new StringBuilder(line);
+        int lines = 1;
+        for (String l : old.split("\n")) {
+            if (l.isEmpty()) continue;
+            if (++lines > 1500) break;
+            sb.append('\n').append(l);
+        }
+        p.edit().putString(CAMLOG, sb.toString()).apply();
+    }
+
+    /** A line for both logs: the main log and the CamAPS log. */
+    static void logCam(Context c, String msg) {
+        log(c, msg);
+        camLog(c, msg);
+    }
+
     static synchronized void log(Context c, String msg) {
         String line = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.UK).format(new Date()) + "  " + msg;
         android.util.Log.i("FXWatcher", msg);

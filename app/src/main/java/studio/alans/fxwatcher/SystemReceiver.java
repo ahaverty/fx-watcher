@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
-/** After a reboot or an app update, restart the watchdog. */
+/** After a reboot or an app update, restart the watchdog and the alarms. */
 public class SystemReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {
@@ -14,6 +14,7 @@ public class SystemReceiver extends BroadcastReceiver {
             Monitor.check(c);
             SleepReceiver.sync(c);
             Bedtime.tick(c);
+            BolusWatch.resume(c);
         }
     }
 }
