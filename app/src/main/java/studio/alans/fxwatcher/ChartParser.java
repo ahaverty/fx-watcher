@@ -28,6 +28,11 @@ import java.util.regex.Pattern;
  *   basal    flats of the blue line give a rate directly; risers give the rates on both
  *            sides (a riser runs from one level's line to the next), which covers steps too
  *            short to show a flat. The dotted profile-basal line is found and ignored.
+ *   slow     a slowly absorbed meal's carb box (the grey "24 g" box above the plot) is
+ *   meals    stretched: its tick is when it was entered and its right edge is when CamAPS
+ *            expects absorption to end (checked against Glooko's slow-meal portions:
+ *            12:18-15:17 vs 12:18-15:18, 19:35-22:36 vs 19:37-22:37). The amount is the
+ *            first label in the box (other entries' boxes can be drawn over it).
  * Anything that can't be verified throws {@link Fail} and nothing is used: labels unreadable,
  * uneven, off the fit, a date line that disagrees, a now line away from the clock, a clock
  * change in view, or zoomed out so far that a 10-min step is under 6 line widths (there,
@@ -51,6 +56,13 @@ final class ChartParser {
         Fail(String m) { super(m); }
     }
 
+    /** A slowly absorbed meal: entered at start, absorbed by end (ms), the slow part in grams. */
+    static final class SlowMeal {
+        final long start, end;
+        final int grams;
+        SlowMeal(long start, long end, int grams) { this.start = start; this.end = end; this.grams = grams; }
+    }
+
     /** A basal rate from start to end (ms). */
     static final class Step {
         final long start, end;
@@ -60,6 +72,7 @@ final class ChartParser {
 
     static final class Result {
         final List<Step> steps = new ArrayList<>();
+        final List<SlowMeal> slowMeals = new ArrayList<>();
         double pxPerMin;
         long left, right;          // ms of the plot's left edge and of the last usable time
         long now = -1;             // ms of the now line, -1 if not on screen
@@ -83,6 +96,12 @@ final class ChartParser {
         boolean blue(int x, int y) {
             int c = px[y * w + x], r = (c >> 16) & 0xff, g = (c >> 8) & 0xff, b = c & 0xff;
             return b > 200 && r < 90 && g > 100 && g < 180;
+        }
+        boolean white(int x, int y) { return (px[y * w + x] & 0xffffff) == 0xffffff; }
+        /** CamAPS's label-box grey (242, 242, 242). */
+        boolean fill(int x, int y) {
+            int c = px[y * w + x], r = (c >> 16) & 0xff, g = (c >> 8) & 0xff, b = c & 0xff;
+            return r == g && g == b && r >= 236 && r <= 246;
         }
         boolean gridish(int x, int y) {
             int c = px[y * w + x];
@@ -362,6 +381,9 @@ final class ChartParser {
         res.pxPerMin = 1 / b;
         res.left = ms.applyAsLong(lx);
         res.right = Math.min(ms.applyAsLong(rx), cutoff);
+        for (double[] sm : slowMeals(I, lx, rx, top, res.pxPerMin)) {
+            res.slowMeals.add(new SlowMeal(ms.applyAsLong(sm[0]), ms.applyAsLong(sm[1]), (int) sm[2]));
+        }
         for (double[] st : trace(I, lx, rx, top, bot, res.pxPerMin)) {
             double v = Math.max(0.0, vb + (yb - st[2]) * upp);
             if (v < 0.03) v = 0.0;                  // the zero line half hides under the axis
@@ -516,6 +538,74 @@ final class ChartParser {
             else M.add(s.clone());
         }
         return M;
+    }
+
+    /**
+     * Stretched carb boxes above the plot: {tick x, right edge x, grams}. A normal box is
+     * centred on its tick; a slow meal's runs on to the end of absorption. Boxes cut off by
+     * the plot's edges (start or end not on screen) are skipped.
+     */
+    private static List<double[]> slowMeals(Img I, int lx, int rx, int top, double pxmin) {
+        List<double[]> out = new ArrayList<>();
+        List<int[]> rows = new ArrayList<>();
+        for (int y = 0; y < top; y++) {
+            int n = 0;
+            for (int x = lx; x < rx; x += 4) if (I.fill(x, y)) n++;
+            if (n <= 3) continue;
+            if (!rows.isEmpty() && y - rows.get(rows.size() - 1)[1] <= 2) rows.get(rows.size() - 1)[1] = y;
+            else rows.add(new int[]{y, y});
+        }
+        for (int[] band : rows) {
+            int y0 = band[0], y1 = band[1], ym = (y0 + y1) / 2;
+            if (y1 - y0 < 20 || y1 + 12 >= top) continue;
+            List<int[]> boxes = new ArrayList<>();
+            for (int x = lx; x < rx; x++) {
+                boolean in = I.fill(x, ym) || !I.white(x, ym) && (I.fill(x, y0 + 2) || I.fill(x, y1 - 2));
+                if (!in) continue;
+                if (!boxes.isEmpty() && x - boxes.get(boxes.size() - 1)[1] <= 3) boxes.get(boxes.size() - 1)[1] = x;
+                else boxes.add(new int[]{x, x});
+            }
+            for (int[] bx : boxes) {
+                int bx0 = bx[0], bx1 = bx[1];
+                // the tick: the first dark column just under the box
+                int t0 = -1, t1 = -1;
+                for (int x = bx0; x <= bx1; x++) {
+                    boolean dk = I.sum(x, y1 + 12) < 300;
+                    if (dk && t0 < 0) t0 = x;
+                    if (dk) t1 = x;
+                    else if (t0 >= 0) break;
+                }
+                if (t0 < 0 || bx1 >= rx - 2) continue;
+                double tick = (t0 + t1) / 2.0, half = tick - bx0;
+                if (bx1 - tick - half < 10 * pxmin) continue;          // not stretched: a normal box
+                Integer g = boxGrams(I, y0, y1, bx0, (int) Math.min(bx1 - 3, tick + 3 * half));
+                if (g != null) out.add(new double[]{tick, bx1, g});
+            }
+        }
+        return out;
+    }
+
+    /** The first label in a box, "24 g": digits then a glyph with a descender. Null if unreadable. */
+    private static Integer boxGrams(Img I, int y0, int y1, int x0, int x1) {
+        int a = y0 + 4, b = y1 - 3;
+        List<List<int[]>> W = words(I, x0 + 4, x1, a, b, 0.5);
+        if (W.isEmpty() || W.get(0).size() < 2) return null;
+        List<int[]> word = W.get(0);
+        int d0 = Integer.MAX_VALUE, d1 = -1, u1 = -1;
+        for (int i = 0; i < word.size(); i++) {
+            int top = -1, bottom = -1;
+            for (int y = a; y < b; y++) {
+                boolean has = false;
+                for (int x = word.get(i)[0]; x < word.get(i)[1] && !has; x++) has = I.ink(x, y);
+                if (has) { if (top < 0) top = y; bottom = y + 1; }
+            }
+            if (top < 0) return null;
+            if (i < word.size() - 1) { d0 = Math.min(d0, top); d1 = Math.max(d1, bottom); }
+            else u1 = bottom;
+        }
+        if (u1 <= d1 + 3) return null;                               // last glyph isn't a "g"
+        String s = read(I, word.subList(0, word.size() - 1), d0, d1);
+        return s != null && digits(s) && s.length() <= 3 ? Integer.parseInt(s) : null;
     }
 
     private static int hrun(Img I, int lx, int rx, int x, int y) {

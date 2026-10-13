@@ -114,6 +114,7 @@ final class Store {
     static final String RD_DUMP = "rd_dump";           // log full text of unknown CamAPS screens (debug, adb only)
     static final String RD_IOB = "rd_iob";             // last active insulin sent, as "value@time"
     static final String CHART_SENT = "chart_sent";     // chart basal bins sent (ChartBasal.Ledger)
+    static final String CHART_MEALS = "chart_meals";   // chart slow meals sent (ChartBasal.MealLedger)
     static final String CHART_LAST = "chart_last";     // last chart outcome logged (no repeats)
 
     static SharedPreferences p(Context c) {
@@ -135,7 +136,11 @@ final class Store {
         return (m / 60) + " h ago";
     }
 
-    /** Keeps the last 80 events, newest first, for the log on the app screen. */
+    /**
+     * Keeps the last 1500 events, newest first, for the log on the app screen: about two days,
+     * so a whole night can be looked back on (the pump link alone logs ~400 lines a day; 80
+     * lines lost the evening's bedtime-volume events by 05:00).
+     */
     static synchronized void log(Context c, String msg) {
         String line = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.UK).format(new Date()) + "  " + msg;
         android.util.Log.i("FXWatcher", msg);
@@ -145,7 +150,7 @@ final class Store {
         int lines = 1;
         for (String l : old.split("\n")) {
             if (l.isEmpty()) continue;
-            if (++lines > 80) break;
+            if (++lines > 1500) break;
             sb.append('\n').append(l);
         }
         p.edit().putString(LOG, sb.toString()).apply();

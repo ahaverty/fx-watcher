@@ -106,8 +106,10 @@ raises media volume when you go to bed and puts it back in the morning.
   so it never blasts a video or podcast you're listening to in bed. A quiet notification says
   it's waiting, with **Not tonight** and **Set it now** buttons.
 - **It only ever raises the volume**, never lowers it.
+- **Turned it down in the night?** If you turn media down again before morning (a video in bed),
+  it's raised again each time you put the phone down for 10 minutes with nothing playing.
 - **In the morning**, the first time you unlock after 07:00, it puts the volume back where it
-  was (unless you changed it during the night).
+  was before bedtime (unless you changed it after it was last raised).
 
 Everything is adjustable under **Settings > Bedtime media volume**: the level, which signals
 start it, the times, the idle minutes, the morning restore, and (Advanced) a different start
@@ -134,6 +136,9 @@ Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS s
   skipped, never guessed. Zoom so about 9 hours or less fill the screen: further out the line
   is too crowded to read reliably, and it is skipped. One look backfills the whole view, so
   scrolling back over a day fills that day in.
+- **Slowly absorbed meals from the chart.** A slow meal's carb box on the chart stretches to
+  when CamAPS expects it absorbed. It reads when you entered it, the slow amount and that end
+  time (matched Glooko's slow-meal portions to the minute in tests).
 - Nothing it reads leaves the phone unless you set up Nightscout. It does not keep or send your
   account details or other CamAPS screens.
 - Turning it off in Accessibility settings stops it at once.
@@ -151,6 +156,7 @@ within a minute, long before the same data reaches Glooko or other clouds:
 | `CamAPS Auto mode` treatment (On, Off, Attempting...) | notification |
 | device status with active insulin (`pump.iob`), reservoir, battery | screen reader |
 | `Temp Basal` treatment per 5 min (`absolute` U/h, `duration` 5, `source: camaps-chart`) | the landscape chart (screen reader) |
+| `CamAPS Slow meal` treatment (`slow_carbs_g`, `duration` until absorbed, `absorbed_by`) | the landscape chart (screen reader); no `carbs` field, so it never counts the carbs twice |
 
 Set **Nightscout address** and **access token** under Settings. Make a Nightscout subject whose
 role can only `api:treatments:create`, `api:treatments:read`, `api:devicestatus:create` and
