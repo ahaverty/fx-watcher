@@ -11,7 +11,9 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
-**New in v3.3:** missed bolus check. If CamAPS's bolus calculator showed a bolus (carbs or units above 0) and no "Delivered" follows within 5 minutes, FX Watcher sounds an alarm-style notification: "Bolus not delivered? Calculator showed 46 g / 7.1 U at 12:32, no delivery seen", with Open CamAPS and "I didn't bolus (dismiss)". Any delivery clears it, whatever the amount, so changing the numbers before bolusing is fine. One alert per bolus; the time is in Settings (0 = off). Needs the optional screen reader. With Nightscout it also posts an Announcement, and with Home Assistant a webhook post.
+**New in v3.4:** sensor expiry. When CamAPS warns "Sensor expires in less than 24 hours", FX Watcher shows when the sensor expires and when the 12 h grace period ends (the warning's time plus 24 h, within about 5 minutes). With Home Assistant it also sends a `{type: sensor_expiry, expires, grace_end}` webhook post, e.g. to add calendar events or a task.
+
+**v3.3:** missed bolus check. If CamAPS's bolus calculator showed a bolus (carbs or units above 0) and no "Delivered" follows within 5 minutes, FX Watcher sounds an alarm-style notification: "Bolus not delivered? Calculator showed 46 g / 7.1 U at 12:32, no delivery seen", with Open CamAPS and "I didn't bolus (dismiss)". Any delivery clears it, whatever the amount, so changing the numbers before bolusing is fine. One alert per bolus; the time is in Settings (0 = off). Needs the optional screen reader. With Nightscout it also posts an Announcement, and with Home Assistant a webhook post.
 
 Also in v3.3:
 - **Faster alert once Deliver is tapped.** CamAPS's "Delivery will start in" countdown only appears after Deliver is tapped. When FX Watcher sees it and no delivery follows within 60 s plus 10 s per unit (Settings, 0 = off), it alerts "Deliver was tapped at 12:32 but no delivery was confirmed" instead of waiting the full 5 minutes. It works even when the same dose is entered twice within half an hour.

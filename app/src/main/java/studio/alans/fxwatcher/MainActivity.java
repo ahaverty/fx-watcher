@@ -107,6 +107,14 @@ public class MainActivity extends Activity {
                 : pump == Phone.DOWN ? "off since " + Store.hm(p.getLong(Store.PUMP_DOWN_SINCE, now)) : "unknown")
                 + (pump != Phone.UP && upAt > 0 ? " (last on " + Store.hm(upAt) + ")" : "")
                 + " · battery " + Phone.battery(this) + "%" + (Phone.charging(this) ? " charging" : ""), 14));
+        SensorExpiry sensor = SensorExpiry.load(p.getString(Store.SENSOR_EXPIRY, ""));
+        if (sensor != null && sensor.graceEnd > now) {
+            TextView se = text(now < sensor.expires
+                    ? "Sensor expires " + Store.dayHm(sensor.expires) + " · grace until " + Store.hm(sensor.graceEnd)
+                    : "Sensor expired · grace period ends " + Store.dayHm(sensor.graceEnd), 14);
+            if (now >= sensor.expires) se.setTextColor(0xFFEF6C00);
+            root.addView(se);
+        }
         TextView ver = text("FX Watcher " + version(), 12);
         ver.setTextColor(0xFF888888);
         root.addView(ver);

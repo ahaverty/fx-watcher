@@ -147,6 +147,10 @@ Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS s
 - **Faster check once Deliver is tapped.** CamAPS's "Delivery will start in" countdown only exists
   after Deliver is tapped. If it was seen and nothing is delivered within 60 s plus 10 s per unit
   (Settings, 0 = off), the alert comes then rather than after the full 5 minutes.
+- **Sensor expiry.** When CamAPS says "Sensor expires in less than 24 hours", FX Watcher works out
+  the expiry (the notification's time plus 24 h, within about 5 min) and the end of the 12 h grace
+  period, and shows both under the status. With Home Assistant, a `{type: sensor_expiry}` webhook
+  post, e.g. to put them in a calendar.
 - **Logs.** Settings has two logs, FX Watcher's own and "What FX Watcher saw in CamAPS". Both can
   be copied (last hours, last 24 h or all, with the app version on top) or shared, e.g. to paste
   into a chat. CamAPS's own internal log is private to CamAPS and cannot be read.
@@ -187,6 +191,8 @@ FX Watcher POSTs to it:
 - its own state, on every change and every 9 min as a heartbeat:
   `{type: "state", level: NONE|WARN|ACKED|ALARM, problem, title, snoozed, pump, battery, charging, ts}`
 - snoozes set on the phone: `{type: "snooze", until: <epoch ms, 0 = cancelled>}`
+- the CGM sensor's expiry, once CamAPS warns about it:
+  `{type: "sensor_expiry", expires: <epoch ms>, grace_end: <epoch ms>, text, ts}`
 
 Home Assistant can snooze the phone back through the companion app's `command_broadcast_intent`:
 action `studio.alans.fxwatcher.HA_SNOOZE`, extras `until:<epoch ms>:long,key:<your webhook id>`

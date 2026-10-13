@@ -26,7 +26,8 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es calc 46,7.1   (bolus calculator showing 46 g / 7.1 U)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es delivered 4.6   (a delivery, for the missed bolus check)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd bolus_check   (missed bolus deadline check now)
- *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd log_dump   (the app's event log to logcat, tag FXWatcherLog)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es info "Sensor expires in less than 24 hours." --el at <ms>   (sensor expiry)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd log_dump  (the app's event log to logcat, tag FXWatcherLog)
  */
 public class DebugReceiver extends BroadcastReceiver {
     @Override
@@ -75,6 +76,11 @@ public class DebugReceiver extends BroadcastReceiver {
         if (delivered != null) {
             Store.log(c, "Simulating delivery of " + delivered + " U");
             BolusWatch.delivered(c, Double.parseDouble(delivered), System.currentTimeMillis());
+        }
+        String info = i.getStringExtra("info");
+        if (info != null) {
+            Store.log(c, "Simulating CamAPS info: " + info);
+            CamapsListener.sensorExpiry(c, info, i.getLongExtra("at", System.currentTimeMillis()));
         }
         String cmd = i.getStringExtra("cmd");
         if (cmd != null) {
