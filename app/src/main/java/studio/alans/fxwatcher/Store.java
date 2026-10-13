@@ -153,19 +153,16 @@ final class Store {
     static synchronized void camLog(Context c, String msg) {
         SharedPreferences p = p(c);
         String old = p.getString(CAMLOG, "");
-        int nl = old.indexOf('
-');
+        int nl = old.indexOf('\n');
         String newest = nl < 0 ? old : old.substring(0, nl);
         if (newest.length() > 16 && newest.substring(16).equals(msg)) return;
         String line = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.UK).format(new Date()) + "  " + msg;
         StringBuilder sb = new StringBuilder(line);
         int lines = 1;
-        for (String l : old.split("
-")) {
+        for (String l : old.split("\n")) {
             if (l.isEmpty()) continue;
             if (++lines > 1500) break;
-            sb.append('
-').append(l);
+            sb.append('\n').append(l);
         }
         p.edit().putString(CAMLOG, sb.toString()).apply();
     }
