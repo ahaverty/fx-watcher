@@ -139,6 +139,11 @@ Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS s
 - **Slowly absorbed meals from the chart.** A slow meal's carb box on the chart stretches to
   when CamAPS expects it absorbed. It reads when you entered it, the slow amount and that end
   time (matched Glooko's slow-meal portions to the minute in tests).
+- **Missed bolus check.** If the bolus calculator shows carbs or units and no "Delivered"
+  follows within 5 minutes (Settings, 0 = off), an alarm-style notification asks "Bolus not
+  delivered?" with Open CamAPS and "I didn't bolus (dismiss)". Any delivery clears it, whatever
+  the amount, so retyping the calculator is fine. One alert per bolus. With Nightscout it also
+  posts an `Announcement`; with Home Assistant, a `{type: missed_bolus}` webhook post.
 - Nothing it reads leaves the phone unless you set up Nightscout. It does not keep or send your
   account details or other CamAPS screens.
 - Turning it off in Accessibility settings stops it at once.
@@ -151,6 +156,7 @@ within a minute, long before the same data reaches Glooko or other clouds:
 | Sent as | From |
 |---|---|
 | `Bolus` treatment (insulin, plus carbs if the bolus calculator was used) | CamAPS's "Delivered X U" message |
+| `Announcement` "Bolus not delivered? ..." | missed bolus check (screen reader) |
 | `Carbs` treatment with `meal_type` meal / hypo / slow | Add meal (screen reader) |
 | `CamAPS Boost` / `CamAPS Ease-off` treatment with `duration` | screen reader |
 | `CamAPS Auto mode` treatment (On, Off, Attempting...) | notification |

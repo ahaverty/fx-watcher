@@ -23,6 +23,10 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ez reader_dump true|false   (full CamAPS screen text to logcat)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ez bed_on true --ei bed_level 67   (bedtime media volume)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd bed_tick   (re-check bedtime volume now)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es calc 46,7.1   (bolus calculator showing 46 g / 7.1 U)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es delivered 4.6   (a delivery, for the missed bolus check)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd bolus_check   (missed bolus deadline check now)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd log_dump   (the app's event log to logcat, tag FXWatcherLog)
  */
 public class DebugReceiver extends BroadcastReceiver {
     @Override
@@ -61,6 +65,17 @@ public class DebugReceiver extends BroadcastReceiver {
             Store.log(c, "Pump link warning set to " + pumpMin + " min over adb");
             Monitor.check(c);
         }
+        String calc = i.getStringExtra("calc");
+        if (calc != null) {
+            String[] gu = calc.split(",");
+            Store.log(c, "Simulating bolus calculator " + calc);
+            BolusWatch.calculator(c, Double.parseDouble(gu[0]), Double.parseDouble(gu[1]), System.currentTimeMillis());
+        }
+        String delivered = i.getStringExtra("delivered");
+        if (delivered != null) {
+            Store.log(c, "Simulating delivery of " + delivered + " U");
+            BolusWatch.delivered(c, Double.parseDouble(delivered), System.currentTimeMillis());
+        }
         String cmd = i.getStringExtra("cmd");
         if (cmd != null) {
             switch (cmd) {
@@ -71,6 +86,10 @@ public class DebugReceiver extends BroadcastReceiver {
                 case "unsnooze": Monitor.unsnooze(c); break;
                 case "ns_flush": Nightscout.flush(c); break;
                 case "bed_tick": Bedtime.tick(c); break;
+                case "bolus_check": BolusWatch.check(c); break;
+                case "log_dump":
+                    for (String l : Store.p(c).getString(Store.LOG, "").split("\n")) android.util.Log.i("FXWatcherLog", l);
+                    break;
                 default: break;
             }
             return;

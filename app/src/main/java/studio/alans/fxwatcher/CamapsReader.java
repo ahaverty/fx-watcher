@@ -212,6 +212,7 @@ public class CamapsReader extends AccessibilityService {
                 if (!shown.equals(lastCalc)) {
                     lastCalc = shown;
                     Store.log(this, "Bolus calculator: " + shown);
+                    BolusWatch.calculator(this, calc.optDouble("carbs", Double.NaN), calc.optDouble("units"), now);
                 }
                 Store.p(this).edit().putString(Store.RD_CALC, calc.toString()).apply();
             } catch (Exception ignored) {

@@ -52,6 +52,8 @@ final class Store {
     static final String DEF_BED_MORNING = "07:00";
     static final String NS_URL = "ns_url";             // optional Nightscout to send CamAPS events to
     static final String NS_TOKEN = "ns_token";          // its access token (subject with treatments create/read)
+    static final String MISSED_BOLUS_MIN = "missed_bolus_min"; // calculator bolus not delivered -> alert after (0 = off)
+    static final int DEF_MISSED_BOLUS_MIN = 5;
 
     static final int DEF_SIGNAL_MIN = 20;
     static final String DEF_PUMP_NAME = "YpsoPump";
@@ -101,6 +103,7 @@ final class Store {
     static final String NS_LAST_SENT = "ns_last_sent";
     static final String NS_AUTO_MODE = "ns_auto_mode";  // last REAL auto mode sent (not simulations)
     static final String BOLUS_TRACKER = "bolus_tracker";   // BolusTracker state (bolus dedupe)
+    static final String MISSED_BOLUS = "missed_bolus";     // MissedBolus state (missed bolus check)
     static final String LAST_INFO = "last_info";       // last CamAPS info notification handled (dedupe)
     static final String BOOST_TRACKER = "boost_tracker";   // BoostTracker state
     static final String RD_ACTIVE = "rd_active";        // Boost/Ease-off running, as JSON (CamapsReader)

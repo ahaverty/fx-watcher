@@ -141,6 +141,9 @@ public class CamapsListener extends NotificationListenerService {
         if (key.equals(p.getString(Store.LAST_INFO, ""))) return;   // the same post seen twice
         p.edit().putString(Store.LAST_INFO, key).apply();
         Store.log(this, "CamAPS: " + (title.isEmpty() ? "" : title + ": ") + text);
+        // Any fresh "Delivered" notification answers the missed bolus check, Nightscout or not.
+        double u = BolusTracker.units(text);
+        if (u >= 0) BolusWatch.delivered(this, u, System.currentTimeMillis());
         if (!Nightscout.configured(this)) return;
         try {
             if (delivered(this, text, at, "camaps-notification")) return;
@@ -173,6 +176,7 @@ public class CamapsListener extends NotificationListenerService {
         BolusTracker t = BolusTracker.load(p.getString(Store.BOLUS_TRACKER, ""));
         String before = t.save();
         BolusTracker.Result r = t.screen(texts, now, calcCarbs(p, now));
+        if (r.kind == BolusTracker.Kind.NEW) BolusWatch.delivered(c, r.units, now);
         String after = t.save();
         if (!after.equals(before)) p.edit().putString(Store.BOLUS_TRACKER, after).apply();
         post(c, r, "camaps-screen");
@@ -350,6 +354,22 @@ public class CamapsListener extends NotificationListenerService {
             j.put("pump", pump);
             j.put("battery", battery);
             j.put("charging", charging);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
+    /** The missed bolus check: state alert / cleared / dismissed, with the calculator's values. */
+    static void forwardMissedBolus(Context c, String state, double carbs, double units, String message) {
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "missed_bolus");
+            j.put("state", state);
+            j.put("carbs", carbs);
+            j.put("units", units);
+            j.put("message", message);
             j.put("ts", System.currentTimeMillis());
             post(c, j.toString());
         } catch (Exception ignored) {
