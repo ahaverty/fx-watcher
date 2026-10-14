@@ -149,11 +149,17 @@ public class CamapsListener extends NotificationListenerService {
         double u = BolusTracker.units(text);
         if (u >= 0) BolusWatch.delivered(this, u, System.currentTimeMillis());
         sensorExpiry(this, text, at);
+        CamapsAlert a = CamapsAlert.parse(title, text);
+        if (a.reservoir() && !Double.isNaN(a.units)) reservoir(this, a.units, at, "alert");
+        if (!CamapsAlert.DELIVERED.equals(a.kind)) forwardAlert(this, a, title, text, at);
         if (!Nightscout.configured(this)) return;
         try {
             if (delivered(this, text, at, "camaps-notification")) return;
             JSONObject tr = Nightscout.treatment("CamAPS Info", at, "camaps-notification");
             tr.put("notes", (title.isEmpty() || title.equalsIgnoreCase("Information") ? "" : title + ": ") + text);
+            tr.put("camaps_kind", a.kind);
+            tr.put("camaps_alert", a.alert);
+            if (!Double.isNaN(a.units)) tr.put("reservoir_u", a.units);
             Nightscout.postTreatment(this, tr);
         } catch (Exception e) {
             Log.w(TAG, "info notification", e);
@@ -300,6 +306,9 @@ public class CamapsListener extends NotificationListenerService {
     /** Notes a CamAPS notification that isn't the status one, so we can see what it was. */
     private void logIgnored(StatusBarNotification sbn) {
         Notification n = sbn.getNotification();
+        // Android's group summary over CamAPS's messages (id 0, no text): the messages themselves
+        // are read in info(), so this only filled the log.
+        if ((n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return;
         CharSequence t = n.extras.getCharSequence(Notification.EXTRA_TITLE);
         CharSequence x = n.extras.getCharSequence(Notification.EXTRA_TEXT);
         Store.logCam(this, "Ignored other CamAPS notification (id " + sbn.getId()
@@ -402,6 +411,67 @@ public class CamapsListener extends NotificationListenerService {
             post(c, j.toString());
         } catch (Exception ignored) {
             // nothing to send
+        }
+    }
+
+    /**
+     * A CamAPS message other than "Delivered" -> Home Assistant {type: camaps_alert, kind, alert,
+     * title, text, at (ms)[, units]}, so it can show or announce it. kind: CamapsAlert.
+     */
+    static void forwardAlert(Context c, CamapsAlert a, String title, String text, long at) {
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "camaps_alert");
+            j.put("kind", a.kind);
+            j.put("alert", a.alert);
+            j.put("title", title);
+            j.put("text", text);
+            j.put("at", at);
+            if (!Double.isNaN(a.units)) j.put("units", a.units);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
+    /**
+     * Insulin left in the pump, from CamAPS's low reservoir message or its home info panel.
+     * Kept for the app screen and, when it changes, sent to Home Assistant
+     * {type: reservoir, units, at (ms), source} and to Nightscout as device status (pump.reservoir,
+     * shown by Nightscout's pump pill). A reading older than the one kept is ignored.
+     */
+    static synchronized void reservoir(Context c, double units, long at, String source) {
+        SharedPreferences p = Store.p(c);
+        CamapsAlert.Reservoir old = CamapsAlert.Reservoir.load(p.getString(Store.RESERVOIR, ""));
+        if (old != null && !old.changedBy(units, at)) return;
+        p.edit().putString(Store.RESERVOIR, new CamapsAlert.Reservoir(units, at, source).save()).apply();
+        Store.logCam(c, "Reservoir " + units + " U (" + source + ")");
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "reservoir");
+            j.put("units", units);
+            j.put("at", at);
+            j.put("source", source);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+        // The info panel's own device status already carries pump.reservoir.
+        if (!"alert".equals(source) || !Nightscout.configured(c)) return;
+        try {
+            JSONObject d = new JSONObject();
+            d.put("device", "fx-watcher");
+            d.put("created_at", Nightscout.iso(at));
+            JSONObject pump = new JSONObject();
+            pump.put("reservoir", units);
+            pump.put("clock", Nightscout.iso(at));
+            d.put("pump", pump);
+            d.put("source", "camaps-alert");
+            Nightscout.postDeviceStatus(c, d);
+        } catch (Exception e) {
+            Log.w(TAG, "reservoir", e);
         }
     }
 

@@ -104,14 +104,30 @@ actions:
           - action: input_text.set_value
             target: {entity_id: input_text.fx_watcher_problem}
             data: {value: "{{ (trigger.json.title | default('OK') | string) | truncate(250, true, '') }}"}
-    default:
-      # A CamAPS reading (no "type")
-      - action: input_text.set_value
-        target: {entity_id: input_text.camaps_auto_mode}
-        data: {value: "{{ trigger.json.status | default('Unknown') | string | truncate(100, true, '') }}"}
-      - action: input_text.set_value
-        target: {entity_id: input_text.camaps_notification_text}
-        data: {value: "{{ (trigger.json.texts | default([]) | join(' | ')) | truncate(255, true, '') }}"}
+      - alias: CamAPS reading (no type)
+        conditions: "{{ trigger.json.type is not defined }}"
+        sequence:
+          - action: input_text.set_value
+            target: {entity_id: input_text.camaps_auto_mode}
+            data: {value: "{{ trigger.json.status | default('Unknown') | string | truncate(100, true, '') }}"}
+          - action: input_text.set_value
+            target: {entity_id: input_text.camaps_notification_text}
+            data: {value: "{{ (trigger.json.texts | default([]) | join(' | ')) | truncate(255, true, '') }}"}
+    # Other types (reservoir, camaps_alert, sensor_expiry, missed_bolus) are ignored unless you add
+    # a branch for them; see the Message reference. Don't use a `default:` for CamAPS readings, or
+    # each new type would overwrite the auto mode.
+```
+
+Optional, insulin left in the pump: create a **Number** helper `input_number.camaps_reservoir`
+(0-300, step 0.1, unit U) and add this branch to the `choose:` above:
+
+```yaml
+      - alias: Reservoir level
+        conditions: "{{ trigger.json.type | default('') == 'reservoir' }}"
+        sequence:
+          - action: input_number.set_value
+            target: {entity_id: input_number.camaps_reservoir}
+            data: {value: "{{ trigger.json.units | float(0) }}"}
 ```
 
 ## 4. Tell FX Watcher
@@ -281,3 +297,26 @@ Every message is a JSON `POST` to your webhook. `ts` is the phone's time in epoc
 ```
 
 `until` is when the snooze ends (epoch ms); `0` means cancelled.
+
+**Reservoir** (`type: reservoir`): insulin left in the pump, when it changes. Read from CamAPS's
+low reservoir alert, or from the home screen's (i) panel whenever you open it.
+
+```json
+{"type": "reservoir", "units": 9.8, "at": 1792019118582, "source": "alert", "ts": 1792019120000}
+```
+
+- `source`: `alert` (CamAPS's "low level of insulin" message) or `panel` (the (i) panel).
+- `at`: when CamAPS showed it (epoch ms). Values from the panel can be days apart if you rarely
+  open it, so check `at` before trusting an old one.
+
+**CamAPS message** (`type: camaps_alert`): each one-off CamAPS notification except "Delivered".
+
+```json
+{"type": "camaps_alert", "kind": "reservoir_very_low", "alert": true, "title": "Alert",
+ "text": "Very low level of insulin in reservoir. \n9.8 U of insulin left in reservoir.",
+ "units": 9.8, "at": 1792019118582, "ts": 1792019120000}
+```
+
+- `kind`: `reservoir_low`, `reservoir_very_low`, `pump_connect` ("Unable to connect to your
+  pump"), `sensor_expiry`, or `other` (anything FX Watcher doesn't know yet, with its text).
+- `alert`: CamAPS titled it "Alert" rather than "Information".
