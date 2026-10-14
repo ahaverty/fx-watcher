@@ -27,6 +27,7 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es delivered 4.6   (a delivery, for the missed bolus check)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd bolus_check   (missed bolus deadline check now)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es info "Sensor expires in less than 24 hours." --el at <ms>   (sensor expiry)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ei quiet 30   (quiet event for 30 min; --es cmd quiet_end ends it)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd log_dump  (the app's event log to logcat, tag FXWatcherLog)
  */
 public class DebugReceiver extends BroadcastReceiver {
@@ -82,6 +83,7 @@ public class DebugReceiver extends BroadcastReceiver {
             Store.log(c, "Simulating CamAPS info: " + info);
             CamapsListener.sensorExpiry(c, info, i.getLongExtra("at", System.currentTimeMillis()));
         }
+        if (i.hasExtra("quiet")) Quiet.start(c, System.currentTimeMillis() + i.getIntExtra("quiet", 30) * 60_000L);
         String cmd = i.getStringExtra("cmd");
         if (cmd != null) {
             switch (cmd) {
@@ -93,6 +95,7 @@ public class DebugReceiver extends BroadcastReceiver {
                 case "ns_flush": Nightscout.flush(c); break;
                 case "bed_tick": Bedtime.tick(c); break;
                 case "bolus_check": BolusWatch.check(c); break;
+                case "quiet_end": Quiet.end(c, "over adb"); break;
                 case "log_dump":
                     for (String l : Store.p(c).getString(Store.LOG, "").split("\n")) android.util.Log.i("FXWatcherLog", l);
                     break;

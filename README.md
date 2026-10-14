@@ -38,6 +38,10 @@ All times and thresholds can be changed in the app.
   vibrates, and shows full screen over the lock screen. It comes back 15 min after you silence it
   if the problem is still there.
 - **Snooze** 1-8 hours for sport or when you're away from the phone (urgent lows still alarm).
+- **Quiet event** for the cinema or a ceremony: pick an end time and it turns media volume to 0
+  (that silences CamAPS alerts except Urgent Low), puts the phone on vibrate and makes FX Watcher's
+  alarms buzz instead of ring, then puts it all back. It first lists what still makes sound
+  (Urgent Low, the pump's own alarms) and what still buzzes on your watch.
 - Alerts are message-style notifications, so they show on smartwatches and in Android Auto,
   with Silence / Snooze buttons (or reply "snooze 2" / "ok").
 - When something's wrong it reopens CamAPS FX to help it recover.

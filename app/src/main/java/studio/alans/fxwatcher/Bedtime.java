@@ -248,6 +248,7 @@ final class Bedtime {
             int morning = minutes(p.getString(Store.BED_MORNING, Store.DEF_BED_MORNING));
             if (APPLIED.equals(st) && morning >= 0 && at(ev, morning) > now) next = Math.min(next, at(ev, morning));
             if (musicPlaying(c)) next = now + 5 * 60_000L;
+            if (Quiet.active(c)) next = Math.max(next, Quiet.until(c) + 1000L);
         } else {
             // Next fallback time (tonight or tomorrow) or the morning time, whichever is first.
             next = now + 12 * 3600_000L;
@@ -285,6 +286,7 @@ final class Bedtime {
     }
 
     private static void apply(Context c, String key, String why) {
+        if (Quiet.active(c)) return;   // the quiet event's end ticks again
         AudioManager a = c.getSystemService(AudioManager.class);
         int cur = a.getStreamVolume(AudioManager.STREAM_MUSIC), tgt = target(c);
         SharedPreferences.Editor e = Store.p(c).edit();
@@ -319,6 +321,7 @@ final class Bedtime {
 
     /** Turned down since it was set: back up. The morning restore still goes to the pre-bedtime level. */
     private static void raiseAgain(Context c, long idle) {
+        if (Quiet.active(c)) return;
         AudioManager a = c.getSystemService(AudioManager.class);
         int cur = a.getStreamVolume(AudioManager.STREAM_MUSIC), tgt = target(c);
         if (cur >= tgt) return;

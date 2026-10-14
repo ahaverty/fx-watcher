@@ -122,6 +122,13 @@ final class Store {
     static final String CHART_SENT = "chart_sent";     // chart basal bins sent (ChartBasal.Ledger)
     static final String CHART_MEALS = "chart_meals";   // chart slow meals sent (ChartBasal.MealLedger)
     static final String CHART_LAST = "chart_last";     // last chart outcome logged (no repeats)
+    // Quiet event (Quiet.java): end time, and the media volume / ringer mode before and as set
+    static final String QUIET_UNTIL = "quiet_until";
+    static final String QUIET_MEDIA_PREV = "quiet_media_prev";
+    static final String QUIET_MEDIA_SET = "quiet_media_set";
+    static final String QUIET_RINGER_PREV = "quiet_ringer_prev";
+    static final String QUIET_RINGER_SET = "quiet_ringer_set";
+    static final String QUIET_BUZZ = "quiet_buzz";      // last time a muted alarm buzzed
 
     static SharedPreferences p(Context c) {
         return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);

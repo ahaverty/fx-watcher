@@ -24,6 +24,12 @@
         <package android:name="com.camdiab.fx_alert.mgdl" />
         <package android:name="com.camdiab.fx_alert.hx.mmoll" />
         <package android:name="com.camdiab.fx_alert.hx.mgdl" />
+        <!-- Only to tailor the quiet event walkthrough (Quiet.guide) to what is installed. -->
+        <package android:name="com.dexcom.g7" />
+        <package android:name="com.eveningoutpost.dexdrip" />
+        <package android:name="com.garmin.android.apps.connectmobile" />
+        <package android:name="com.google.android.wearable.app" />
+        <package android:name="com.samsung.android.app.watchmanager" />
     </queries>
 
     <application
