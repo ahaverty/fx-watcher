@@ -131,6 +131,17 @@ public class CamapsReader extends AccessibilityService {
             Log.w(TAG, "delivered", ex);
         }
 
+        // CamAPS's own popup while it is open: "Alert" | "Very low level of insulin in reservoir.
+        // 
+9.8 U of insulin left in reservoir." | "Acknowledge and dismiss" (CamAPS 192, 15 Oct
+        // 2026). The same message comes as a notification (CamapsListener.info), which sends it on;
+        // here only the reservoir level is taken.
+        if (items.size() > 1 && (items.get(0).text.equals("Alert") || items.get(0).text.equals("Information"))) {
+            known = true;
+            CamapsAlert a = CamapsAlert.parse(items.get(0).text, items.get(1).text);
+            if (a.reservoir() && !Double.isNaN(a.units)) CamapsListener.reservoir(this, a.units, now, "alert");
+        }
+
         // Active insulin: side menu, as two items "Active insulin" | "0.9 U"
         int ai = indexOf(items, "Active insulin");
         if (ai >= 0 && ai + 1 < items.size()) {
@@ -417,6 +428,7 @@ public class CamapsReader extends AccessibilityService {
             if (camaps.length() > 0) d.put("camaps", camaps);
             d.put("source", text != null && camaps.length() > 0 ? "camaps-screen:status" : "camaps-screen:calculator");
             Nightscout.postDeviceStatus(this, d);
+            if (camaps.has("reservoir_u")) CamapsListener.reservoir(this, camaps.getDouble("reservoir_u"), now, "panel");
             Store.logCam(this, "Active insulin " + iob + " U"
                     + (camaps.has("infusion_rate_u_h") ? ", rate " + camaps.get("infusion_rate_u_h") + " U/h" : ""));
         } catch (Exception ex) {

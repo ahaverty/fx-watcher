@@ -155,6 +155,11 @@ Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS s
   the expiry (the notification's time plus 24 h, within about 5 min) and the end of the 12 h grace
   period, and shows both under the status. With Home Assistant, a `{type: sensor_expiry}` webhook
   post, e.g. to put them in a calendar.
+- **Insulin left in the pump.** From CamAPS's "low level of insulin in reservoir" alert, or the
+  home screen's (i) panel whenever you open it, shown under the status (orange below 20 U). With
+  Nightscout it is sent as device status (Nightscout's pump pill shows it); with Home Assistant,
+  a `{type: reservoir}` webhook post. Every CamAPS message is also posted to Home Assistant as
+  `{type: camaps_alert}`.
 - **Logs.** Settings has two logs, FX Watcher's own and "What FX Watcher saw in CamAPS". Both can
   be copied (last hours, last 24 h or all, with the app version on top) or shared, e.g. to paste
   into a chat. CamAPS's own internal log is private to CamAPS and cannot be read.
@@ -197,6 +202,9 @@ FX Watcher POSTs to it:
 - snoozes set on the phone: `{type: "snooze", until: <epoch ms, 0 = cancelled>}`
 - the CGM sensor's expiry, once CamAPS warns about it:
   `{type: "sensor_expiry", expires: <epoch ms>, grace_end: <epoch ms>, text, ts}`
+- insulin left in the pump, when it changes: `{type: "reservoir", units, at, source: alert|panel, ts}`
+- each CamAPS message other than "Delivered": `{type: "camaps_alert", kind, alert, title, text, at, units?, ts}`,
+  kind `reservoir_low`, `reservoir_very_low`, `pump_connect`, `sensor_expiry` or `other`
 
 Home Assistant can snooze the phone back through the companion app's `command_broadcast_intent`:
 action `studio.alans.fxwatcher.HA_SNOOZE`, extras `until:<epoch ms>:long,key:<your webhook id>`

@@ -115,6 +115,13 @@ public class MainActivity extends Activity {
             if (now >= sensor.expires) se.setTextColor(0xFFEF6C00);
             root.addView(se);
         }
+        CamapsAlert.Reservoir res = CamapsAlert.Reservoir.load(p.getString(Store.RESERVOIR, ""));
+        if (res != null && now - res.at < 3 * 86_400_000L) {
+            TextView rv = text("Reservoir " + res.units + " U · " + ("panel".equals(res.source)
+                    ? "read " : "CamAPS alert ") + Store.ago(res.at, now), 14);
+            if (res.units < 20) rv.setTextColor(0xFFEF6C00);
+            root.addView(rv);
+        }
         TextView ver = text("FX Watcher " + version(), 12);
         ver.setTextColor(0xFF888888);
         root.addView(ver);
