@@ -313,8 +313,7 @@ low reservoir alert, or from the home screen's (i) panel whenever you open it.
 
 ```json
 {"type": "camaps_alert", "kind": "reservoir_very_low", "alert": true, "title": "Alert",
- "text": "Very low level of insulin in reservoir. 
-9.8 U of insulin left in reservoir.",
+ "text": "Very low level of insulin in reservoir. \n9.8 U of insulin left in reservoir.",
  "units": 9.8, "at": 1792019118582, "ts": 1792019120000}
 ```
 

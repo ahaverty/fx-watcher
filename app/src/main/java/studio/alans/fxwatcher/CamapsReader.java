@@ -132,8 +132,7 @@ public class CamapsReader extends AccessibilityService {
         }
 
         // CamAPS's own popup while it is open: "Alert" | "Very low level of insulin in reservoir.
-        // 
-9.8 U of insulin left in reservoir." | "Acknowledge and dismiss" (CamAPS 192, 15 Oct
+        // 9.8 U of insulin left in reservoir." | "Acknowledge and dismiss" (CamAPS 192, 15 Oct
         // 2026). The same message comes as a notification (CamapsListener.info), which sends it on;
         // here only the reservoir level is taken.
         if (items.size() > 1 && (items.get(0).text.equals("Alert") || items.get(0).text.equals("Information"))) {
