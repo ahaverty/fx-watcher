@@ -41,6 +41,7 @@ final class Alerts {
     static final int ID_STATUS = 1;
     static final int ID_PROBLEM = 2;
     static final int ID_RESOLVED = 3;
+    static final int ID_QUIET = 4;
 
     static final String KEY_REPLY = "reply";
 
@@ -93,6 +94,11 @@ final class Alerts {
 
     /** The warning or alarm notification. */
     static void problem(Context c, Monitor.Problem pr, int level, boolean alert) {
+        problem(c, pr, level, alert, false);
+    }
+
+    /** quiet: an alarm during a quiet event, posted like a warning (buzz, watch) with no full screen. */
+    private static void problem(Context c, Monitor.Problem pr, int level, boolean alert, boolean quiet) {
         channels(c);
         boolean alarm = level == Monitor.ALARM;
         long now = System.currentTimeMillis();
@@ -126,7 +132,7 @@ final class Alerts {
                 Icon.createWithResource(c, R.drawable.ic_stat), "Open CamAPS",
                 action(c, ActionReceiver.OPEN_CAMAPS, 23, 0)).build();
 
-        Notification.Builder b = new Notification.Builder(c, alarm ? CH_ALARM : CH_WARN)
+        Notification.Builder b = new Notification.Builder(c, alarm && !quiet ? CH_ALARM : CH_WARN)
                 .setSmallIcon(R.drawable.ic_stat)
                 .setColor(0xFFC62828)
                 .setStyle(style)
@@ -134,7 +140,7 @@ final class Alerts {
                 .setContentText(pr.detail)
                 .setCategory(alarm ? Notification.CATEGORY_ALARM : Notification.CATEGORY_MESSAGE)
                 .setContentIntent(alarm ? alarmScreen(c) : openApp(c))
-                .setOnlyAlertOnce(!alert && !alarm)
+                .setOnlyAlertOnce(quiet ? !alert : !alert && !alarm)
                 .setOngoing(level != Monitor.WARN)
                 .setShowWhen(true)
                 .setWhen(pr.since)
@@ -142,13 +148,23 @@ final class Alerts {
                 .addAction(alarm || level == Monitor.ACKED ? silence : reply)
                 .addAction(pr.snoozable ? snooze : open)
                 .addAction(alarm || level == Monitor.ACKED ? reply : silence);
-        if (alarm) b.setFullScreenIntent(alarmScreen(c), true);
+        if (alarm && !quiet) b.setFullScreenIntent(alarmScreen(c), true);
         if (level == Monitor.ACKED) b.setOnlyAlertOnce(true);
         c.getSystemService(NotificationManager.class).notify(ID_PROBLEM, b.build());
     }
 
     /** Full alarm: notification, full-screen alert, sound and vibration. */
     static void alarm(Context c, Monitor.Problem pr, boolean fresh) {
+        if (Quiet.active(c) && Quiet.mutes(pr.code)) {
+            // Quiet event: buzz the phone and watch (again every 10 min) instead of ringing.
+            stopSound(c);
+            SharedPreferences p = Store.p(c);
+            long now = System.currentTimeMillis();
+            boolean buzz = fresh || now - p.getLong(Store.QUIET_BUZZ, 0) >= 10 * 60_000L;
+            if (buzz) p.edit().putLong(Store.QUIET_BUZZ, now).apply();
+            problem(c, pr, Monitor.ALARM, buzz, true);
+            return;
+        }
         problem(c, pr, Monitor.ALARM, true);
         startSound(c);
         if (fresh) {
@@ -163,6 +179,20 @@ final class Alerts {
     static void cancelProblem(Context c) {
         c.getSystemService(NotificationManager.class).cancel(ID_PROBLEM);
         AlarmActivity.closeIfOpen();
+    }
+
+    /** Quiet event over: sound is back. Shown on the "Back to normal" channel. */
+    static void quietOver(Context c, String text) {
+        channels(c);
+        Notification n = new Notification.Builder(c, CH_INFO)
+                .setSmallIcon(R.drawable.ic_stat)
+                .setContentTitle("Quiet event over")
+                .setContentText(text)
+                .setContentIntent(openApp(c))
+                .setAutoCancel(true)
+                .setTimeoutAfter(60 * 60_000L)
+                .build();
+        c.getSystemService(NotificationManager.class).notify(ID_QUIET, n);
     }
 
     static void resolved(Context c, String title) {
@@ -197,7 +227,9 @@ final class Alerts {
                 + Store.hm(pr.since);
         else title = pr.title;
         long snooze = p.getLong(Store.SNOOZE_UNTIL, 0);
+        long quiet = Quiet.until(c);
         String text = snooze > now ? "Snoozed until " + Store.hm(snooze) : "FX Watcher is watching";
+        if (quiet > now) text = "Quiet until " + Store.hm(quiet) + " · " + text;
         String key = title + "|" + text;
         if (key.equals(lastStatus) && isShowing(nm, ID_STATUS)) return;
         lastStatus = key;
@@ -209,6 +241,12 @@ final class Alerts {
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false);
+        if (quiet > now) {
+            b.addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
+                    "End quiet", PendingIntent.getBroadcast(c, 33, new Intent(c, ActionReceiver.class)
+                            .setAction(ActionReceiver.QUIET_END).putExtra("now", true),
+                            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT)).build());
+        }
         if (snooze > now) {
             b.addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
                     "Cancel snooze", action(c, ActionReceiver.UNSNOOZE, 30, 0)).build());

@@ -203,8 +203,10 @@ final class BolusWatch {
 
     private static void alert(Context c, String msg, long now) {
         channel(c);
+        Alerts.channels(c);
+        boolean quiet = Quiet.active(c);   // quiet event: buzz like a warning, don't ring
         PendingIntent open = action(c, ActionReceiver.BOLUS_OPEN, REQ_OPEN);
-        Notification n = new Notification.Builder(c, CH)
+        Notification n = new Notification.Builder(c, quiet ? Alerts.CH_WARN : CH)
                 .setSmallIcon(R.drawable.ic_stat)
                 .setColor(0xFFC62828)
                 .setContentTitle("Bolus not delivered?")
@@ -221,7 +223,7 @@ final class BolusWatch {
                 .addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
                         "I didn't bolus (dismiss)", action(c, ActionReceiver.BOLUS_DISMISS, REQ_DISMISS)).build())
                 .build();
-        n.flags |= Notification.FLAG_INSISTENT;   // sound repeats until it is answered
+        if (!quiet) n.flags |= Notification.FLAG_INSISTENT;   // sound repeats until it is answered
         c.getSystemService(NotificationManager.class).notify(NOTIF, n);
     }
 

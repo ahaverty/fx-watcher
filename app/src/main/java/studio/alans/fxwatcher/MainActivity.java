@@ -131,6 +131,21 @@ public class MainActivity extends Activity {
                     new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         }
         root.addView(row);
+        long quiet = Quiet.until(this);
+        if (quiet > now) {
+            root.addView(text("Quiet event until " + Store.hm(quiet) + ": media volume 0, phone on vibrate, "
+                    + "FX alarms buzz instead of ring. Urgent lows still ring.", 16));
+            LinearLayout qr = new LinearLayout(this);
+            qr.addView(button("End now", () -> Quiet.end(this, "ended early")),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            qr.addView(button("Change end", this::pickQuietEnd),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            qr.addView(button("What still rings?", () -> quietGuide(quiet, false)),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            root.addView(qr);
+        } else {
+            root.addView(button("Quiet event (cinema, ceremony…)", this::pickQuietEnd));
+        }
         if (Alerts.sounding() || p.getInt(Store.LEVEL, 0) >= Monitor.ACKED) {
             root.addView(button("Silence alarm", () -> Monitor.silence(this)));
         }
@@ -334,6 +349,45 @@ public class MainActivity extends Activity {
         logSection("What FX Watcher saw in CamAPS", "camlog", Store.CAMLOG, "CamAPS log (as seen by FX Watcher)", 3);
 
         setContentView(sv);
+    }
+
+    /** Quiet event: how long, then the walkthrough, then start. */
+    private void pickQuietEnd() {
+        int[] mins = {60, 90, 120, 150, 180};
+        String[] items = {"1 hour", "1½ hours", "2 hours", "2½ hours", "3 hours", "Until a time…"};
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Quiet for how long?")
+                .setItems(items, (d, w) -> {
+                    long now = System.currentTimeMillis();
+                    if (w < mins.length) {
+                        quietGuide(now + mins[w] * 60_000L, true);
+                        return;
+                    }
+                    java.util.Calendar t = java.util.Calendar.getInstance();
+                    t.setTimeInMillis(now + 2 * 3_600_000L);
+                    new android.app.TimePickerDialog(this, (v, h, m) ->
+                            quietGuide(Quiet.nextAt(System.currentTimeMillis(), h, m), true),
+                            t.get(java.util.Calendar.HOUR_OF_DAY), t.get(java.util.Calendar.MINUTE) / 15 * 15,
+                            true).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void quietGuide(long until, boolean offerStart) {
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this)
+                .setTitle("Quiet until " + Store.hm(until))
+                .setMessage(Quiet.guide(this, until));
+        if (offerStart) {
+            b.setPositiveButton(Quiet.active(this) ? "Change end" : "Start", (d, w) -> {
+                Quiet.start(this, until);
+                Toast.makeText(this, "Quiet until " + Store.hm(until), Toast.LENGTH_SHORT).show();
+                build();
+            }).setNegativeButton("Cancel", null);
+        } else {
+            b.setPositiveButton("OK", null);
+        }
+        b.show();
     }
 
     /** One log: copy / share buttons, and the text in a fold-away area. */

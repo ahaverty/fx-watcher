@@ -412,6 +412,7 @@ final class Monitor {
 
     /** Called by the watchdog timer: confirm CamAPS is still there, then re-evaluate. */
     static void check(Context c) {
+        Quiet.tick(c);
         if (!CamapsListener.poll(c)) {
             Store.log(c, "Watchdog: notification listener not bound");
             evaluate(c);
