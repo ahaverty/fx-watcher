@@ -84,6 +84,17 @@ final class BolusWatch {
         }
     }
 
+    /** The pump's Bluetooth link went off (Phone). A delivery counting now can't be confirmed. */
+    static synchronized void linkOff(Context c, long now) {
+        SharedPreferences p = Store.p(c);
+        MissedBolus m = load(p);
+        if (m.linkOff(now) == MissedBolus.Event.STARTED) {
+            save(p, m);
+            Store.log(c, "Missed bolus check: pump link dropped during the " + MissedBolus.num(m.units)
+                    + " U delivery, a missing confirmation will only buzz");
+        }
+    }
+
     /** A delivered bolus (CamapsListener), any amount. */
     static synchronized void delivered(Context c, double units, long now) {
         SharedPreferences p = Store.p(c);
@@ -116,14 +127,15 @@ final class BolusWatch {
         SharedPreferences p = Store.p(c);
         MissedBolus m = load(p);
         long now = System.currentTimeMillis();
-        boolean tapped = m.counting;
+        boolean tapped = m.counting, linkLost = m.linkLost;
         MissedBolus.Event e = m.tick(now);
         save(p, m);
         if (e == MissedBolus.Event.ALERT) {
-            String msg = tapped ? MissedBolus.countdownMessage(m.carbs, m.units, Store.hm(m.shownAt))
+            String msg = linkLost ? MissedBolus.linkLostMessage(m.carbs, m.units, Store.hm(m.shownAt))
+                    : tapped ? MissedBolus.countdownMessage(m.carbs, m.units, Store.hm(m.shownAt))
                     : MissedBolus.message(m.carbs, m.units, Store.hm(m.shownAt));
-            Store.log(c, "Missed bolus check: ALERT. " + msg);
-            alert(c, msg, now);
+            Store.log(c, "Missed bolus check: " + (linkLost ? "CHECK. " : "ALERT. ") + msg);
+            alert(c, msg, now, linkLost);
             announce(c, msg, now);
             forward(c, "alert", m.carbs, m.units, msg);
         } else if (m.pending()) {
@@ -201,15 +213,16 @@ final class BolusWatch {
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
-    private static void alert(Context c, String msg, long now) {
+    /** soft: buzz once like a warning instead of ringing (quiet event, or the pump link dropped). */
+    private static void alert(Context c, String msg, long now, boolean soft) {
         channel(c);
         Alerts.channels(c);
-        boolean quiet = Quiet.active(c);   // quiet event: buzz like a warning, don't ring
+        boolean quiet = soft || Quiet.active(c);   // quiet event: buzz like a warning, don't ring
         PendingIntent open = action(c, ActionReceiver.BOLUS_OPEN, REQ_OPEN);
         Notification n = new Notification.Builder(c, quiet ? Alerts.CH_WARN : CH)
                 .setSmallIcon(R.drawable.ic_stat)
                 .setColor(0xFFC62828)
-                .setContentTitle("Bolus not delivered?")
+                .setContentTitle(soft ? "Check the bolus went in" : "Bolus not delivered?")
                 .setContentText(msg)
                 .setStyle(new Notification.BigTextStyle().bigText(msg))
                 .setCategory(Notification.CATEGORY_ALARM)
