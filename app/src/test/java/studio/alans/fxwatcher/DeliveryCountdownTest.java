@@ -146,6 +146,41 @@ public class DeliveryCountdownTest {
     }
 
     @Test
+    public void pumpLinkDroppingMidDeliveryMakesItASoftCheck() {
+        // 19 Oct: 10 g / 1.5 U, countdown 14:00:30, link off 14:01:11, no "Delivered" ever came.
+        MissedBolus t = new MissedBolus();
+        t.calculator(10, 1.5, at("14:00:29"), TIMEOUT);
+        t.countdown(at("14:00:30"), BASE);
+        assertEquals(MissedBolus.Event.STARTED, t.linkOff(at("14:01:11")));
+        assertEquals(MissedBolus.Event.NONE, t.linkOff(at("14:01:12")));
+        MissedBolus u = MissedBolus.load(t.save());
+        assertTrue(u.linkLost);
+        assertEquals(MissedBolus.Event.ALERT, u.tick(at("14:01:45")));
+        assertFalse(u.linkLost);
+    }
+
+    @Test
+    public void linkOffBeforeDeliverWasTappedChangesNothing() {
+        MissedBolus t = new MissedBolus();
+        t.calculator(38, 5.8, at("11:53:14"), TIMEOUT);
+        assertEquals(MissedBolus.Event.NONE, t.linkOff(at("11:55:34")));
+        assertFalse(t.linkLost);
+    }
+
+    @Test
+    public void aNewCountdownForgetsTheLostLink() {
+        MissedBolus t = new MissedBolus();
+        t.calculator(10, 1.5, at("14:00:29"), TIMEOUT);
+        t.countdown(at("14:00:30"), BASE);
+        t.linkOff(at("14:01:11"));
+        assertEquals(MissedBolus.Event.CLEARED, t.delivered(1.5, at("14:01:20")));
+        assertFalse(t.linkLost);
+        t.calculator(20, 3.0, at("16:00:00"), TIMEOUT);
+        t.countdown(at("16:00:05"), BASE);
+        assertFalse(t.linkLost);
+    }
+
+    @Test
     public void oldSavedStateWithoutTheFlagStillLoads() {
         MissedBolus u = MissedBolus.load("1000|46.0|7.1|2000|0|0|0|-1.0|0|1000");
         assertTrue(u.pending());

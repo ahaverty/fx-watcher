@@ -16,6 +16,9 @@ import java.util.Locale;
  *      0 g / 0 U is not a cancel: that is just what a missed bolus looks like.
  *   4. A calculator still on screen right after a delivery (the same burst) is that bolus, not a
  *      new one; so is one showing the units of a bolus delivered shortly before.
+ *   5. The pump's Bluetooth link dropping while the delivery is counting: the alert becomes a soft
+ *      check. 19 Oct 2026: 1.5 U tapped 14:00:30, link off 14:01:11, CamAPS's graph showed the
+ *      bolus but no "Delivered" ever came, not even after the 14:06 reconnect.
  */
 final class MissedBolus {
 
@@ -35,6 +38,7 @@ final class MissedBolus {
     double carbs, units;
     long deadline;
     boolean counting;        // CamAPS's "Delivery will start in" countdown was seen: Deliver was tapped
+    boolean linkLost;        // the pump link dropped while counting: CamAPS can't confirm it
     // The latest calculator read, kept even when it was recognised as a bolus already delivered
     double calcCarbs, calcUnits;
     long calcAt;
@@ -67,6 +71,7 @@ final class MissedBolus {
                 && Math.abs(units - deliveredUnits) < 0.05) return Event.NONE;
         boolean fresh = !pending();
         if (fresh) { alertedAt = 0; counting = false; }                            // a new bolus: the old alert is history
+        linkLost = false;
         pendingAt = now;
         shownAt = now;
         this.carbs = g;
@@ -97,8 +102,16 @@ final class MissedBolus {
             deadline = Long.MAX_VALUE;
         }
         counting = true;
+        linkLost = false;
         long fast = now + baseMs + Math.round(units * PER_UNIT);
         if (fast < deadline) deadline = fast;
+        return Event.STARTED;
+    }
+
+    /** The pump's Bluetooth link went off. Only matters while a tapped delivery is counting. */
+    Event linkOff(long now) {
+        if (!pending() || !counting || linkLost) return Event.NONE;
+        linkLost = true;
         return Event.STARTED;
     }
 
@@ -109,6 +122,7 @@ final class MissedBolus {
         if (!pending()) return Event.NONE;
         pendingAt = 0;
         counting = false;
+        linkLost = false;
         return Event.CLEARED;
     }
 
@@ -118,6 +132,7 @@ final class MissedBolus {
         alertedAt = now;
         pendingAt = 0;
         counting = false;
+        linkLost = false;
         return Event.ALERT;
     }
 
@@ -127,6 +142,7 @@ final class MissedBolus {
         pendingAt = 0;
         alertedAt = 0;
         counting = false;
+        linkLost = false;
         return was ? Event.DISMISSED : Event.NONE;
     }
 
@@ -142,6 +158,12 @@ final class MissedBolus {
                 + " U) but no delivery was confirmed. Check CamAPS.";
     }
 
+    /** The soft check when the pump link dropped during the delivery. */
+    static String linkLostMessage(double carbs, double units, String hhmm) {
+        return "Pump link dropped during the " + num(units) + " U delivery tapped at " + hhmm + " (" + num(carbs)
+                + " g), so CamAPS couldn't confirm it. Check the CamAPS graph.";
+    }
+
     static String num(double v) {
         return v == Math.rint(v) ? String.valueOf((long) v) : String.format(Locale.US, "%.1f", v);
     }
@@ -149,9 +171,9 @@ final class MissedBolus {
     // ── Persistence (plain text, like BolusTracker) ──
 
     String save() {
-        return String.format(Locale.US, "%d|%s|%s|%d|%d|%d|%d|%s|%d|%d|%d|%s|%s|%d", pendingAt, carbs, units, deadline,
+        return String.format(Locale.US, "%d|%s|%s|%d|%d|%d|%d|%s|%d|%d|%d|%s|%s|%d|%d", pendingAt, carbs, units, deadline,
                 burstStart, lastCalcAt, deliveredAt, deliveredUnits, alertedAt, shownAt, counting ? 1 : 0,
-                calcCarbs, calcUnits, calcAt);
+                calcCarbs, calcUnits, calcAt, linkLost ? 1 : 0);
     }
 
     static MissedBolus load(String s) {
@@ -175,6 +197,7 @@ final class MissedBolus {
                 m.calcUnits = Double.parseDouble(a[12]);
                 m.calcAt = Long.parseLong(a[13]);
             }
+            m.linkLost = a.length > 14 && a[14].equals("1");
         } catch (Exception e) {
             return new MissedBolus();
         }

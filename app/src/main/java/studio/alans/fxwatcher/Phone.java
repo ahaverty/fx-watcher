@@ -108,6 +108,7 @@ final class Phone {
             String after = now == UP && t - nudged < 3 * 60_000L
                     ? " (" + (t - nudged) / 1000 + " s after FX reopened CamAPS)" : "";
             Store.log(c, "Pump Bluetooth link " + new String[]{"unknown", "off", "on"}[now + 1] + after);
+            if (now == DOWN) BolusWatch.linkOff(c, t);
         }
     }
 
