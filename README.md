@@ -37,6 +37,9 @@ All times and thresholds can be changed in the app.
 - The alarm plays on the **alarm** volume at full level, so media volume and silent mode don't matter,
   vibrates, and shows full screen over the lock screen. It comes back 15 min after you silence it
   if the problem is still there.
+- The night battery warning has its own **Snooze 60 min** button that quiets only the battery alert
+  (CamAPS alarms carry on), and after one battery warning a new one waits 60 min (the 15 % alarm
+  doesn't wait). Both lengths are in Settings > Night and battery; a gap of 0 turns it off.
 - **Snooze** 1-8 hours for sport or when you're away from the phone (urgent lows still alarm).
 - **Quiet event** for the cinema or a ceremony: pick an end time and it turns media volume to 0
   (that silences CamAPS alerts except Urgent Low), puts the phone on vibrate and makes FX Watcher's
