@@ -128,6 +128,12 @@ final class Alerts {
         Notification.Action snooze = new Notification.Action.Builder(
                 Icon.createWithResource(c, R.drawable.ic_stat), "Snooze 2h",
                 action(c, ActionReceiver.SNOOZE, 22, 2)).build();
+        if ("BATTERY".equals(pr.code)) {
+            // Just the battery alert: a 2 h snooze of everything would also mute CamAPS alarms.
+            snooze = new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
+                    "Snooze " + Store.p(c).getInt(Store.BATT_SNOOZE_MIN, Store.DEF_BATT_SNOOZE_MIN) + " min",
+                    action(c, ActionReceiver.BATT_SNOOZE, 24, 0)).build();
+        }
         Notification.Action open = new Notification.Action.Builder(
                 Icon.createWithResource(c, R.drawable.ic_stat), "Open CamAPS",
                 action(c, ActionReceiver.OPEN_CAMAPS, 23, 0)).build();
@@ -229,6 +235,8 @@ final class Alerts {
         long snooze = p.getLong(Store.SNOOZE_UNTIL, 0);
         long quiet = Quiet.until(c);
         String text = snooze > now ? "Snoozed until " + Store.hm(snooze) : "FX Watcher is watching";
+        long batt = p.getLong(Store.BATT_SNOOZE_UNTIL, 0);
+        if (pr != null && "BATTERY".equals(pr.code) && batt > now) text = "Battery alert snoozed until " + Store.hm(batt);
         if (quiet > now) text = "Quiet until " + Store.hm(quiet) + " · " + text;
         String key = title + "|" + text;
         if (key.equals(lastStatus) && isShowing(nm, ID_STATUS)) return;

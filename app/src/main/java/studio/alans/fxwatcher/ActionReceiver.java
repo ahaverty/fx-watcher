@@ -17,6 +17,7 @@ public class ActionReceiver extends BroadcastReceiver {
     static final String SILENCE = "studio.alans.fxwatcher.SILENCE";
     static final String SNOOZE = "studio.alans.fxwatcher.SNOOZE";
     static final String UNSNOOZE = "studio.alans.fxwatcher.UNSNOOZE";
+    static final String BATT_SNOOZE = "studio.alans.fxwatcher.BATT_SNOOZE";
     static final String REPLY = "studio.alans.fxwatcher.REPLY";
     static final String OPEN_CAMAPS = "studio.alans.fxwatcher.OPEN_CAMAPS";
     static final String BED_TICK = "studio.alans.fxwatcher.BED_TICK";
@@ -41,6 +42,7 @@ public class ActionReceiver extends BroadcastReceiver {
                 case SILENCE: Monitor.silence(c); break;
                 case SNOOZE: Monitor.snooze(c, i.getDoubleExtra("hours", 2)); break;
                 case UNSNOOZE: Monitor.unsnooze(c); break;
+                case BATT_SNOOZE: Monitor.snoozeBattery(c); break;
                 case OPEN_CAMAPS:
                     Monitor.silence(c);
                     Monitor.launchCamaps(c, "notification button");
@@ -68,6 +70,10 @@ public class ActionReceiver extends BroadcastReceiver {
         Store.log(c, "Reply: " + text);
         if (text.contains("resume") || text.contains("cancel") || text.contains("unsnooze")) {
             Monitor.unsnooze(c);
+            return;
+        }
+        if (text.contains("snooze") && "BATTERY".equals(Store.p(c).getString(Store.PROBLEM, ""))) {
+            Monitor.snoozeBattery(c);
             return;
         }
         if (text.contains("snooze") || text.contains("hour")) {

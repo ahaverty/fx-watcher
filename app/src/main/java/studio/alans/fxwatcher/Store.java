@@ -30,6 +30,8 @@ final class Store {
     static final String PUMP_NUDGE = "pump_nudge";      // pump link off -> wake the screen after this many min (0 = off)
     static final String BATT_NAG = "batt_nag";         // at night, warn below this % when not charging
     static final String BATT_ALARM = "batt_alarm";      // at night, alarm below this % when not charging
+    static final String BATT_GAP_MIN = "batt_gap_min";  // after a battery alert, a new one waits this long (0 = off)
+    static final String BATT_SNOOZE_MIN = "batt_snooze_min"; // the battery alert's Snooze button lasts this long
     static final String NIGHT_FROM = "night_from";      // hour
     static final String NIGHT_TO = "night_to";          // hour
     // Bedtime media volume (Bedtime.java)
@@ -63,6 +65,8 @@ final class Store {
     static final int DEF_PUMP_NUDGE = 12;
     static final int DEF_BATT_NAG = 30;
     static final int DEF_BATT_ALARM = 15;
+    static final int DEF_BATT_GAP_MIN = 60;
+    static final int DEF_BATT_SNOOZE_MIN = 60;
     static final int DEF_NIGHT_FROM = 23;
     static final int DEF_NIGHT_TO = 8;
     static final int DEF_MISSING_MIN = 5;
@@ -96,6 +100,8 @@ final class Store {
     static final String PUMP_UP_AT = "pump_up_at";
     static final String LAST_NUDGE = "last_nudge";
     static final String BATT_LOW_SINCE = "batt_low_since";
+    static final String BATT_ALERTED = "batt_alerted";      // last time a battery alert went off
+    static final String BATT_SNOOZE_UNTIL = "batt_snooze_until"; // battery alerts only, not CamAPS ones
     static final String LAST_REPORT = "last_report";    // last state report to Home Assistant
     static final String REPORTED = "reported";          // what it said, to report changes at once
     static final String LOG = "log";

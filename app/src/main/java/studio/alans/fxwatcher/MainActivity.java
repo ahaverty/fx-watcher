@@ -248,6 +248,12 @@ public class MainActivity extends Activity {
                 p.getInt(Store.BATT_NAG, Store.DEF_BATT_NAG), false);
         EditText battAlarm = number("At night, alarm below battery (%)", "Only when not charging.",
                 p.getInt(Store.BATT_ALARM, Store.DEF_BATT_ALARM), false);
+        EditText battGap = number("Battery alert gap (min)",
+                "After a battery alert, a new warning waits this long (the alarm doesn't). 0 turns it off.",
+                p.getInt(Store.BATT_GAP_MIN, Store.DEF_BATT_GAP_MIN), false);
+        EditText battSnooze = number("Battery alert snooze length (min)",
+                "What the alert's Snooze button does. Only quiets the battery alert.",
+                p.getInt(Store.BATT_SNOOZE_MIN, Store.DEF_BATT_SNOOZE_MIN), false);
 
         section("Bedtime media volume", "bedtime", false);
         cur.addView(text("CamAPS plays most alerts (all but Urgent Low) on the media volume, so they are "
@@ -310,6 +316,8 @@ public class MainActivity extends Activity {
                     .putString(Store.PUMP_NAME, pumpName.getText().toString().trim())
                     .putInt(Store.BATT_NAG, Math.min(100, intOf(battNag, Store.DEF_BATT_NAG)))
                     .putInt(Store.BATT_ALARM, Math.min(100, intOf(battAlarm, Store.DEF_BATT_ALARM)))
+                    .putInt(Store.BATT_GAP_MIN, intOf(battGap, Store.DEF_BATT_GAP_MIN))
+                    .putInt(Store.BATT_SNOOZE_MIN, Math.max(1, intOf(battSnooze, Store.DEF_BATT_SNOOZE_MIN)))
                     .putInt(Store.NIGHT_FROM, Math.min(23, intOf(nightFrom, Store.DEF_NIGHT_FROM)))
                     .putInt(Store.NIGHT_TO, Math.min(23, intOf(nightTo, Store.DEF_NIGHT_TO)))
                     .putBoolean(Store.AUTO_LAUNCH, launch.isChecked())

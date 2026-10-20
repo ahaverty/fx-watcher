@@ -206,8 +206,14 @@ final class Monitor {
             b.code = "BATTERY";
             b.title = "Phone battery " + pct + "%, not charging";
             b.detail = "Put the phone on charge: FX Watcher can only wake you overnight while it has power.";
-            b.since = b.warnAt = battSince;
-            b.alarmAt = pct >= 0 && pct < p.getInt(Store.BATT_ALARM, Store.DEF_BATT_ALARM) ? battSince : Long.MAX_VALUE;
+            b.since = battSince;
+            // A snooze holds both; the gap after the last alert holds only the warning, never the alarm.
+            long snoozed = p.getLong(Store.BATT_SNOOZE_UNTIL, 0);
+            long alerted = p.getLong(Store.BATT_ALERTED, 0);
+            long gap = alerted < battSince ? alerted + Store.minutes(c, Store.BATT_GAP_MIN, Store.DEF_BATT_GAP_MIN) : 0;
+            b.warnAt = Math.max(battSince, Math.max(snoozed, gap));
+            b.alarmAt = pct >= 0 && pct < p.getInt(Store.BATT_ALARM, Store.DEF_BATT_ALARM)
+                    ? Math.max(battSince, snoozed) : Long.MAX_VALUE;
             return b;
         }
         return pump;
@@ -274,6 +280,9 @@ final class Monitor {
             e.putLong(Store.ACK_UNTIL, 0).putString(Store.PROBLEM, "").putString(Store.PROBLEM_TITLE, "");
         } else {
             e.putString(Store.PROBLEM, pr.code).putString(Store.PROBLEM_TITLE, pr.title);
+        }
+        if (pr != null && "BATTERY".equals(pr.code) && level != NONE && (prevLevel == NONE || !pr.code.equals(prevCode))) {
+            e.putLong(Store.BATT_ALERTED, now);
         }
         e.putInt(Store.LEVEL, level).apply();
 
@@ -443,6 +452,15 @@ final class Monitor {
         String from = fromHa ? " (from Home Assistant)" : "";
         Store.log(c, until == 0 ? "Snooze cancelled" + from : "Snoozed until " + Store.hm(until) + from);
         if (!fromHa) CamapsListener.forwardSnooze(c, until);
+        evaluate(c);
+    }
+
+    /** Quiets the phone battery alert only (CamAPS alarms carry on) for the battery snooze length. */
+    static void snoozeBattery(Context c) {
+        SharedPreferences p = Store.p(c);
+        long until = System.currentTimeMillis() + Store.minutes(c, Store.BATT_SNOOZE_MIN, Store.DEF_BATT_SNOOZE_MIN);
+        p.edit().putLong(Store.BATT_SNOOZE_UNTIL, until).apply();
+        Store.log(c, "Battery alert snoozed until " + Store.hm(until));
         evaluate(c);
     }
 
