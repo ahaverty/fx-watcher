@@ -179,7 +179,7 @@ public class MainActivity extends Activity {
                     startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
                             Uri.parse("package:" + getPackageName()))));
         }
-        check("Display over other apps (lets it reopen CamAPS)", okOverlay, () ->
+        check("Display over other apps (alarm buttons over any app, reopening CamAPS)", okOverlay, () ->
                 startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName()))));
         check("See the pump's Bluetooth link", okBt, () ->

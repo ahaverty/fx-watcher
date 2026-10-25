@@ -155,6 +155,9 @@ final class Alerts {
                 .addAction(pr.snoozable ? snooze : open)
                 .addAction(alarm || level == Monitor.ACKED ? reply : silence);
         if (alarm && !quiet) b.setFullScreenIntent(alarmScreen(c), true);
+        // Swiping a ringing alarm away (phone or watch) silences it, like xDrip's swipe to snooze.
+        // Android 14+ lets ongoing notifications be swiped, which used to hide it and keep ringing.
+        if (alarm) b.setDeleteIntent(action(c, ActionReceiver.SWIPED, 25, 0));
         if (level == Monitor.ACKED) b.setOnlyAlertOnce(true);
         c.getSystemService(NotificationManager.class).notify(ID_PROBLEM, b.build());
     }
@@ -173,6 +176,7 @@ final class Alerts {
         }
         problem(c, pr, Monitor.ALARM, true);
         startSound(c);
+        AlarmOverlay.show(c, pr);
         if (fresh) {
             try {
                 c.startActivity(new Intent(c, AlarmActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
@@ -373,6 +377,7 @@ final class Alerts {
 
     static synchronized void stopSound(Context c) {
         Context app = c.getApplicationContext();
+        AlarmOverlay.hide();
         if (player != null) {
             try { player.stop(); } catch (Exception ignored) { }
             player.release();

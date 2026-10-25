@@ -15,6 +15,7 @@ public class ActionReceiver extends BroadcastReceiver {
 
     static final String CHECK = "studio.alans.fxwatcher.CHECK";
     static final String SILENCE = "studio.alans.fxwatcher.SILENCE";
+    static final String SWIPED = "studio.alans.fxwatcher.SWIPED";
     static final String SNOOZE = "studio.alans.fxwatcher.SNOOZE";
     static final String UNSNOOZE = "studio.alans.fxwatcher.UNSNOOZE";
     static final String BATT_SNOOZE = "studio.alans.fxwatcher.BATT_SNOOZE";
@@ -40,6 +41,11 @@ public class ActionReceiver extends BroadcastReceiver {
             switch (a) {
                 case CHECK: Monitor.check(c); break;
                 case SILENCE: Monitor.silence(c); break;
+                case SWIPED:
+                    Store.log(c, "Alarm notification swiped away");
+                    if (Store.p(c).getInt(Store.LEVEL, Monitor.NONE) == Monitor.ALARM) Monitor.silence(c);
+                    else Monitor.evaluate(c);
+                    break;
                 case SNOOZE: Monitor.snooze(c, i.getDoubleExtra("hours", 2)); break;
                 case UNSNOOZE: Monitor.unsnooze(c); break;
                 case BATT_SNOOZE: Monitor.snoozeBattery(c); break;
