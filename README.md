@@ -13,7 +13,7 @@ No server, no account, no internet needed.
 
 Open that link on your Android phone, then follow **[Install](#install)** and
 **[Keep it running](#keep-it-running)** below. To update later, download and open it again:
-your settings are kept. The app's version is shown in Android's Settings > Apps > FX Watcher.
+your settings are kept. From v3.8.0 the app checks for updates itself (quiet notification, or **Check for update** on its main screen). The app's version is shown in Android's Settings > Apps > FX Watcher.
 
 > **Unofficial and not a medical device.** FX Watcher is not made by or affiliated with CamDiab
 > or Ypsomed. It can fail (phone off, battery dead, a CamAPS update changing its notification).
@@ -40,6 +40,8 @@ All times and thresholds can be changed in the app.
 - The night battery warning has its own **Snooze 60 min** button that quiets only the battery alert
   (CamAPS alarms carry on), and after one battery warning a new one waits 60 min (the 15 % alarm
   doesn't wait). Both lengths are in Settings > Night and battery; a gap of 0 turns it off.
+- While it rings and the phone is unlocked, a big **Silence** card shows over whatever app is open.
+  Swiping the alarm notification away (phone or watch) also silences it.
 - **Snooze** 1-8 hours for sport or when you're away from the phone (urgent lows still alarm).
 - **Quiet event** for the cinema or a ceremony: pick an end time and it turns media volume to 0
   (that silences CamAPS alerts except Urgent Low), puts the phone on vibrate and makes FX Watcher's

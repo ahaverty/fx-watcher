@@ -40,6 +40,18 @@ public class AlarmActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        AlarmOverlay.alarmScreen(true);
+    }
+
+    @Override
+    protected void onPause() {
+        AlarmOverlay.alarmScreen(false);
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
         if (open.get() == this) open = new WeakReference<>(null);
         super.onDestroy();

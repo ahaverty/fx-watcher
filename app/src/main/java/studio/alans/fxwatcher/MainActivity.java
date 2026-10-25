@@ -36,6 +36,7 @@ public class MainActivity extends Activity {
     private LinearLayout cur;       // where the next field goes: root, or the open group
     private int pad;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private String updateMsg;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -71,12 +72,24 @@ public class MainActivity extends Activity {
                     .setNegativeButton("Exit", (d, w) -> finish())
                     .show();
         }
+        if (getIntent() != null && Updater.ACTION_INSTALL.equals(getIntent().getAction())) installUpdate();
+    }
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        if (Updater.ACTION_INSTALL.equals(i.getAction())) installUpdate();
+    }
+
+    private void installUpdate() {
+        Updater.install(this, m -> Toast.makeText(this, m, Toast.LENGTH_LONG).show());
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         Monitor.check(this);
+        Updater.check(this, false, m -> build());
         build();
     }
 
@@ -125,6 +138,24 @@ public class MainActivity extends Activity {
         TextView ver = text("FX Watcher " + version(), 12);
         ver.setTextColor(0xFF888888);
         root.addView(ver);
+        String[] upd = Updater.available(this);
+        if (updateMsg != null && upd == null) root.addView(hint(updateMsg));
+        LinearLayout ur = new LinearLayout(this);
+        ur.setOrientation(LinearLayout.HORIZONTAL);
+        ur.addView(upd != null ? button("Install v" + upd[0], this::installUpdate)
+                        : button("Check for update", () -> {
+                            updateMsg = "Checking…";
+                            Updater.check(this, true, m -> {
+                                updateMsg = m;
+                                build();
+                            });
+                        }),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        ur.addView(button("Releases", () -> startActivity(new Intent(Intent.ACTION_VIEW,
+                        Uri.parse(Updater.RELEASES)))),
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        root.addView(ur);
+        if (upd != null && !upd[1].isEmpty()) root.addView(hint(upd[1]));
 
         long snooze = p.getLong(Store.SNOOZE_UNTIL, 0);
         if (snooze > now) {
@@ -179,7 +210,7 @@ public class MainActivity extends Activity {
                     startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
                             Uri.parse("package:" + getPackageName()))));
         }
-        check("Display over other apps (lets it reopen CamAPS)", okOverlay, () ->
+        check("Display over other apps (alarm buttons over any app, reopening CamAPS)", okOverlay, () ->
                 startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + getPackageName()))));
         check("See the pump's Bluetooth link", okBt, () ->

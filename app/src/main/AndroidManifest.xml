@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <!-- Optional: Google sleep detection for bedtime media volume (asked only if switched on). -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- Self-update from the latest GitHub release (Android asks before installing). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Lets the app see CamAPS FX: needed to draw its notification layout and to relaunch it. -->
     <queries>
@@ -122,6 +124,11 @@
                 <action android:name="studio.alans.fxwatcher.HA_SNOOZE" />
             </intent-filter>
         </receiver>
+
+        <!-- Self-update install progress (asks the user to confirm). -->
+        <receiver
+            android:name=".Updater$InstallStatus"
+            android:exported="false" />
 
         <!-- Test hooks for adb only (the shell holds DUMP, other apps do not). -->
         <receiver
