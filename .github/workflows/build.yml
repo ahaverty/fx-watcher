@@ -52,4 +52,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" fx-watcher.apk --title "FX Watcher $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
+          code=$(grep -oP 'versionCode \K\d+' app/build.gradle)
+          name=$(grep -oP "versionName '\K[^']+" app/build.gradle)
+          notes=$(grep -m1 '^\*\*New in' RELEASE_NOTES.md | sed 's/\*\*//g; s/\[\([^]]*\)\]([^)]*)/\1/g')
+          jq -n --argjson c "$code" --arg n "$name" --arg t "$notes" '{versionCode: $c, versionName: $n, notes: $t}' > version.json
+          cat version.json
+          gh release create "$GITHUB_REF_NAME" fx-watcher.apk version.json --title "FX Watcher $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md

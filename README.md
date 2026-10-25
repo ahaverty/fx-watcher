@@ -13,7 +13,7 @@ No server, no account, no internet needed.
 
 Open that link on your Android phone, then follow **[Install](#install)** and
 **[Keep it running](#keep-it-running)** below. To update later, download and open it again:
-your settings are kept. The app's version is shown in Android's Settings > Apps > FX Watcher.
+your settings are kept. From v3.8.0 the app checks for updates itself (quiet notification, or **Check for update** on its main screen). The app's version is shown in Android's Settings > Apps > FX Watcher.
 
 > **Unofficial and not a medical device.** FX Watcher is not made by or affiliated with CamDiab
 > or Ypsomed. It can fail (phone off, battery dead, a CamAPS update changing its notification).

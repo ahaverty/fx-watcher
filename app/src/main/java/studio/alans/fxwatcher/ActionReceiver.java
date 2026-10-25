@@ -39,7 +39,10 @@ public class ActionReceiver extends BroadcastReceiver {
         PendingResult pending = goAsync();
         try {
             switch (a) {
-                case CHECK: Monitor.check(c); break;
+                case CHECK:
+                    Monitor.check(c);
+                    Updater.check(c, false, null);
+                    break;
                 case SILENCE: Monitor.silence(c); break;
                 case SWIPED:
                     Store.log(c, "Alarm notification swiped away");
