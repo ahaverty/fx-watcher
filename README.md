@@ -193,6 +193,27 @@ role can only `api:treatments:create`, `api:treatments:read`, `api:devicestatus:
 `api:devicestatus:read`, and use its token. Events wait on the phone and are retried if
 Nightscout can't be reached. Every event has `enteredBy: fx-watcher`.
 
+### Nudges
+
+Optional reminders, each with its own switch in **Settings > Nudges**, all off until you turn them
+on. Only ever a notification: FX Watcher never changes anything in CamAPS or the pump, and a nudge
+never suggests a dose. Tapping one opens CamAPS. Each one that fires is noted in Nightscout, tagged
+`#nudge`.
+
+| Nudge | When |
+|---|---|
+| Possible duplicate bolus (needs the screen reader) | A second bolus within 10 min of another, with similar carbs (within 20%) or the same units |
+| Boost after a slow meal (needs Nightscout) | 60 to 90 min after a Slowly absorbed meal, over 10 mmol/L and rising, Boost off. Not after an `#alcohol` note in the last 6 h, a reading under 4 in the last 3 h, or with Ease-off on. Once per meal |
+| Bedtime | 22:30 to 00:30, over 2 U on board and under 6 mmol/L (or under 7 and falling), Ease-off off. Once a night |
+
+CamAPS only shows active insulin when its calculator or (i) panel is open, so a reading from the
+last 15 min is used if there is one, and otherwise an estimate from the boluses the phone saw
+(shown as "About 2.5 U"). It is an estimate, not CamAPS's figure.
+
+In the night hours (Settings > Night and battery) the duplicate and Boost nudges make no sound; the
+bedtime one is meant for that time and does. Home Assistant can add its own nudges, shown and
+logged the same way: see [docs/home-assistant.md](docs/home-assistant.md#8-nudges-from-home-assistant).
+
 ## Home Assistant (optional, advanced)
 
 **Step-by-step guide with copy-paste YAML: [docs/home-assistant.md](docs/home-assistant.md)**

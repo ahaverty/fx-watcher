@@ -73,6 +73,48 @@ final class Nightscout {
         enqueue(c, "/api/v1/devicestatus", d);
     }
 
+    /**
+     * Whether a note tagged #alcohol was made since then. Answers on the network thread: null if
+     * Nightscout couldn't be read or isn't set up.
+     */
+    static void alcoholSince(Context c, long since, java.util.function.Consumer<Boolean> done) {
+        Context app = c.getApplicationContext();
+        net.execute(() -> done.accept(configured(app) ? readAlcohol(app, since, true) : null));
+    }
+
+    private static Boolean readAlcohol(Context c, long since, boolean retryAuth) {
+        String token = jwt(c, false);
+        if (token == null) return null;
+        HttpURLConnection conn = null;
+        try {
+            String base = Store.p(c).getString(Store.NS_URL, "").replaceAll("/+$", "");
+            String q = java.net.URLEncoder.encode("find[eventType]", "UTF-8") + "=Note&"
+                    + java.net.URLEncoder.encode("find[created_at][$gte]", "UTF-8") + "="
+                    + java.net.URLEncoder.encode(iso(since), "UTF-8") + "&count=100";
+            conn = (HttpURLConnection) new URL(base + "/api/v1/treatments.json?" + q).openConnection();
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            int code = conn.getResponseCode();
+            if ((code == 401 || code == 403) && retryAuth) {
+                Store.p(c).edit().remove(Store.NS_JWT).apply();
+                return readAlcohol(c, since, false);
+            }
+            if (code != 200) return null;
+            JSONArray notes = new JSONArray(read(conn.getInputStream()));
+            for (int i = 0; i < notes.length(); i++) {
+                JSONObject n = notes.optJSONObject(i);
+                if (n != null && NudgeRules.alcoholTag(n.optString("notes"))) return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "Nightscout notes", e);
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
     static int queued(Context c) {
         return load(c).length();
     }

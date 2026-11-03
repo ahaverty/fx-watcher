@@ -28,6 +28,7 @@ public class ActionReceiver extends BroadcastReceiver {
     static final String BOLUS_OPEN = "studio.alans.fxwatcher.BOLUS_OPEN";
     static final String BOLUS_DISMISS = "studio.alans.fxwatcher.BOLUS_DISMISS";
     static final String QUIET_END = "studio.alans.fxwatcher.QUIET_END";
+    static final String NUDGE_OPEN = "studio.alans.fxwatcher.NUDGE_OPEN";
 
     private static final String[] NUMBERS = {"zero", "one", "two", "three", "four", "five", "six",
             "seven", "eight", "nine", "ten", "eleven", "twelve"};
@@ -63,6 +64,7 @@ public class ActionReceiver extends BroadcastReceiver {
                 case BOLUS_CHECK: BolusWatch.check(c); break;
                 case BOLUS_OPEN: BolusWatch.openCamaps(c); break;
                 case BOLUS_DISMISS: BolusWatch.dismiss(c); break;
+                case NUDGE_OPEN: Monitor.launchCamaps(c, "nudge"); break;
                 case QUIET_END: Quiet.end(c, i.getBooleanExtra("now", false) ? "ended early" : "time up"); break;
                 default: break;
             }

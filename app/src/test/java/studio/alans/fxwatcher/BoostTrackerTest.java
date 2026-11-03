@@ -145,4 +145,21 @@ public class BoostTrackerTest {
         assertEquals(t.save(), BoostTracker.load(t.save()).save());
         assertEquals("", BoostTracker.load("garbage").save().replace(";", ""));
     }
+
+    @Test
+    public void onUntil_runningPlannedAndOver() {
+        long min = 60_000L;
+        BoostTracker t = new BoostTracker();
+        org.junit.Assert.assertFalse(t.on(BoostTracker.EASE, 0));
+        t.bar(BoostTracker.EASE, 120 * min, 0);
+        org.junit.Assert.assertTrue(t.on(BoostTracker.EASE, 119 * min));
+        org.junit.Assert.assertEquals(120 * min, t.until(BoostTracker.EASE, 0));
+        org.junit.Assert.assertFalse(t.on(BoostTracker.BOOST, 0));
+        org.junit.Assert.assertFalse("ran out", t.on(BoostTracker.EASE, 120 * min));
+        BoostTracker p = new BoostTracker();
+        p.start(BoostTracker.BOOST, 60, 10 * min, 0);
+        org.junit.Assert.assertFalse("not yet", p.on(BoostTracker.BOOST, 5 * min));
+        org.junit.Assert.assertTrue("planned one has started", p.on(BoostTracker.BOOST, 20 * min));
+        org.junit.Assert.assertFalse(p.on(BoostTracker.BOOST, 70 * min));
+    }
 }

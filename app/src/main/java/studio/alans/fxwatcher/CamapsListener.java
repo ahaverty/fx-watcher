@@ -222,6 +222,11 @@ public class CamapsListener extends NotificationListenerService {
         SharedPreferences p = Store.p(c);
         Store.logCam(c, (r.kind == BolusTracker.Kind.NEW ? "Bolus delivered: " : "Bolus updated with carbs: ")
                 + r.units + " U" + (Double.isNaN(r.carbs) ? "" : ", " + r.carbs + " g") + " (" + source + ")");
+        try {
+            Nudges.bolus(c, r);
+        } catch (Exception e) {
+            Log.w(TAG, "nudge", e);   // a nudge must never get in the way of recording the bolus
+        }
         if (!Nightscout.configured(c)) return;
         JSONObject tr = Nightscout.treatment("Bolus", r.at, source);
         tr.put("insulin", r.units);
@@ -396,6 +401,26 @@ public class CamapsListener extends NotificationListenerService {
             j.put("carbs", carbs);
             j.put("units", units);
             j.put("message", message);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
+    /**
+     * What Home Assistant's nudges need {type: insulin_state, ease_off_until, boost_until,
+     * last_bolus_at (ms, 0 = none), iob (U), iob_estimated}: on each change and every 9 min.
+     */
+    static void forwardInsulin(Context c, long easeUntil, long boostUntil, long lastBolusAt, double iob, boolean estimated) {
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "insulin_state");
+            j.put("ease_off_until", easeUntil);
+            j.put("boost_until", boostUntil);
+            j.put("last_bolus_at", lastBolusAt);
+            j.put("iob", Math.round(iob * 10) / 10.0);
+            j.put("iob_estimated", estimated);
             j.put("ts", System.currentTimeMillis());
             post(c, j.toString());
         } catch (Exception ignored) {

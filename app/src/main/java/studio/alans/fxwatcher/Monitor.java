@@ -101,6 +101,13 @@ final class Monitor {
                     }
                 }
             }
+            if (!simulated && mmol >= 0) {
+                try {
+                    Nudges.reading(c, mmol, glucose, now);
+                } catch (Exception ex) {
+                    android.util.Log.w("FXWatcher", "nudge", ex);   // never let a nudge stop the alarms
+                }
+            }
             if (!simulated && (!joined.equals(oldTexts) || !wasPresent)) {
                 Double g = mmol < 0 || glucose == null ? null : parse(glucose);
                 CamapsListener.forward(c, status, g, texts, pkg);
@@ -378,6 +385,7 @@ final class Monitor {
         CamapsListener.forwardState(c, LEVELS[level], code, pr == null ? "OK" : pr.title, snoozed,
                 pump == Phone.UP ? "on" : pump == Phone.DOWN ? "off" : "unknown",
                 Phone.battery(c), Phone.charging(c));
+        Nudges.forwardInsulin(c);
     }
 
     /** Next watchdog wake-up: the next deadline, the end of a snooze or silence, or 10 minutes. */

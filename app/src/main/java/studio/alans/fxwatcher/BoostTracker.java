@@ -56,6 +56,17 @@ final class BoostTracker {
     String nowKind;              // confirmed "Now" waiting for its bar
     long nowAt;
 
+    /** When this kind ends, if it is running at this time (a planned one counts once it starts); else 0. */
+    long until(String kind, long now) {
+        if (active != null && active.kind.equals(kind) && now < active.end) return active.end;
+        Span p = planned(kind);
+        return p != null && p.start <= now && now < p.end ? p.end : 0;
+    }
+
+    boolean on(String kind, long now) {
+        return until(kind, now) > 0;
+    }
+
     private Span planned(String kind) {
         return BOOST.equals(kind) ? plannedBoost : plannedEase;
     }

@@ -317,6 +317,7 @@ public class CamapsReader extends AccessibilityService {
                 t.put("notes", "Add meal: " + mealAmount + " g, " + ("hypo".equals(mealType)
                         ? "hypo treatment" : "slow".equals(mealType) ? "slowly absorbed meal" : "meal or snack"));
                 Store.logCam(this, t.getString("notes"));
+                if ("slow".equals(mealType)) Nudges.slowMeal(this, now);
                 Nightscout.postTreatment(this, t);
                 mealAmount = -1;
                 return;
@@ -344,7 +345,10 @@ public class CamapsReader extends AccessibilityService {
         String before = t.save();
         List<BoostTracker.Post> posts = event.apply(t);
         String after = t.save();
-        if (!after.equals(before)) p.edit().putString(Store.BOOST_TRACKER, after).apply();
+        if (!after.equals(before)) {
+            p.edit().putString(Store.BOOST_TRACKER, after).apply();
+            Nudges.forwardInsulin(this);
+        }
         for (BoostTracker.Post x : posts) {
             try {
                 send(x);
@@ -410,6 +414,7 @@ public class CamapsReader extends AccessibilityService {
             if (at > 0 && last.substring(0, at).equals(key)
                     && now - Long.parseLong(last.substring(at + 1)) < 300_000L) return;
             p.edit().putString(Store.RD_IOB, key + "@" + now).apply();
+            Nudges.iobSeen(this, iob, now);
 
             JSONObject d = new JSONObject();
             d.put("device", "fx-watcher");

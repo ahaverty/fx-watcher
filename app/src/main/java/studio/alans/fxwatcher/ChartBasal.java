@@ -168,6 +168,7 @@ final class ChartBasal {
         if (send.isEmpty()) return;
         p.edit().putString(Store.CHART_MEALS, l.save()).apply();
         for (long[] m : send) {
+            Nudges.slowMeal(c, m[0]);
             try {
                 JSONObject t = Nightscout.treatment("CamAPS Slow meal", m[0], "camaps-chart");
                 t.put("duration", Math.round((m[1] - m[0]) / 60_000.0));
