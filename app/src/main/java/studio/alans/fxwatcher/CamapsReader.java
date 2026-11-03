@@ -213,6 +213,7 @@ public class CamapsReader extends AccessibilityService {
                 JSONObject calc = new JSONObject();
                 calc.put("time", now);
                 calc.put("units", num(items.get(total - 1).text));
+                if (calc.optDouble("units") > 0) CamapsListener.calculatorSeen(this, now);
                 if (cho >= 0 && cho + 1 < items.size() && NUM.matcher(items.get(cho + 1).text).matches()) {
                     calc.put("carbs", num(items.get(cho + 1).text));
                 }

@@ -176,9 +176,20 @@ public class CamapsListener extends NotificationListenerService {
         if (BolusTracker.units(text) < 0) return false;
         SharedPreferences p = Store.p(c);
         BolusTracker t = BolusTracker.load(p.getString(Store.BOLUS_TRACKER, ""));
-        post(c, t.notification(text, at, calcCarbs(p, at)), source);
+        BolusTracker.Result r = t.notification(text, at, calcCarbs(p, at), Phone.readerOn(c));
+        if (r.kind == BolusTracker.Kind.NONE && r.text != null) {
+            Store.logCam(c, "Not counted: CamAPS repeated \"" + r.text + "\" with no calculator or countdown seen");
+        }
+        post(c, r, source);
         p.edit().putString(Store.BOLUS_TRACKER, t.save()).apply();
         return true;
+    }
+
+    /** The bolus calculator on screen showing a bolus (CamapsReader): a new bolus may follow. */
+    static synchronized void calculatorSeen(Context c, long now) {
+        SharedPreferences p = Store.p(c);
+        BolusTracker t = BolusTracker.load(p.getString(Store.BOLUS_TRACKER, ""));
+        if (t.calculator(now)) p.edit().putString(Store.BOLUS_TRACKER, t.save()).apply();
     }
 
     /** Every CamAPS screen read (CamapsReader): picks up the in-app "Delivered" popup. */
