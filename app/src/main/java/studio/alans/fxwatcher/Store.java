@@ -58,6 +58,10 @@ final class Store {
     static final int DEF_MISSED_BOLUS_MIN = 5;
     static final String DELIVERY_FAST_SEC = "delivery_fast_sec"; // Deliver tapped, nothing delivered -> alert after (+10 s per U; 0 = off)
     static final int DEF_DELIVERY_FAST_SEC = 60;
+    // Nudges (Nudges.java), each off until turned on
+    static final String NUDGE_DUPLICATE = "nudge_duplicate";  // possible duplicate bolus
+    static final String NUDGE_BOOST = "nudge_boost";          // Boost after a slow meal
+    static final String NUDGE_BEDTIME = "nudge_bedtime";      // Ease-off at bedtime with insulin on board
 
     static final int DEF_SIGNAL_MIN = 20;
     static final String DEF_PUMP_NAME = "YpsoPump";
@@ -116,6 +120,12 @@ final class Store {
     static final String SENSOR_EXPIRY = "sensor_expiry";   // CGM sensor expiry + grace end (SensorExpiry)
     static final String RESERVOIR = "reservoir";           // insulin left in the pump (CamapsAlert.Reservoir)
     static final String BOOST_TRACKER = "boost_tracker";   // BoostTracker state
+    static final String NUDGE_BOLUSES = "nudge_boluses";   // recent boluses (NudgeRules.BolusLog)
+    static final String NUDGE_GLUCOSE = "nudge_glucose";   // last 3 h of readings (NudgeRules.GlucoseLog)
+    static final String NUDGE_MEALS = "nudge_meals";       // recent slow meals (NudgeRules.SlowMeals)
+    static final String NUDGE_BED_NIGHT = "nudge_bed_night"; // the night the bedtime nudge last went out
+    static final String NUDGE_IOB = "nudge_iob";           // active insulin last read from CamAPS
+    static final String NUDGE_IOB_AT = "nudge_iob_at";
     static final String RD_ACTIVE = "rd_active";        // Boost/Ease-off running, as JSON (CamapsReader)
     static final String RD_PENDING = "rd_pending";      // Boost/Ease-off duration just confirmed, as JSON
     static final String RD_CALC = "rd_calc";            // last bolus calculator values seen, as JSON

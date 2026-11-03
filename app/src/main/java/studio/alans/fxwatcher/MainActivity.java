@@ -260,6 +260,19 @@ public class MainActivity extends Activity {
                 "Plus 10 s for each unit. Starts when the delivery countdown shows. 0 turns it off.",
                 p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
 
+        section("Nudges", "nudges", false);
+        cur.addView(text("A reminder at the moment Ease-off or Boost might help, or a bolus is worth "
+                + "checking. Only ever a notification: nothing changes in CamAPS or the pump, and no "
+                + "dose is suggested. Each one that fires is noted in Nightscout. In the night hours "
+                + "the first two make no sound.", 14));
+        CheckBox nudgeDuplicate = box("Possible duplicate bolus (needs the screen reader)",
+                p.getBoolean(Store.NUDGE_DUPLICATE, false));
+        CheckBox nudgeBoost = box("Boost after a slow meal (needs Nightscout, to check for #alcohol notes)",
+                p.getBoolean(Store.NUDGE_BOOST, false));
+        CheckBox nudgeBedtime = box("Bedtime: insulin on board and low-ish, 22:30 to 00:30",
+                p.getBoolean(Store.NUDGE_BEDTIME, false));
+        cur.addView(button("Show a test nudge", () -> Nudges.test(this)));
+
         section("Pump link", "pump", false);
         EditText pumpName = field("Pump Bluetooth name", "Or part of it, for example YpsoPump.",
                 p.getString(Store.PUMP_NAME, Store.DEF_PUMP_NAME));
@@ -344,6 +357,9 @@ public class MainActivity extends Activity {
                     .putInt(Store.PUMP_NUDGE, intOf(pumpNudge, Store.DEF_PUMP_NUDGE))
                     .putInt(Store.MISSED_BOLUS_MIN, intOf(missedBolus, Store.DEF_MISSED_BOLUS_MIN))
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
+                    .putBoolean(Store.NUDGE_DUPLICATE, nudgeDuplicate.isChecked())
+                    .putBoolean(Store.NUDGE_BOOST, nudgeBoost.isChecked())
+                    .putBoolean(Store.NUDGE_BEDTIME, nudgeBedtime.isChecked())
                     .putString(Store.PUMP_NAME, pumpName.getText().toString().trim())
                     .putInt(Store.BATT_NAG, Math.min(100, intOf(battNag, Store.DEF_BATT_NAG)))
                     .putInt(Store.BATT_ALARM, Math.min(100, intOf(battAlarm, Store.DEF_BATT_ALARM)))

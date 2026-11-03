@@ -12,8 +12,9 @@ Everything below is copy-paste YAML. Replace the parts in `<angle brackets>`.
 
 **How it works.** FX Watcher sends small JSON messages to a Home Assistant **webhook**.
 Home Assistant can send a snooze back to the phone through the **Home Assistant companion app**.
-FX Watcher never receives anything else from Home Assistant, and nothing leaves the phone unless
-you enter a webhook address.
+The only other thing FX Watcher accepts from Home Assistant is a request to show a nudge
+([section 8](#8-nudges-from-home-assistant)), and nothing leaves the phone unless you enter a webhook
+address.
 
 ---
 
@@ -258,6 +259,33 @@ ignores the echo of its own snooze, so the two don't loop.
 
 ---
 
+## 8. Nudges from Home Assistant
+
+Home Assistant knows where you are, so it can decide nudges the phone can't, like a reminder when
+you are out walking with insulin on board. FX Watcher shows them and notes them in Nightscout
+(tagged `#nudge`) like its own. Two kinds exist:
+
+| `kind` | The nudge |
+|---|---|
+| `walking` | Walking with insulin on board. Ease-off? |
+| `late_home` | Back late. Overnight Ease-off for 6 h? |
+
+```yaml
+- action: notify.mobile_app_<your_phone>
+  data:
+    message: command_broadcast_intent
+    data:
+      intent_package_name: studio.alans.fxwatcher
+      intent_action: studio.alans.fxwatcher.HA_NUDGE
+      intent_extras: "kind:walking,key:<webhook id>"
+```
+
+FX Watcher drops it if Ease-off is already on. `walking` makes no sound in the night hours;
+`late_home` is meant for night-time and does. To decide when to send them, Home Assistant gets
+`insulin_state` messages (below).
+
+---
+
 ## Message reference
 
 Every message is a JSON `POST` to your webhook. `ts` is the phone's time in epoch milliseconds.
@@ -320,3 +348,16 @@ low reservoir alert, or from the home screen's (i) panel whenever you open it.
 - `kind`: `reservoir_low`, `reservoir_very_low`, `pump_connect` ("Unable to connect to your
   pump"), `sensor_expiry`, or `other` (anything FX Watcher doesn't know yet, with its text).
 - `alert`: CamAPS titled it "Alert" rather than "Information".
+
+**Insulin state** (`type: insulin_state`): when Boost, Ease-off or a bolus changes, and every 9
+minutes. Needs the screen reader for Boost and Ease-off.
+
+```json
+{"type": "insulin_state", "ease_off_until": 0, "boost_until": 1792019118582,
+ "last_bolus_at": 1792012000000, "iob": 2.4, "iob_estimated": true, "ts": 1792019120000}
+```
+
+- `ease_off_until`, `boost_until`: when it ends (epoch ms), `0` when it isn't running.
+- `last_bolus_at`: the last bolus in the last 8 hours (epoch ms), `0` if none.
+- `iob`: units on board. `iob_estimated` is `false` only when it is CamAPS's own figure, read in
+  the last 15 min.
