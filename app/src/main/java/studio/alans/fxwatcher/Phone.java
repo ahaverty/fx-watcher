@@ -127,6 +127,13 @@ final class Phone {
     }
 
     /** True between the configured night hours (default 23:00 to 08:00). */
+    /** The read-only CamAPS screen reader is switched on. */
+    static boolean readerOn(Context c) {
+        String on = android.provider.Settings.Secure.getString(c.getContentResolver(),
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        return on != null && on.contains(c.getPackageName() + "/");
+    }
+
     static boolean night(Context c, long t) {
         SharedPreferences p = Store.p(c);
         int from = p.getInt(Store.NIGHT_FROM, Store.DEF_NIGHT_FROM);

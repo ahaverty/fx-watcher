@@ -206,4 +206,79 @@ public class BolusTrackerTest {
         assertEquals(BolusTracker.Kind.NONE, u.screen(POPUP_44, 200_000, NONE).kind);
         assertEquals(BolusTracker.Kind.NONE, BolusTracker.load("4.4@123").screen(HOME, 0, NONE).kind);
     }
+
+    // ── CamAPS re-posting "Delivered" (screen reader on) ──
+
+    private static final String DELIVERED_14 = "Delivered 1.4 U of insulin.";
+
+    private static BolusTracker.Result note(BolusTracker t, String text, long at, double carbs) {
+        return t.notification(text, at, carbs, true);
+    }
+
+    @Test
+    public void rePost_1Nov_noCalculatorSeen_isNotASecondBolus() {
+        // 1 Nov 2026 17:51 and 17:54, 1.4 U: one bolus in the pump's records, no calculator before the second.
+        BolusTracker t = new BolusTracker();
+        t.calculator(-MIN);
+        assertEquals(BolusTracker.Kind.NEW, note(t, DELIVERED_14, 0, 10).kind);
+        BolusTracker.Result second = note(t, DELIVERED_14, 3 * MIN, NONE);
+        assertEquals(BolusTracker.Kind.NONE, second.kind);
+        assertEquals(DELIVERED_14, second.text);    // for the log
+    }
+
+    @Test
+    public void rePost_25Oct_theUsualCycle_countsOnce() {
+        // 25 Oct 2026: 6.9 U / 45 g at 14:54, re-posted at 15:07 and 15:15.
+        String d = "Delivered 6.9 U of insulin.";
+        BolusTracker t = new BolusTracker();
+        t.calculator(-MIN);
+        assertEquals(BolusTracker.Kind.NEW, note(t, d, 0, 45).kind);
+        assertEquals(BolusTracker.Kind.NONE, note(t, d, 13 * MIN, NONE).kind);
+        assertEquals(BolusTracker.Kind.NONE, note(t, d, 21 * MIN, NONE).kind);
+    }
+
+    @Test
+    public void realSecondBolus_calculatorSeen_counts() {
+        // 16 Oct 2026: 1.5 U / 10 g at 14:53 and again at 15:03, both in the pump's records.
+        String d = "Delivered 1.5 U of insulin.";
+        BolusTracker t = new BolusTracker();
+        assertEquals(BolusTracker.Kind.NEW, note(t, d, 0, 10).kind);
+        t.calculator(8 * MIN);
+        BolusTracker.Result second = note(t, d, 10 * MIN, 10);
+        assertEquals(BolusTracker.Kind.NEW, second.kind);
+        assertEquals(10 * MIN, second.at);
+    }
+
+    @Test
+    public void realSecondBolus_25Oct_countdownSeen_counts() {
+        BolusTracker t = BolusTracker.load(new BolusTracker().save());
+        t.screen(Arrays.asList("Delivered 2.1 U of insulin."), 0, 15);
+        t.screen(HOME, MIN, NONE);
+        t.screen(COUNTDOWN, 3 * MIN, NONE);
+        assertEquals(BolusTracker.Kind.NEW, note(t, "Delivered 2.1 U of insulin.", 4 * MIN, 15).kind);
+    }
+
+    @Test
+    public void calculatorStillUpJustAfterTheBolus_isNotEvidence() {
+        BolusTracker t = new BolusTracker();
+        note(t, DELIVERED_14, 0, 10);
+        t.calculator(30_000);
+        assertEquals(BolusTracker.Kind.NONE, note(t, DELIVERED_14, 3 * MIN, NONE).kind);
+    }
+
+    @Test
+    public void readerOff_aSecondNotificationStillCounts() {
+        BolusTracker t = new BolusTracker();
+        assertEquals(BolusTracker.Kind.NEW, t.notification(DELIVERED_14, 0, NONE).kind);
+        assertEquals(BolusTracker.Kind.NEW, t.notification(DELIVERED_14, 3 * MIN, NONE).kind);
+    }
+
+    @Test
+    public void calculatorRead_survivesSaving_andOldStateLoads() {
+        BolusTracker t = new BolusTracker();
+        t.calculator(10 * MIN);
+        assertEquals(10 * MIN, BolusTracker.load(t.save()).calculatorAt);
+        assertEquals(1.5, BolusTracker.load("1.5|100||notification|-1|0|").lastUnits, 0);
+        assertEquals(0, BolusTracker.load("1.5|100||notification|-1|0|").calculatorAt);
+    }
 }
