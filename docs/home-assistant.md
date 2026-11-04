@@ -346,7 +346,7 @@ low reservoir alert, or from the home screen's (i) panel whenever you open it.
 ```
 
 - `kind`: `reservoir_low`, `reservoir_very_low`, `pump_connect` ("Unable to connect to your
-  pump"), `sensor_expiry`, or `other` (anything FX Watcher doesn't know yet, with its text).
+  pump"), `sensor_expiry`, `sensor_expired`, or `other` (anything FX Watcher doesn't know yet, with its text).
 - `alert`: CamAPS titled it "Alert" rather than "Information".
 
 **Insulin state** (`type: insulin_state`): when Boost, Ease-off or a bolus changes, and every 9

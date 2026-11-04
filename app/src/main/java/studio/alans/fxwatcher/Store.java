@@ -118,6 +118,8 @@ final class Store {
     static final String MISSED_BOLUS = "missed_bolus";     // MissedBolus state (missed bolus check)
     static final String LAST_INFO = "last_info";       // last CamAPS info notification handled (dedupe)
     static final String SENSOR_EXPIRY = "sensor_expiry";   // CGM sensor expiry + grace end (SensorExpiry)
+    static final String SENSOR_SWAP = "sensor_swap";       // sensor stop/start state (SensorSwap)
+    static final String SENSOR_BONDS = "sensor_bonds";     // addresses of bonded DXCM devices seen so far
     static final String RESERVOIR = "reservoir";           // insulin left in the pump (CamapsAlert.Reservoir)
     static final String BOOST_TRACKER = "boost_tracker";   // BoostTracker state
     static final String NUDGE_BOLUSES = "nudge_boluses";   // recent boluses (NudgeRules.BolusLog)

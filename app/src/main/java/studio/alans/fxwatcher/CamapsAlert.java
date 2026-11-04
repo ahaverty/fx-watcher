@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
  *   Information: "Unable to connect to your pump. ... nearby, turn off and then turn on Bluetooth
  *                 on your smart device ... persists, restart your smart device"
  *   Information: "Sensor expires in less than 24 hours. ..." (SensorExpiry)
+ *   Information: "Sensor expired. \n\nReplace sensor. ... 12 hour grace period. ..." (every 5 min)
  *   Information: "Delivered 1.3 U of insulin." (BolusTracker)
  * Anything else is kind "other" and still goes to Nightscout and Home Assistant with its text,
  * so new messages show up. Pure, so it can be tested off the phone.
@@ -20,6 +21,7 @@ final class CamapsAlert {
     static final String RESERVOIR_VERY_LOW = "reservoir_very_low";
     static final String PUMP_CONNECT = "pump_connect";
     static final String SENSOR_EXPIRY = "sensor_expiry";
+    static final String SENSOR_EXPIRED = "sensor_expired";
     static final String DELIVERED = "delivered";
     static final String OTHER = "other";
 
@@ -52,6 +54,7 @@ final class CamapsAlert {
             return new CamapsAlert(PUMP_CONNECT, alert, units);
         }
         if (SensorExpiry.parse(t, 0) != null) return new CamapsAlert(SENSOR_EXPIRY, alert, units);
+        if (SensorExpiry.expired(t, 0) != null) return new CamapsAlert(SENSOR_EXPIRED, alert, units);
         if (BolusTracker.units(t) >= 0) return new CamapsAlert(DELIVERED, alert, units);
         return new CamapsAlert(OTHER, alert, units);
     }

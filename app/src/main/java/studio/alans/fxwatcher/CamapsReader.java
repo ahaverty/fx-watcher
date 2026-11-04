@@ -131,6 +131,10 @@ public class CamapsReader extends AccessibilityService {
             Log.w(TAG, "delivered", ex);
         }
 
+        // Sensor stop, pairing code and start only ever show on CamAPS's screens.
+        stopDialog = SensorSwap.stopDialog(texts);
+        SensorWatch.texts(this, texts, now);
+
         // CamAPS's own popup while it is open: "Alert" | "Very low level of insulin in reservoir.
         // 9.8 U of insulin left in reservoir." | "Acknowledge and dismiss" (CamAPS 192, 15 Oct
         // 2026). The same message comes as a notification (CamapsListener.info), which sends it on;
@@ -272,6 +276,9 @@ public class CamapsReader extends AccessibilityService {
     private double mealAmount = -1;
     private String mealType = "meal";
 
+    /** "Once your sensor has stopped, it cannot be restarted" is on screen. */
+    private boolean stopDialog;
+
     /** The Boost/Ease-off dialog on screen ("duration", "start", "cancel-planned:K", "stop:K"). */
     private String dialog;
     /** What the setup dialogs showed: kind, duration in minutes (-1 unknown), start (0 = now). */
@@ -302,6 +309,10 @@ public class CamapsReader extends AccessibilityService {
         String label = e.getText() != null && !e.getText().isEmpty() ? String.valueOf(e.getText().get(0))
                 : e.getContentDescription() != null ? e.getContentDescription().toString() : "";
         Log.i(TAG, "click: " + label + " (dialog " + dialog + ")");
+        if (stopDialog && SensorSwap.confirmsStop(label)) {
+            stopDialog = false;
+            SensorWatch.stopConfirmed(this, System.currentTimeMillis());
+        }
         if (label.equals("Add meal")) { mealType = "meal"; mealAmount = -1; }
         else if (label.equals("Meal or snack")) mealType = "meal";
         else if (label.equals("Hypoglycaemia treatment")) mealType = "hypo";

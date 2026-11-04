@@ -28,6 +28,7 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd bolus_check   (missed bolus deadline check now)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es info "Sensor expires in less than 24 hours." --el at <ms>   (sensor expiry)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es title Alert --es info "9.8 U of insulin left in reservoir."   (reservoir, HA only)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es sensor_sim "Pairing code|8538"   (what SensorSwap makes of these texts, app log only, nothing saved or sent)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ei quiet 30   (quiet event for 30 min; --es cmd quiet_end ends it)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd log_dump  (the app's event log to logcat, tag FXWatcherLog)
  */
@@ -89,6 +90,14 @@ public class DebugReceiver extends BroadcastReceiver {
             CamapsAlert a = CamapsAlert.parse(title, info);
             if (a.reservoir() && !Double.isNaN(a.units)) CamapsListener.reservoir(c, a.units, at, "sim");
             if (!CamapsAlert.DELIVERED.equals(a.kind)) CamapsListener.forwardAlert(c, a, title == null ? "" : title, info, at);
+        }
+        String sensorSim = i.getStringExtra("sensor_sim");
+        if (sensorSim != null) {
+            SensorSwap w = SensorSwap.load(Store.p(c).getString(Store.SENSOR_SWAP, ""));
+            long now = System.currentTimeMillis();
+            SensorSwap.Kind k = w.texts(Arrays.asList(sensorSim.split("\\|")), now);
+            Store.log(c, "Sensor sim (dry run): " + k + ", code on screen "
+                    + (SensorSwap.pairingCode(Arrays.asList(sensorSim.split("\\|"))) != null));
         }
         if (i.hasExtra("quiet")) Quiet.start(c, System.currentTimeMillis() + i.getIntExtra("quiet", 30) * 60_000L);
         String cmd = i.getStringExtra("cmd");

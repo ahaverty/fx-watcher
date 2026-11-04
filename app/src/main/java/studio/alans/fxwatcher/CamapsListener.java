@@ -79,6 +79,15 @@ public class CamapsListener extends NotificationListenerService {
     };
     private boolean screenRegistered;
 
+    /** A new Bluetooth bond: a new Dexcom G7 sensor bonds with the phone as it pairs. */
+    private final android.content.BroadcastReceiver bonds = new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(Context c, android.content.Intent i) {
+            int state = i.getIntExtra(android.bluetooth.BluetoothDevice.EXTRA_BOND_STATE, -1);
+            if (state == android.bluetooth.BluetoothDevice.BOND_BONDED) SensorWatch.checkBonds(c);
+        }
+    };
+
     @Override
     public void onListenerConnected() {
         instance = this;
@@ -88,9 +97,11 @@ public class CamapsListener extends NotificationListenerService {
             f.addAction(android.content.Intent.ACTION_USER_PRESENT);
             f.addAction(android.content.Intent.ACTION_SCREEN_OFF);
             registerReceiver(screen, f);
+            registerReceiver(bonds, new android.content.IntentFilter(android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED));
             screenRegistered = true;
         }
         scanActive();
+        SensorWatch.checkBonds(this);
         SleepReceiver.sync(this);
         onInterruptionFilterChanged(getCurrentInterruptionFilter());
         Bedtime.tick(this);
@@ -107,6 +118,7 @@ public class CamapsListener extends NotificationListenerService {
     public void onListenerDisconnected() {
         if (screenRegistered) {
             try { unregisterReceiver(screen); } catch (Exception ignored) { }
+            try { unregisterReceiver(bonds); } catch (Exception ignored) { }
             screenRegistered = false;
         }
         instance = null;
@@ -144,11 +156,14 @@ public class CamapsListener extends NotificationListenerService {
         String key = at + "|" + text;
         if (key.equals(p.getString(Store.LAST_INFO, ""))) return;   // the same post seen twice
         p.edit().putString(Store.LAST_INFO, key).apply();
+        // CamAPS repeats "Sensor expired" every 5 min until it is replaced: only the first counts.
+        if (SensorExpiry.expired(text, at) != null && !SensorWatch.firstExpired(this, at)) return;
         Store.logCam(this, "CamAPS: " + (title.isEmpty() ? "" : title + ": ") + text);
         // Any fresh "Delivered" notification answers the missed bolus check, Nightscout or not.
         double u = BolusTracker.units(text);
         if (u >= 0) BolusWatch.delivered(this, u, System.currentTimeMillis());
         sensorExpiry(this, text, at);
+        SensorWatch.texts(this, java.util.Collections.singletonList(text), at);
         CamapsAlert a = CamapsAlert.parse(title, text);
         if (a.reservoir() && !Double.isNaN(a.units)) reservoir(this, a.units, at, "alert");
         if (!CamapsAlert.DELIVERED.equals(a.kind)) forwardAlert(this, a, title, text, at);
@@ -434,15 +449,32 @@ public class CamapsListener extends NotificationListenerService {
      */
     static void sensorExpiry(Context c, String text, long at) {
         SensorExpiry s = SensorExpiry.parse(text, at);
+        if (s == null) s = SensorExpiry.expired(text, at);
         if (s == null) return;
         Store.p(c).edit().putString(Store.SENSOR_EXPIRY, s.save()).apply();
-        Store.log(c, "Sensor expires " + Store.dayHm(s.expires) + ", grace until " + Store.dayHm(s.graceEnd));
+        Store.log(c, (s.expires == at ? "Sensor expired" : "Sensor expires " + Store.dayHm(s.expires))
+                + ", grace until " + Store.dayHm(s.graceEnd));
         try {
             JSONObject j = new JSONObject();
             j.put("type", "sensor_expiry");
             j.put("expires", s.expires);
             j.put("grace_end", s.graceEnd);
             j.put("text", text);
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
+    /** A sensor stopped or started -> Home Assistant {type: sensor_change, event, at[, name]}. */
+    static void sensorChange(Context c, boolean stop, long at, String name) {
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "sensor_change");
+            j.put("event", stop ? "stop" : "start");
+            j.put("at", at);
+            if (name != null) j.put("name", name);
             j.put("ts", System.currentTimeMillis());
             post(c, j.toString());
         } catch (Exception ignored) {

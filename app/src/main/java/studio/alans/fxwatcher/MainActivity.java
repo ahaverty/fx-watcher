@@ -128,6 +128,12 @@ public class MainActivity extends Activity {
             if (now >= sensor.expires) se.setTextColor(0xFFEF6C00);
             root.addView(se);
         }
+        SensorSwap swap = SensorSwap.load(p.getString(Store.SENSOR_SWAP, ""));
+        if (swap.startedAt > 0 && now - swap.startedAt < 11 * 86_400_000L
+                && (sensor == null || sensor.graceEnd <= now)) {
+            root.addView(text("Sensor started " + Store.dayHm(swap.startedAt)
+                    + (swap.startCode == null ? "" : " · code " + swap.startCode), 14));
+        }
         CamapsAlert.Reservoir res = CamapsAlert.Reservoir.load(p.getString(Store.RESERVOIR, ""));
         if (res != null && now - res.at < 3 * 86_400_000L) {
             TextView rv = text("Reservoir " + res.units + " U · " + ("panel".equals(res.source)

@@ -228,9 +228,10 @@ FX Watcher POSTs to it:
 - snoozes set on the phone: `{type: "snooze", until: <epoch ms, 0 = cancelled>}`
 - the CGM sensor's expiry, once CamAPS warns about it:
   `{type: "sensor_expiry", expires: <epoch ms>, grace_end: <epoch ms>, text, ts}`
+- a CGM sensor change: `{type: "sensor_change", event: "stop"|"start", at: <epoch ms>, name?, ts}`
 - insulin left in the pump, when it changes: `{type: "reservoir", units, at, source: alert|panel, ts}`
 - each CamAPS message other than "Delivered": `{type: "camaps_alert", kind, alert, title, text, at, units?, ts}`,
-  kind `reservoir_low`, `reservoir_very_low`, `pump_connect`, `sensor_expiry` or `other`
+  kind `reservoir_low`, `reservoir_very_low`, `pump_connect`, `sensor_expiry`, `sensor_expired` or `other`
 
 Home Assistant can snooze the phone back through the companion app's `command_broadcast_intent`:
 action `studio.alans.fxwatcher.HA_SNOOZE`, extras `until:<epoch ms>:long,key:<your webhook id>`

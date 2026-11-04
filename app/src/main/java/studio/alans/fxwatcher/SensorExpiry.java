@@ -37,6 +37,17 @@ final class SensorExpiry {
         return new SensorExpiry(expires, expires + grace * 3_600_000L);
     }
 
+    /**
+     * "Sensor expired. \n\nReplace sensor. ... an extra time 12 hour grace period." posted at
+     * {@code at}, or null if it isn't that. CamAPS repeats it every 5 min: use the first one's time.
+     */
+    static SensorExpiry expired(String text, long at) {
+        if (text == null || !text.toLowerCase(java.util.Locale.UK).contains("sensor expired")) return null;
+        Matcher g = GRACE.matcher(text);
+        int grace = g.find() ? Integer.parseInt(g.group(1)) : DEF_GRACE_H;
+        return new SensorExpiry(at, at + grace * 3_600_000L);
+    }
+
     String save() {
         return expires + "," + graceEnd;
     }

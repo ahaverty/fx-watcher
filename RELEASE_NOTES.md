@@ -11,7 +11,9 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
-**New in v3.9.0:** nudges, optional reminders with their own switches in Settings: a possible duplicate bolus, Boost after a slow meal, and a bedtime check for insulin on board. Only ever a notification, and no dose is suggested. With the screen reader on, CamAPS repeating its "Delivered" message no longer records a second bolus in Nightscout.
+**New in v3.10.0:** sensor changes get recorded. FX Watcher now logs a Dexcom G7 swap to Nightscout as Sensor Stop and Sensor Start, with the pairing code you typed, from CamAPS's own screens and the new sensor's Bluetooth pairing. The main screen shows when the sensor started and the old expiry clears. "Sensor expired", which CamAPS repeats every 5 minutes, is now recorded once.
+
+**v3.9.0:** nudges, optional reminders with their own switches in Settings: a possible duplicate bolus, Boost after a slow meal, and a bedtime check for insulin on board. Only ever a notification, and no dose is suggested. With the screen reader on, CamAPS repeating its "Delivered" message no longer records a second bolus in Nightscout.
 
 **v3.8.0:** faster ways to stop a ringing alarm. While an alarm rings and the phone is unlocked, a big card with **Silence 15 min** (plus Snooze and Open CamAPS where allowed) now sits over whatever app is open, so you don't have to find the notification. And swiping the alarm notification away, on the phone or a watch, now silences it like xDrip's swipe to snooze; before, Android 14+ let you swipe it away while it kept ringing. Urgent lows still come back after 15 min if you're still low. The card needs **Display over other apps** (already in Setup). FX Watcher can also update itself from now on: it checks for a new release every few hours and posts a quiet notification, and the main screen has **Check for update** / **Install** and **Releases** buttons. Android asks you to allow installs from FX Watcher the first time.
 
