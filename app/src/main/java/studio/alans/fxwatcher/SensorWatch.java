@@ -89,6 +89,7 @@ final class SensorWatch {
             // The old sensor's expiry no longer applies; CamAPS warns again before this one's.
             Store.p(c).edit().remove(Store.SENSOR_EXPIRY).apply();
         }
+        if (!stop && w.expiresAt > 0) CamapsListener.sensorExpires(c, w.expiresAt);
         // The app log can be copied and shared, so the code goes to Nightscout only.
         if (k != SensorSwap.Kind.START_UPDATED) {
             Store.log(c, stop ? "Sensor stopped" : "New sensor started (" + source + ")");
@@ -100,6 +101,9 @@ final class SensorWatch {
             t.put("notes", stop ? "Sensor stopped" : w.startNotes());
             if (!stop && w.startCode != null) t.put("sensor_code", w.startCode);
             if (!stop && w.startName != null) t.put("sensor_name", w.startName);
+            if (!stop && w.startSerial != null) t.put("sensor_serial", w.startSerial);
+            if (!stop && w.activatedAt > 0) t.put("sensor_activated", w.activatedAt);
+            if (!stop && w.expiresAt > 0) t.put("sensor_expires", w.expiresAt);
             Nightscout.postTreatment(c, t);
         } catch (Exception ignored) {
             // nothing to send

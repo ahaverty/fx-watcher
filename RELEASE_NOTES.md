@@ -11,7 +11,9 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
-**New in v3.10.0:** sensor changes get recorded. FX Watcher now logs a Dexcom G7 swap to Nightscout as Sensor Stop and Sensor Start, with the pairing code you typed, from CamAPS's own screens and the new sensor's Bluetooth pairing. The main screen shows when the sensor started and the old expiry clears. "Sensor expired", which CamAPS repeats every 5 minutes, is now recorded once.
+**New in v3.10.1:** opening CamAPS's **Dexcom G7** page now fills in the sensor's serial, pairing code and exact expiry.
+
+**v3.10.0:** sensor changes get recorded. FX Watcher now logs a Dexcom G7 swap to Nightscout as Sensor Stop and Sensor Start, with the pairing code you typed, from CamAPS's own screens and the new sensor's Bluetooth pairing. The main screen shows when the sensor started and the old expiry clears. "Sensor expired", which CamAPS repeats every 5 minutes, is now recorded once.
 
 **v3.9.0:** nudges, optional reminders with their own switches in Settings: a possible duplicate bolus, Boost after a slow meal, and a bedtime check for insulin on board. Only ever a notification, and no dose is suggested. With the screen reader on, CamAPS repeating its "Delivered" message no longer records a second bolus in Nightscout.
 

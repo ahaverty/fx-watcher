@@ -12,6 +12,10 @@ import java.util.regex.Pattern;
  *   code:   "Enter your sensor pairing code", "Pairing code", 4 digits
  *   start:  "Sensor paired successfully.", "Your sensor is now warming up.", "Sensor warming up."
  *   and a new Bluetooth bond with a "DXCMxx" device, which does not depend on the wording at all.
+ *   info:   the "Dexcom G7" page: "Dexcom G7 information", "Pairing code", "9995", "Serial number",
+ *           "...", "Activated on", "2026-11-03 22:46:05", "Expires on", "2026-11-13 22:46:05"
+ *           (seen 4 Nov 2026). A G7 is activated when applied and can be paired an hour or more
+ *           later, so this is the real session and expiry, but only if the page gets opened.
  * Each session gives one stop and one start, whichever signal comes first. Pure, so it can be
  * tested off the phone. Read only: nothing here touches CamAPS.
  */
@@ -49,6 +53,64 @@ final class SensorSwap {
     long codeAt;
     String startCode;    // what the current session started with
     String startName;
+    String startSerial;
+    long activatedAt;
+    long expiresAt;
+
+    /** What the "Dexcom G7" page says about the sensor in use. */
+    static final class Info {
+        final String code, serial;
+        final long activated, expires;
+
+        Info(String code, String serial, long activated, long expires) {
+            this.code = code;
+            this.serial = serial;
+            this.activated = activated;
+            this.expires = expires;
+        }
+    }
+
+    /** The "Dexcom G7" page's details, or null if this is not that page. */
+    static Info info(List<String> texts) {
+        if (!texts.contains("Dexcom G7 information")) return null;
+        String serial = after(texts, "Serial number");
+        if (serial == null) return null;
+        return new Info(after(texts, "Pairing code"), serial,
+                time(after(texts, "Activated on")), time(after(texts, "Expires on")));
+    }
+
+    private static String after(List<String> texts, String label) {
+        int i = texts.indexOf(label);
+        return i >= 0 && i + 1 < texts.size() ? texts.get(i + 1).trim() : null;
+    }
+
+    private static long time(String s) {
+        if (s == null) return 0;
+        try {
+            return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.UK).parse(s).getTime();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /** The page was open: a new serial is a new sensor, otherwise it fills in the details. */
+    Kind info(Info i) {
+        boolean same = i.serial.equals(startSerial);
+        if (same) return Kind.NONE;
+        boolean sameSession = startSerial == null && startedAt > 0 && i.activated > 0
+                && Math.abs(startedAt - i.activated) < START_WINDOW;
+        Kind k = sameSession ? Kind.START_UPDATED : Kind.START;
+        if (k == Kind.START) {
+            startedAt = i.activated > 0 ? i.activated : System.currentTimeMillis();
+            startName = null;
+            expiredAt = 0;
+        }
+        startSerial = i.serial;
+        startCode = i.code;
+        activatedAt = i.activated;
+        expiresAt = i.expires;
+        return k;
+    }
 
     /** Whether the stop confirmation is on screen (its button's label is not known). */
     static boolean stopDialog(List<String> texts) {
@@ -88,6 +150,8 @@ final class SensorSwap {
 
     /** A CamAPS screen or notification's texts. Tells the caller what to record. */
     Kind texts(List<String> texts, long now) {
+        Info page = info(texts);
+        if (page != null) return info(page);
         String c = pairingCode(texts);
         if (c != null) {
             code = c;
@@ -120,6 +184,9 @@ final class SensorSwap {
             expiredAt = 0;
             startCode = null;
             startName = name;
+            startSerial = null;
+            activatedAt = 0;
+            expiresAt = 0;
             attachCode(now);
             return Kind.START;
         }
@@ -149,13 +216,15 @@ final class SensorSwap {
         StringBuilder s = new StringBuilder("New sensor");
         if (startCode != null) s.append(", pairing code ").append(startCode);
         if (startName != null) s.append(", ").append(startName);
+        if (startSerial != null) s.append(", serial ").append(startSerial);
         return s.toString();
     }
 
     String save() {
         return stoppedAt + "," + startedAt + "," + expiredAt + "," + codeAt + ","
                 + (code == null ? "" : code) + "," + (startCode == null ? "" : startCode) + ","
-                + (startName == null ? "" : startName);
+                + (startName == null ? "" : startName) + ","
+                + (startSerial == null ? "" : startSerial) + "," + activatedAt + "," + expiresAt;
     }
 
     static SensorSwap load(String s) {
@@ -170,6 +239,11 @@ final class SensorSwap {
             w.code = a[4].isEmpty() ? null : a[4];
             w.startCode = a[5].isEmpty() ? null : a[5];
             w.startName = a[6].isEmpty() ? null : a[6];
+            if (a.length > 9) {
+                w.startSerial = a[7].isEmpty() ? null : a[7];
+                w.activatedAt = Long.parseLong(a[8]);
+                w.expiresAt = Long.parseLong(a[9]);
+            }
         } catch (Exception e) {
             return new SensorSwap();
         }

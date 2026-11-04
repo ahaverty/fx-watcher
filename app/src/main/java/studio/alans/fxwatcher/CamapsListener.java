@@ -467,6 +467,24 @@ public class CamapsListener extends NotificationListenerService {
         }
     }
 
+    /** The exact expiry from CamAPS's "Dexcom G7" page: as sensorExpiry, with the default grace. */
+    static void sensorExpires(Context c, long expires) {
+        SensorExpiry s = new SensorExpiry(expires, expires + SensorExpiry.DEF_GRACE_H * 3_600_000L);
+        Store.p(c).edit().putString(Store.SENSOR_EXPIRY, s.save()).apply();
+        Store.log(c, "Sensor expires " + Store.dayHm(s.expires) + ", grace until " + Store.dayHm(s.graceEnd));
+        try {
+            JSONObject j = new JSONObject();
+            j.put("type", "sensor_expiry");
+            j.put("expires", s.expires);
+            j.put("grace_end", s.graceEnd);
+            j.put("text", "Sensor expires " + Store.dayHm(s.expires) + ", from CamAPS's Dexcom G7 page");
+            j.put("ts", System.currentTimeMillis());
+            post(c, j.toString());
+        } catch (Exception ignored) {
+            // nothing to send
+        }
+    }
+
     /** A sensor stopped or started -> Home Assistant {type: sensor_change, event, at[, name]}. */
     static void sensorChange(Context c, boolean stop, long at, String name) {
         try {

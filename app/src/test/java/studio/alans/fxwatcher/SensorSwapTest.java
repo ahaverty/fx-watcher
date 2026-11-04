@@ -104,6 +104,50 @@ public class SensorSwapTest {
         }
     }
 
+    private static final java.util.List<String> PAGE = Arrays.asList("Navigate up", "Dexcom G7",
+            "Dexcom G7 information", "Username", "someone", "Pairing code", "9995", "Serial number",
+            "422659817025", "Activated on", "2026-11-03 22:46:05", "Expires on", "2026-11-13 22:46:05",
+            "Firmware", "32.192.109.40", "Software number", "13354", "Connected devices", "[Phone]");
+
+    @Test
+    public void dexcomPageFillsInTheSession() {
+        SensorSwap w = new SensorSwap();
+        long bond = new java.util.GregorianCalendar(2026, 10, 3, 23, 45, 38).getTimeInMillis();
+        assertEquals(SensorSwap.Kind.START, w.started(bond, "DXCMQL"));
+        assertEquals(SensorSwap.Kind.START_UPDATED, w.texts(PAGE, bond + H));
+        assertEquals(bond, w.startedAt);
+        assertEquals("9995", w.startCode);
+        assertEquals("422659817025", w.startSerial);
+        assertEquals(new java.util.GregorianCalendar(2026, 10, 13, 22, 46, 5).getTimeInMillis(), w.expiresAt);
+        assertEquals("New sensor, pairing code 9995, DXCMQL, serial 422659817025", w.startNotes());
+        assertEquals(SensorSwap.Kind.NONE, w.texts(PAGE, bond + 2 * H));
+        // looking at the page does not leave a code waiting for the next sensor
+        assertNull(w.code);
+    }
+
+    @Test
+    public void dexcomPageAloneIsAStartAtActivation() {
+        SensorSwap w = new SensorSwap();
+        assertEquals(SensorSwap.Kind.START, w.texts(PAGE, T));
+        assertEquals(new java.util.GregorianCalendar(2026, 10, 3, 22, 46, 5).getTimeInMillis(), w.startedAt);
+        SensorSwap l = SensorSwap.load(w.save());
+        assertEquals("422659817025", l.startSerial);
+        assertEquals(w.expiresAt, l.expiresAt);
+        assertEquals(SensorSwap.Kind.NONE, l.texts(PAGE, T + H));
+    }
+
+    @Test
+    public void newSerialIsANewSensor() {
+        SensorSwap w = new SensorSwap();
+        w.texts(PAGE, T);
+        java.util.List<String> next = new java.util.ArrayList<>(PAGE);
+        next.set(8, "999999999999");
+        next.set(10, "2026-11-13 21:00:00");
+        next.set(12, "2026-11-23 21:00:00");
+        assertEquals(SensorSwap.Kind.START, w.texts(next, T + 10 * 24 * H));
+        assertEquals("999999999999", w.startSerial);
+    }
+
     @Test
     public void saveAndLoad() {
         SensorSwap w = new SensorSwap();
