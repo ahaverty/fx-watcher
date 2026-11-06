@@ -20,6 +20,13 @@
     <!-- Self-update from the latest GitHub release (Android asks before installing). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Optional bolus broadcast (BolusBroadcast): apps that want it ask for this permission. -->
+    <permission
+        android:name="studio.alans.fxwatcher.permission.RECEIVE_BOLUS"
+        android:label="Receive boluses from FX Watcher"
+        android:description="@string/perm_receive_bolus"
+        android:protectionLevel="normal" />
+
     <!-- Lets the app see CamAPS FX: needed to draw its notification layout and to relaunch it. -->
     <queries>
         <package android:name="com.camdiab.fx_alert.mmoll" />
@@ -32,6 +39,10 @@
         <package android:name="com.garmin.android.apps.connectmobile" />
         <package android:name="com.google.android.wearable.app" />
         <package android:name="com.samsung.android.app.watchmanager" />
+        <!-- Apps that listen for the optional bolus broadcast. -->
+        <intent>
+            <action android:name="studio.alans.fxwatcher.action.BOLUS" />
+        </intent>
     </queries>
 
     <application

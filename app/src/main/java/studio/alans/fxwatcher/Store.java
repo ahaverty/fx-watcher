@@ -62,6 +62,7 @@ final class Store {
     static final String NUDGE_DUPLICATE = "nudge_duplicate";  // possible duplicate bolus
     static final String NUDGE_BOOST = "nudge_boost";          // Boost after a slow meal
     static final String NUDGE_BEDTIME = "nudge_bedtime";      // Ease-off at bedtime with insulin on board
+    static final String SHARE_BOLUS = "share_bolus";          // BolusBroadcast to other apps, off until turned on
 
     static final int DEF_SIGNAL_MIN = 20;
     static final String DEF_PUMP_NAME = "YpsoPump";

@@ -11,7 +11,9 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
-**New in v3.10.1:** opening CamAPS's **Dexcom G7** page now fills in the sensor's serial, pairing code and exact expiry.
+**New in v3.11.0:** FX Watcher can tell other apps on the phone about each bolus (units, carbs, time), so a separate app can, for example, ask what you ate right after a meal bolus. Off until you turn on **Settings > Connections > Share boluses with other apps**, and only apps that ask for FX Watcher's bolus permission get it. How to listen for it is in the [README](https://github.com/ahaverty/fx-watcher#bolus-broadcast).
+
+**v3.10.1:** opening CamAPS's **Dexcom G7** page now fills in the sensor's serial, pairing code and exact expiry.
 
 **v3.10.0:** sensor changes get recorded. FX Watcher now logs a Dexcom G7 swap to Nightscout as Sensor Stop and Sensor Start, with the pairing code you typed, from CamAPS's own screens and the new sensor's Bluetooth pairing. The main screen shows when the sensor started and the old expiry clears. "Sensor expired", which CamAPS repeats every 5 minutes, is now recorded once.
 

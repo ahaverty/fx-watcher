@@ -242,6 +242,13 @@ public class CamapsListener extends NotificationListenerService {
         } catch (Exception e) {
             Log.w(TAG, "nudge", e);   // a nudge must never get in the way of recording the bolus
         }
+        try {
+            String mealSize = Double.isNaN(r.carbs) ? null
+                    : new JSONObject(p.getString(Store.RD_CALC, "{}")).optString("meal_size", null);
+            BolusBroadcast.send(c, r, source, mealSize);
+        } catch (Exception e) {
+            Log.w(TAG, "bolus broadcast", e);
+        }
         if (!Nightscout.configured(c)) return;
         JSONObject tr = Nightscout.treatment("Bolus", r.at, source);
         tr.put("insulin", r.units);

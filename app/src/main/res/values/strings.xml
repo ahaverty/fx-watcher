@@ -2,4 +2,5 @@
 <resources>
     <string name="reader_label">FX Watcher: CamAPS screen reader</string>
     <string name="reader_description">Reads the CamAPS FX screen while you use it, to record Boost, Ease-off, bolus calculator carbs and active insulin, and sends them to your Nightscout. It only reads CamAPS FX. It never taps, types or changes anything in CamAPS or any other app.</string>
+    <string name="perm_receive_bolus">Hear about each bolus FX Watcher records (units, carbs and time), if sharing is turned on in FX Watcher.</string>
 </resources>

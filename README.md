@@ -214,6 +214,26 @@ In the night hours (Settings > Night and battery) the duplicate and Boost nudges
 bedtime one is meant for that time and does. Home Assistant can add its own nudges, shown and
 logged the same way: see [docs/home-assistant.md](docs/home-assistant.md#8-nudges-from-home-assistant).
 
+## Bolus broadcast
+
+Optional, for people who build their own apps. With **Settings > Connections > Share boluses with
+other apps** on, FX Watcher sends each bolus it records to apps on the phone that hold its bolus
+permission. Nothing is sent while it is off.
+
+```xml
+<uses-permission android:name="studio.alans.fxwatcher.permission.RECEIVE_BOLUS" />
+<receiver android:name=".BolusReceiver" android:exported="true">
+    <intent-filter>
+        <action android:name="studio.alans.fxwatcher.action.BOLUS" />
+    </intent-filter>
+</receiver>
+```
+
+Extras: `kind` ("new", or "update" when the carbs show up after the bolus), `units` (double),
+`carbs` (double, grams; absent if none were entered), `at` (long, ms since the epoch), `source`,
+and `meal_size` when CamAPS showed one. Install FX Watcher before your app, so Android knows the
+permission when your app is installed.
+
 ## Home Assistant (optional, advanced)
 
 **Step-by-step guide with copy-paste YAML: [docs/home-assistant.md](docs/home-assistant.md)**

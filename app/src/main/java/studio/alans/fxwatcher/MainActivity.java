@@ -351,6 +351,8 @@ public class MainActivity extends Activity {
             cur.addView(text("Nightscout: " + Nightscout.queued(this) + " waiting"
                     + (sent > 0 ? " · last sent " + Store.ago(sent, now) : ""), 14));
         }
+        CheckBox shareBolus = box("Share boluses with other apps on this phone (units, carbs, time), "
+                + "for apps that ask for FX Watcher's bolus permission", p.getBoolean(Store.SHARE_BOLUS, false));
         cur = root;
 
         root.addView(button("Save settings", () -> {
@@ -366,6 +368,7 @@ public class MainActivity extends Activity {
                     .putBoolean(Store.NUDGE_DUPLICATE, nudgeDuplicate.isChecked())
                     .putBoolean(Store.NUDGE_BOOST, nudgeBoost.isChecked())
                     .putBoolean(Store.NUDGE_BEDTIME, nudgeBedtime.isChecked())
+                    .putBoolean(Store.SHARE_BOLUS, shareBolus.isChecked())
                     .putString(Store.PUMP_NAME, pumpName.getText().toString().trim())
                     .putInt(Store.BATT_NAG, Math.min(100, intOf(battNag, Store.DEF_BATT_NAG)))
                     .putInt(Store.BATT_ALARM, Math.min(100, intOf(battAlarm, Store.DEF_BATT_ALARM)))
