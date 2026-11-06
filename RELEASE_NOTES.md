@@ -11,6 +11,8 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
+**New in v3.12.1:** the Bolus tab tap also works when CamAPS's tabs are only icons (it finds the middle tab of the three), and logs the tab names it saw. While Meal Log's plan is over CamAPS, FX Watcher tells it when an entry box (Carbohydrates, Glucose) is open, so the plan shrinks out of the keyboard's way.
+
 **New in v3.12.0:** optional, off by default: **Settings > Connections > Open the Bolus tab when an app asks**. When Meal Log's "Open CamAPS with this plan" opens CamAPS, FX Watcher taps the Bolus tab once so the calculator is ready. It is the only tap FX Watcher ever makes in CamAPS (never numbers, never Deliver), and only within 20 s of the app asking. Needs the screen reader on.
 
 **New in v3.11.0:** FX Watcher can tell other apps on the phone about each bolus (units, carbs, time), so a separate app can, for example, ask what you ate right after a meal bolus. Off until you turn on **Settings > Connections > Share boluses with other apps**, and only apps that ask for FX Watcher's bolus permission get it. How to listen for it is in the [README](https://github.com/ahaverty/fx-watcher#bolus-broadcast).
