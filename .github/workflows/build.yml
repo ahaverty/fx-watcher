@@ -25,8 +25,16 @@ jobs:
         # FX Watcher must never act on CamAPS (it runs an insulin pump): no accessibility
         # actions, gestures or text input anywhere in the app.
         run: |
-          if grep -rnE "performAction|dispatchGesture|performGlobalAction|ACTION_SET_TEXT|ACTION_CLICK|canPerformGestures=\"true\"|flagRequestFilterKeyEvents|flagRequestTouchExploration" app/src/main; then
+          if grep -rnE "performAction|dispatchGesture|performGlobalAction|ACTION_SET_TEXT|ACTION_CLICK|canPerformGestures=\"true\"|flagRequestFilterKeyEvents|flagRequestTouchExploration" app/src/main --exclude=BolusTab.java; then
             echo "::error::An acting accessibility API appeared in the source. FX Watcher must stay read-only."
+            exit 1
+          fi
+          # The one opt-in exception: BolusTab taps the Bolus tab, once, and does nothing else.
+          f=app/src/main/java/studio/alans/fxwatcher/BolusTab.java
+          if grep -nE "dispatchGesture|performGlobalAction|ACTION_SET_TEXT|ACTION_SCROLL|ACTION_PASTE" "$f" \
+              || [ "$(grep -c 'performAction(' "$f")" != 1 ] \
+              || [ "$(grep -c 'performAction(AccessibilityNodeInfo.ACTION_CLICK)' "$f")" != 1 ]; then
+            echo "::error::BolusTab may only make its one ACTION_CLICK on the Bolus tab."
             exit 1
           fi
       - name: Signing key

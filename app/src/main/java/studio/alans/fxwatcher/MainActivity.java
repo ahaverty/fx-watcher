@@ -221,7 +221,7 @@ public class MainActivity extends Activity {
                         Uri.parse("package:" + getPackageName()))));
         check("See the pump's Bluetooth link", okBt, () ->
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 1));
-        check("Read the CamAPS screen (Boost, meals, bolus checks; read-only)", okA11y,
+        check("Read the CamAPS screen (Boost, meals, bolus checks)", okA11y,
                 () -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         check("Battery: unrestricted", okBattery, () ->
                 startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
@@ -353,6 +353,10 @@ public class MainActivity extends Activity {
         }
         CheckBox shareBolus = box("Share boluses with other apps on this phone (units, carbs, time), "
                 + "for apps that ask for FX Watcher's bolus permission", p.getBoolean(Store.SHARE_BOLUS, false));
+        CheckBox tapBolusTab = box("Open the Bolus tab when an app asks (e.g. Meal Log's \"Open CamAPS with this plan\"). "
+                + "The only tap FX Watcher ever makes in CamAPS: just the Bolus tab on the home screen, once, within "
+                + "20 s of the app asking. Never numbers, never Deliver. Needs the screen reader on.",
+                p.getBoolean(Store.TAP_BOLUS_TAB, false));
         cur = root;
 
         root.addView(button("Save settings", () -> {
@@ -369,6 +373,7 @@ public class MainActivity extends Activity {
                     .putBoolean(Store.NUDGE_BOOST, nudgeBoost.isChecked())
                     .putBoolean(Store.NUDGE_BEDTIME, nudgeBedtime.isChecked())
                     .putBoolean(Store.SHARE_BOLUS, shareBolus.isChecked())
+                    .putBoolean(Store.TAP_BOLUS_TAB, tapBolusTab.isChecked())
                     .putString(Store.PUMP_NAME, pumpName.getText().toString().trim())
                     .putInt(Store.BATT_NAG, Math.min(100, intOf(battNag, Store.DEF_BATT_NAG)))
                     .putInt(Store.BATT_ALARM, Math.min(100, intOf(battAlarm, Store.DEF_BATT_ALARM)))

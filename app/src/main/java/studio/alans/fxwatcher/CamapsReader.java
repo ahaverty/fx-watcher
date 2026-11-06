@@ -30,10 +30,11 @@ import java.util.regex.Pattern;
  * Boost / Ease-off (start, length, early cancel), the bolus calculator's carbs, and active
  * insulin from the calculator's info panel. Everything goes to Nightscout via {@link Nightscout}.
  *
- * STRICTLY READ-ONLY. CamAPS runs an insulin pump. This service never acts on any window: no
- * node actions, no gestures, no global actions, no text input. Its config
- * (res/xml/camaps_reader.xml) only subscribes to CamAPS's packages, asks for no gesture or key
- * capability, and CI fails the build if any acting API appears in the source.
+ * READ-ONLY, with one opt-in exception: BolusTab (off by default, Settings > Connections) taps
+ * CamAPS's "Bolus" tab once when an app like Meal Log asked a moment ago. Nothing else in this
+ * service acts on any window: no other node actions, no gestures, no global actions, no text
+ * input. Its config (res/xml/camaps_reader.xml) only subscribes to CamAPS's packages, asks for no
+ * gesture or key capability, and CI fails the build if an acting API appears anywhere but BolusTab.
  *
  * Rules work on the visible text (CamAPS's view ids are obfuscated numbers that change between
  * versions). Learnt from CamAPS 1.4(192) mmol/L, 12 Oct 2026:
@@ -63,7 +64,7 @@ public class CamapsReader extends AccessibilityService {
 
     @Override
     protected void onServiceConnected() {
-        Store.log(this, "CamAPS screen reader on (read-only)");
+        Store.log(this, "CamAPS screen reader on");
     }
 
     @Override
@@ -83,6 +84,9 @@ public class CamapsReader extends AccessibilityService {
             if (root.getPackageName() == null || !root.getPackageName().toString().startsWith("com.camdiab.")) return;
             List<Item> items = new ArrayList<>();
             collect(root, items, 0);
+            List<String> texts = new ArrayList<>();
+            for (Item it : items) texts.add(it.text);
+            BolusTab.maybeTap(this, root, texts);   // only acts if turned on and an app just asked
             onScreen(items);
         } catch (Exception ex) {
             Log.w(TAG, "event", ex);

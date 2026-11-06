@@ -99,6 +99,15 @@
         </service>
 
         <!-- Google sleep detection events (bedtime media volume, optional). -->
+        <!-- Opt-in: an app holding the bolus permission asks for CamAPS's Bolus tab (BolusTab). -->
+        <receiver
+            android:name=".BolusTab"
+            android:exported="true"
+            android:permission="studio.alans.fxwatcher.permission.RECEIVE_BOLUS">
+            <intent-filter>
+                <action android:name="studio.alans.fxwatcher.action.OPEN_BOLUS_TAB" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name=".SleepReceiver"
             android:exported="false" />

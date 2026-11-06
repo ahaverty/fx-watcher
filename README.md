@@ -18,8 +18,9 @@ your settings are kept. From v3.8.0 the app checks for updates itself (quiet not
 > **Unofficial and not a medical device.** FX Watcher is not made by or affiliated with CamDiab
 > or Ypsomed. It can fail (phone off, battery dead, a CamAPS update changing its notification).
 > Keep CamAPS FX's own alerts on. FX Watcher only *reads* CamAPS (its notification, and its
-> screen if you turn on the optional screen reader) and may reopen the app; it never taps
-> anything in CamAPS, never changes CamAPS settings and never touches insulin delivery.
+> screen if you turn on the optional screen reader) and may reopen the app; it never changes
+> CamAPS settings and never touches insulin delivery. The one tap it can make is opt-in and off by
+> default: [opening the Bolus tab](#open-the-bolus-tab-opt-in) when another app asks.
 
 ## What it alarms on
 
@@ -125,15 +126,16 @@ start it, the times, the idle minutes, the morning restore, and (Advanced) a dif
 time for each day of the week, or "off" for nights you don't want it.
 Google sleep detection asks for the *Physical activity* permission, only if you turn it on.
 
-### CamAPS screen reader (read-only)
+### CamAPS screen reader
 
 CamAPS's notification doesn't show Boost, Ease-off, meals or active insulin. The screen reader
 reads them from the CamAPS screen **while you use CamAPS**, to send them to Nightscout (below).
 Turn it on in **Settings > Accessibility > Installed apps > FX Watcher: CamAPS screen reader**
 (the app's Setup list links there).
 
-- It only listens to CamAPS FX and only **reads**: it can't tap, type or change anything, and
-  every build is checked automatically for code that could.
+- It only listens to CamAPS FX and only **reads**: it can't type or change anything, and every
+  build is checked automatically for code that could. The single exception is the opt-in
+  [Bolus tab tap](#open-the-bolus-tab-opt-in), off unless you turn it on.
 - It records: Boost and Ease-off (start, length, planned, cancelled), Add meal entries (meal,
   hypo treatment, slowly absorbed), carbs from the bolus calculator, bolus deliveries, and
   active insulin, infusion rate, reservoir and pump battery from CamAPS's info panels.
@@ -233,6 +235,16 @@ Extras: `kind` ("new", or "update" when the carbs show up after the bolus), `uni
 `carbs` (double, grams; absent if none were entered), `at` (long, ms since the epoch), `source`,
 and `meal_size` when CamAPS showed one. Install FX Watcher before your app, so Android knows the
 permission when your app is installed.
+
+### Open the Bolus tab (opt-in)
+
+Off by default. With **Settings > Connections > Open the Bolus tab when an app asks** on (and the
+screen reader on), an app holding the bolus permission can send
+`studio.alans.fxwatcher.action.OPEN_BOLUS_TAB` (to package `studio.alans.fxwatcher`) just before it
+opens CamAPS. Within 20 seconds, on CamAPS's home screen, FX Watcher taps the **Bolus** tab once so
+the calculator is open. That is the only tap it ever makes in CamAPS: never a number, never
+Deliver, not on any other screen, and not at all if the calculator is already showing. Requests
+while it is off are logged and ignored. Every build checks that this is the only acting code.
 
 ## Home Assistant (optional, advanced)
 

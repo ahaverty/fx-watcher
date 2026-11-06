@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  CamapsReader: READ-ONLY. Only CamAPS FX's packages, only window/content/click/text-changed
+  CamapsReader: READ-ONLY except the opt-in BolusTab (one tap on the Bolus tab, no gestures). Only CamAPS FX's packages, only window/content/click/text-changed
   events (text-changed: the sensor pairing code as it is typed), window content readable, and
   nothing else: no gesture or key-filter capability,
   no touch exploration, no magnification, no fingerprint gestures.
