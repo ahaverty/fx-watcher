@@ -334,11 +334,13 @@ public class CamapsReader extends AccessibilityService {
                 Store.logCam(this, t.getString("notes"));
                 if ("slow".equals(mealType)) Nudges.slowMeal(this, now);
                 Nightscout.postTreatment(this, t);
+                BolusBroadcast.carbs(this, now, mealAmount, mealType);
                 mealAmount = -1;
                 return;
             }
             if (dialog.equals("start") && setupKind != null) {
                 boost(t -> t.start(setupKind, setupMinutes, setupAt, now));
+                BolusBroadcast.boost(this, setupKind, setupAt, setupMinutes, now);
             } else if (dialog.startsWith("stop:")) {
                 String kind = dialog.substring(5);
                 boost(t -> t.stop(kind, now));

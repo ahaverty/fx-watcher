@@ -236,6 +236,11 @@ Extras: `kind` ("new", or "update" when the carbs show up after the bolus), `uni
 and `meal_size` when CamAPS showed one. Install FX Watcher before your app, so Android knows the
 permission when your app is installed.
 
+Since v3.13.0 the same apps also get `studio.alans.fxwatcher.action.CARBS` for an **Add meal** entry
+(`carbs` double, `meal_type` "hypo" / "meal" / "slow", `at`) and `studio.alans.fxwatcher.action.BOOST`
+when Boost or Ease-off is confirmed (`kind` "Boost" / "Ease-off", `start`, `minutes` or -1, `at`).
+Both need the screen reader on, since only CamAPS's screens show them.
+
 ### Open the Bolus tab (opt-in)
 
 Off by default. With **Settings > Connections > Open the Bolus tab when an app asks** on (and the
