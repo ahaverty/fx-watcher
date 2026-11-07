@@ -11,7 +11,9 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
-**New in v3.12.1:** the Bolus tab tap also works when CamAPS's tabs are only icons (it finds the middle tab of the three), and logs the tab names it saw. While Meal Log's plan is over CamAPS, FX Watcher tells it when an entry box (Carbohydrates, Glucose) is open, so the plan shrinks out of the keyboard's way.
+**New in v3.12.2:** a Boost or Ease-off started with **Now** is recorded the moment you tap Confirm, not only when FX Watcher next sees its countdown bar. Before, an Ease-off set at bedtime with the screen turned straight off stayed unknown until CamAPS was next opened, so reminders could still suggest Ease-off. If CamAPS never shows the bar within 5 minutes, FX Watcher takes the record back.
+
+**v3.12.1:** the Bolus tab tap also works when CamAPS's tabs are only icons (it finds the middle tab of the three), and logs the tab names it saw. While Meal Log's plan is over CamAPS, FX Watcher tells it when an entry box (Carbohydrates, Glucose) is open, so the plan shrinks out of the keyboard's way.
 
 **New in v3.12.0:** optional, off by default: **Settings > Connections > Open the Bolus tab when an app asks**. When Meal Log's "Open CamAPS with this plan" opens CamAPS, FX Watcher taps the Bolus tab once so the calculator is ready. It is the only tap FX Watcher ever makes in CamAPS (never numbers, never Deliver), and only within 20 s of the app asking. Needs the screen reader on.
 

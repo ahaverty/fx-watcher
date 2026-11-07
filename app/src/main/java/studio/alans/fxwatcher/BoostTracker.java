@@ -6,7 +6,11 @@ import java.util.List;
 /**
  * Boost / Ease-off from the CamAPS screen, decided by explicit events only (pure Java, unit
  * tested; CamapsReader persists it with save()/load()):
- *   - start:  Confirm on the "Boost start" dialog (Now, or Later at a time)
+ *   - start:  Confirm on the "Boost start" dialog (Now, or Later at a time). A "Now" with its
+ *             length seen is recorded straight away (7 Nov 2026: a 6 h bedtime Ease-off
+ *             confirmed at 23:36 was only seen when CamAPS was next opened at 00:00, so the
+ *             reminders didn't know about it). If its bar never shows within 5 min, it is
+ *             taken back (CamAPS refused it, e.g. the pump wasn't connected).
  *   - bar:    the running bar ("HH:MM:SS" remaining + kind) on the home screen
  *   - stop:   Confirm on the "Boost" / "Ease-off" dialog with "Off" (the bar's X)
  *   - cancel: Confirm on the "Planned boost" / "Planned ease-off" dialog
@@ -42,6 +46,7 @@ final class BoostTracker {
         String kind;
         long start, end;
         boolean startKnown;
+        boolean barSeen = true;  // false for a "Now" recorded at Confirm until its bar shows
 
         Span(String kind, long start, long end, boolean startKnown) {
             this.kind = kind;
@@ -83,6 +88,11 @@ final class BoostTracker {
             Span s = new Span(kind, plannedAt, end, true);
             setPlanned(kind, s);
             if (minutes > 0) out.add(new Post(kind, s.start, s.end, true, "planned"));
+        } else if (minutes > 0) {
+            active = new Span(kind, now, now + minutes * 60_000L, true);
+            active.barSeen = false;
+            nowKind = null;
+            out.add(new Post(kind, active.start, active.end, true, "planned"));
         } else {
             nowKind = kind;
             nowAt = now;
@@ -95,6 +105,7 @@ final class BoostTracker {
         List<Post> out = new ArrayList<>();
         long end = now + remaining;
         if (active != null && active.kind.equals(kind)) {
+            active.barSeen = true;
             if (Math.abs(active.end - end) > 90_000L) {          // extended or shortened
                 active.end = end;
                 out.add(new Post(kind, active.start, end, active.startKnown, "planned"));
@@ -124,9 +135,21 @@ final class BoostTracker {
         return out;
     }
 
-    /** Home screen without a bar: only forgets a span that has run its course. */
-    void noBar(long now) {
-        if (active != null && now >= active.end - 60_000L) active = null;
+    /**
+     * Home screen without a bar: forgets a span that has run its course, and takes back a "Now"
+     * recorded at Confirm whose bar never showed in 5 min (CamAPS didn't start it). A home
+     * screen just after Confirm is not enough: CamAPS draws it for a moment before the bar.
+     */
+    List<Post> noBar(long now) {
+        List<Post> out = new ArrayList<>();
+        if (active == null) return out;
+        if (!active.barSeen && now - active.start > 5 * 60_000L && now < active.end - 60_000L) {
+            out.add(new Post(active.kind, active.start, active.start, true, "cancelled"));
+            active = null;
+        } else if (now >= active.end - 60_000L) {
+            active = null;
+        }
+        return out;
     }
 
     /** Confirm on the stop dialog ("Boost" / "Ease-off" with "Off"). */
@@ -155,13 +178,15 @@ final class BoostTracker {
     // ── Persistence (plain text; org.json is not available in local unit tests) ──
 
     private static String span(Span s) {
-        return s == null ? "" : s.kind + "," + s.start + "," + s.end + "," + s.startKnown;
+        return s == null ? "" : s.kind + "," + s.start + "," + s.end + "," + s.startKnown + "," + s.barSeen;
     }
 
     private static Span span(String s) {
         if (s == null || s.isEmpty()) return null;
         String[] a = s.split(",");
-        return new Span(a[0], Long.parseLong(a[1]), Long.parseLong(a[2]), Boolean.parseBoolean(a[3]));
+        Span sp = new Span(a[0], Long.parseLong(a[1]), Long.parseLong(a[2]), Boolean.parseBoolean(a[3]));
+        if (a.length > 4) sp.barSeen = Boolean.parseBoolean(a[4]);
+        return sp;
     }
 
     String save() {

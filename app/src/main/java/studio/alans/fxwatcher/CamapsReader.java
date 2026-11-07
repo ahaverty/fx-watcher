@@ -261,7 +261,7 @@ public class CamapsReader extends AccessibilityService {
             final long rem = remaining;
             if (k != null) boost(t -> t.bar(k, rem, now));
             else if (indexOf(items, "Boost") >= 0 && indexOf(items, "Ease-off") >= 0) {
-                boost(t -> { t.noBar(now); return new ArrayList<>(); });
+                boost(t -> t.noBar(now));
             }
         }
 
