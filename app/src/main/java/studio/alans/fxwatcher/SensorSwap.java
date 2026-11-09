@@ -74,7 +74,9 @@ final class SensorSwap {
     static Info info(List<String> texts) {
         if (!texts.contains("Dexcom G7 information")) return null;
         String serial = after(texts, "Serial number");
-        if (serial == null) return null;
+        // "---" while CamAPS is still connecting, e.g. just after an app update, with the time of
+        // reconnecting as "Activated on" (9 Nov 2026). Not the sensor's details, so not a new sensor.
+        if (serial == null || !serial.matches(".*[0-9A-Za-z].*")) return null;
         return new Info(after(texts, "Pairing code"), serial,
                 time(after(texts, "Activated on")), time(after(texts, "Expires on")));
     }

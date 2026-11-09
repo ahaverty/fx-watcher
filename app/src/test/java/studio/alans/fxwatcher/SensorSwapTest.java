@@ -137,6 +137,21 @@ public class SensorSwapTest {
     }
 
     @Test
+    public void pageStillConnectingIsNotANewSensor() {
+        SensorSwap w = new SensorSwap();
+        w.texts(PAGE, T);
+        long started = w.startedAt;
+        java.util.List<String> blank = new java.util.ArrayList<>(PAGE);
+        blank.set(8, "---");
+        blank.set(10, "2026-11-09 11:10:59");
+        blank.set(12, "---");
+        assertEquals(SensorSwap.Kind.NONE, w.texts(blank, T + 24 * H));
+        assertEquals(started, w.startedAt);
+        assertEquals("422659817025", w.startSerial);
+        assertEquals(SensorSwap.Kind.NONE, w.texts(PAGE, T + 25 * H));
+    }
+
+    @Test
     public void newSerialIsANewSensor() {
         SensorSwap w = new SensorSwap();
         w.texts(PAGE, T);
