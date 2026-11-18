@@ -207,10 +207,15 @@ public class CamapsReader extends AccessibilityService {
             if (indexOf(items, "Add meal") >= 0 && indexOf(items, "Meal or snack") >= 0) {
                 known = true;
                 if (gcho > 0 && NUM.matcher(items.get(gcho - 1).text).matches()) mealAmount = num(items.get(gcho - 1).text);
-            } else if (t.equals("Meal") && gcho > 0 && indexOf(items, "Confirm") >= 0) {
-                known = true;
-                if (NUM.matcher(items.get(gcho - 1).text).matches()) mealAmount = num(items.get(gcho - 1).text);
-                dialog = "meal";
+            } else {
+                List<String> texts2 = new ArrayList<>();
+                for (Item it : items) texts2.add(it.text);
+                if (isMealDialog(texts2)) {
+                    known = true;
+                    double a = mealDialogAmount(texts2);
+                    if (a > 0) mealAmount = a;
+                    dialog = "meal";
+                }
             }
         }
 
@@ -275,6 +280,65 @@ public class CamapsReader extends AccessibilityService {
         if (!known) unknownScreen(items);
     }
 
+    /**
+     * The Add meal "Meal" confirm dialog: "Meal", amount, "g CHO", "Cancel", "Confirm". "Meal"
+     * need not come first: a popup or the bolus countdown can sit above it in the same window
+     * (18 Nov 2026: the Delivered popup came up mid-Add meal and the slow meal was missed).
+     */
+    static boolean isMealDialog(List<String> texts) {
+        int meal = -1, gcho = -1;
+        boolean confirm = false;
+        for (int i = 0; i < texts.size(); i++) {
+            String x = texts.get(i);
+            if (x.equalsIgnoreCase("Total Units") || x.equalsIgnoreCase("Meal or snack")) return false;
+            if (meal < 0 && x.equals("Meal")) meal = i;
+            if (gcho < 0 && x.equalsIgnoreCase("g CHO")) gcho = i;
+            if (x.equalsIgnoreCase("Confirm")) confirm = true;
+        }
+        return confirm && meal >= 0 && gcho > meal;
+    }
+
+    /** The grams on the Meal dialog (the number before "g CHO"), or -1. */
+    static double mealDialogAmount(List<String> texts) {
+        for (int i = 1; i < texts.size(); i++) {
+            if (texts.get(i).equalsIgnoreCase("g CHO") && NUM.matcher(texts.get(i - 1)).matches()) {
+                return num(texts.get(i - 1));
+            }
+        }
+        return -1;
+    }
+
+    /** Texts of the window the clicked view is in (its top ancestor), or of the active window. */
+    private List<String> clickedWindow(AccessibilityEvent e) {
+        AccessibilityNodeInfo n = e.getSource();
+        for (int i = 0; n != null && i < 60; i++) {
+            AccessibilityNodeInfo up = n.getParent();
+            if (up == null) break;
+            n = up;
+        }
+        if (n == null) n = getRootInActiveWindow();
+        List<String> out = new ArrayList<>();
+        if (n == null || n.getPackageName() == null || !n.getPackageName().toString().startsWith("com.camdiab.")) return out;
+        List<Item> items = new ArrayList<>();
+        collect(n, items, 0);
+        for (Item it : items) out.add(it.text);
+        return out;
+    }
+
+    /** First two non-number labels: a screen's title without account details. */
+    private static String title(List<String> texts) {
+        StringBuilder sig = new StringBuilder();
+        int n = 0;
+        for (String x : texts) {
+            if (n == 2) break;
+            if (NUM.matcher(x).matches()) continue;
+            if (sig.length() > 0) sig.append(" | ");
+            sig.append(x.length() > 30 ? x.substring(0, 30) : x);
+            n++;
+        }
+        return sig.toString();
+    }
+
     private String lastCalc;
     /** Add meal: amount on screen and the type tapped last. */
     private double mealAmount = -1;
@@ -321,10 +385,28 @@ public class CamapsReader extends AccessibilityService {
         else if (label.equals("Meal or snack")) mealType = "meal";
         else if (label.equals("Hypoglycaemia treatment")) mealType = "hypo";
         else if (label.equals("Slowly absorbed meal")) mealType = "slow";
-        if (!label.equalsIgnoreCase("Confirm") || dialog == null) return;
+        if (!label.equalsIgnoreCase("Confirm")) return;
+        // Read the dialog the Confirm belongs to: the last screen read can be a popup that came
+        // up over it (Delivered ...) and was gone by the time Confirm was tapped.
+        try {
+            List<String> win = clickedWindow(e);
+            if (isMealDialog(win)) {
+                double a = mealDialogAmount(win);
+                if (a > 0) mealAmount = a;
+                dialog = "meal";
+            } else if (dialog == null) {
+                Store.logCam(this, "Confirm tapped on a CamAPS screen FX doesn't know: " + (win.isEmpty() ? "(unreadable)" : title(win)));
+            }
+        } catch (Exception ex) {
+            Log.w(TAG, "confirm", ex);
+        }
+        if (dialog == null) return;
         long now = System.currentTimeMillis();
         SharedPreferences p = Store.p(this);
         try {
+            if (dialog.equals("meal") && mealAmount <= 0) {
+                Store.logCam(this, "Add meal confirmed but the amount wasn't readable, not recorded");
+            }
             if (dialog.equals("meal") && mealAmount > 0) {
                 JSONObject t = Nightscout.treatment("Carbs", now, "camaps-screen");
                 t.put("carbs", mealAmount);

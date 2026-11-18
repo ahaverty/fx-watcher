@@ -11,6 +11,8 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
+**New in v3.13.2:** an Add meal entry is no longer missed when CamAPS's "Delivered" popup comes up while you are on the Meal screen (entering a slow meal during the bolus countdown). FX Watcher now reads the dialog the Confirm tap belongs to, and logs it when a Confirm lands on a screen it doesn't know.
+
 **New in v3.13.1:** a CamAPS update no longer looks like a new sensor. While CamAPS is reconnecting its Dexcom G7 page shows "---" for the serial, and FX Watcher used to log that as a sensor change.
 
 **New in v3.13.0:** with **Share boluses with other apps** on, FX Watcher now also tells apps like Meal Log about CamAPS **Add meal** entries (hypo treatment, meal or snack, slowly absorbed) and about Boost or Ease-off being started, so a hypo treatment can be logged for you, a snack eaten without a bolus can be asked about, and a "start Ease-off" reminder closes itself. Details in the [README](https://github.com/ahaverty/fx-watcher#bolus-broadcast).
