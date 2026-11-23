@@ -181,6 +181,8 @@ final class Store {
      */
     /** What FX Watcher saw CamAPS do (notifications, bolus calculator, countdown, deliveries), newest first. */
     static final String CAMLOG = "cam_log";
+    /** How CamAPS alerts sound (AlertAudio): player usage, volumes, notification actions. */
+    static final String AUDIOLOG = "audio_log";
 
     /** Writes to the CamAPS log only; a line identical to the newest one is skipped. */
     static synchronized void camLog(Context c, String msg) {

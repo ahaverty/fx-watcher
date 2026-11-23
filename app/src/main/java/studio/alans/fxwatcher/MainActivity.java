@@ -423,6 +423,7 @@ public class MainActivity extends Activity {
         // ---- Logs: copy buttons always visible, the text itself folded away until opened
         logSection("FX Watcher log", "log", Store.LOG, "FX Watcher log", 1);
         logSection("What FX Watcher saw in CamAPS", "camlog", Store.CAMLOG, "CamAPS log (as seen by FX Watcher)", 3);
+        logSection("How CamAPS alerts sound (debug)", "audiolog", Store.AUDIOLOG, "Alert audio log", 3);
 
         setContentView(sv);
     }

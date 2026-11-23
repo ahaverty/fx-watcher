@@ -130,7 +130,22 @@ public class CamapsListener extends NotificationListenerService {
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (isCamaps(sbn) && !handle(sbn, false)) logIgnored(sbn);
         else if (sbn != null && sbn.getPackageName() != null
-                && sbn.getPackageName().startsWith("com.camdiab.") && !sbn.isOngoing()) info(sbn);
+                && sbn.getPackageName().startsWith("com.camdiab.") && !sbn.isOngoing()) {
+            audio(sbn);
+            info(sbn);
+        }
+    }
+
+    /** Debug record of how this alert sounds (AlertAudio). Never throws, changes nothing. */
+    private void audio(StatusBarNotification sbn) {
+        try {
+            android.service.notification.NotificationListenerService.Ranking r =
+                    new android.service.notification.NotificationListenerService.Ranking();
+            android.app.NotificationChannel ch = getCurrentRanking().getRanking(sbn.getKey(), r) ? r.getChannel() : null;
+            AlertAudio.onNotification(this, sbn, ch);
+        } catch (Exception e) {
+            Log.w(TAG, "alert audio record", e);
+        }
     }
 
     private static final java.util.regex.Pattern DELIVERED =
@@ -335,6 +350,11 @@ public class CamapsListener extends NotificationListenerService {
         }
         if (status == null && glucose == null && !force) return false;
         if (status == null) status = "Unknown";
+        if (glucose != null) {
+            try {
+                AlertAudio.onLowGlucose(this, Double.parseDouble(glucose.replace(',', '.')));
+            } catch (NumberFormatException ignored) { }
+        }
         String pkg = sbn.getPackageName();
         Store.camLog(this, "Status notification: auto mode " + status + (glucose == null ? "" : ", glucose " + glucose));
         Monitor.onCamaps(this, true, status, glucose, texts, pkg, false);
