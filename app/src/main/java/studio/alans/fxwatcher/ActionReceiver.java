@@ -29,6 +29,7 @@ public class ActionReceiver extends BroadcastReceiver {
     static final String BOLUS_DISMISS = "studio.alans.fxwatcher.BOLUS_DISMISS";
     static final String QUIET_END = "studio.alans.fxwatcher.QUIET_END";
     static final String NUDGE_OPEN = "studio.alans.fxwatcher.NUDGE_OPEN";
+    static final String LOWWARN_DISMISS = "studio.alans.fxwatcher.LOWWARN_DISMISS";
 
     private static final String[] NUMBERS = {"zero", "one", "two", "three", "four", "five", "six",
             "seven", "eight", "nine", "ten", "eleven", "twelve"};
@@ -44,6 +45,7 @@ public class ActionReceiver extends BroadcastReceiver {
                     Monitor.check(c);
                     Updater.check(c, false, null);
                     break;
+                case LOWWARN_DISMISS: LowWarnings.dismiss(c); break;
                 case SILENCE: Monitor.silence(c); break;
                 case SWIPED:
                     Store.log(c, "Alarm notification swiped away");

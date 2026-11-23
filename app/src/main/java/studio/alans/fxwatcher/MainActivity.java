@@ -24,6 +24,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -266,6 +268,31 @@ public class MainActivity extends Activity {
                 "Plus 10 s for each unit. Starts when the delivery countdown shows. 0 turns it off.",
                 p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
 
+        section("Early low warning", "lowwarn", false);
+        cur.addView(text("A buzz and a notification, no sound, when glucose is on course to go under "
+                + "3.9 in the next 20 to 25 minutes: take 10 g. It looks at the last 15 to 20 minutes of "
+                + "readings and ignores Ease-off, Boost and suspension. Numbers are from your own history "
+                + "(docs/early-low-backtest.md): the more lows it catches early, the more warnings that "
+                + "turn out not to be needed.", 14));
+        final String[] lowModes = {LowWarning.OFF, LowWarning.CALM, LowWarning.BALANCED, LowWarning.EARLY};
+        final String[] lowLabels = {"Off",
+                "Calm: catches about 2 in 3 lows 15+ min ahead, about 1.7 needless warnings a day",
+                "Balanced: about 3 in 4, about 2 needless a day (recommended)",
+                "Early: about 4 in 5, about 3 needless a day"};
+        final RadioGroup lowMode = new RadioGroup(this);
+        String lowNow = LowWarnings.mode(p);
+        for (int i = 0; i < lowModes.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setText(lowLabels[i]);
+            rb.setId(1000 + i);
+            lowMode.addView(rb);
+            if (lowModes[i].equals(lowNow)) rb.setChecked(true);
+        }
+        if (lowMode.getCheckedRadioButtonId() < 0) lowMode.check(1002);   // unknown value: balanced
+        cur.addView(lowMode);
+        cur.addView(button("Show a test warning", () -> LowWarnings.test(this)));
+        cur.addView(text(LowWarnings.recent(this), 12));
+
         section("Nudges", "nudges", false);
         cur.addView(text("A reminder at the moment Ease-off or Boost might help, or a bolus is worth "
                 + "checking. Only ever a notification: nothing changes in CamAPS or the pump, and no "
@@ -369,6 +396,7 @@ public class MainActivity extends Activity {
                     .putInt(Store.PUMP_NUDGE, intOf(pumpNudge, Store.DEF_PUMP_NUDGE))
                     .putInt(Store.MISSED_BOLUS_MIN, intOf(missedBolus, Store.DEF_MISSED_BOLUS_MIN))
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
+                    .putString(Store.LOWWARN_MODE, lowModes[Math.max(0, lowMode.getCheckedRadioButtonId() - 1000)])
                     .putBoolean(Store.NUDGE_DUPLICATE, nudgeDuplicate.isChecked())
                     .putBoolean(Store.NUDGE_BOOST, nudgeBoost.isChecked())
                     .putBoolean(Store.NUDGE_BEDTIME, nudgeBedtime.isChecked())

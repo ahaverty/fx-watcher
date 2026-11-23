@@ -60,6 +60,10 @@ final class Store {
     static final int DEF_DELIVERY_FAST_SEC = 60;
     // Nudges (Nudges.java), each off until turned on
     static final String NUDGE_DUPLICATE = "nudge_duplicate";  // possible duplicate bolus
+    static final String LOWWARN_MODE = "lowwarn_mode";          // off / calm / balanced / early
+    static final String LOWWARN_TRACKER = "lowwarn_tracker";    // LowWarning.Tracker state
+    static final String LOWWARN_JOURNAL = "lowwarn_journal";    // every warning and what came of it
+    static final String TREAT_UNTIL = "treat_until";            // Treating mode end time (0 = not treating)
     static final String NUDGE_BOOST = "nudge_boost";          // Boost after a slow meal
     static final String NUDGE_BEDTIME = "nudge_bedtime";      // Ease-off at bedtime with insulin on board
     static final String SHARE_BOLUS = "share_bolus";          // BolusBroadcast to other apps, off until turned on
