@@ -13,7 +13,7 @@ import Toybox.WatchUi;
 class NumberText {
 
     static function line() {
-        var s = Application.Storage.getValue("state");
+        var s = Application.Storage.getValue("state") as Dictionary?;
         var fetched = Application.Storage.getValue("fetched");
         if (s == null || fetched == null) {
             return null;
@@ -74,7 +74,7 @@ class WidgetNumberView extends WatchUi.View {
         Communications.makeWebRequest("http://127.0.0.1:17590/state.json", {}, options, method(:onReceive));
     }
 
-    function onReceive(code, data) {
+    function onReceive(code as Number, data as Dictionary or String or Null) as Void {
         if (code == 200 && data instanceof Lang.Dictionary && data.hasKey("state")) {
             GlanceApp.store(data);
         }

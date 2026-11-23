@@ -24,7 +24,7 @@ class CalmService extends System.ServiceDelegate {
         Communications.makeWebRequest(URL, {}, options, method(:onReceive));
     }
 
-    function onReceive(code, data) {
+    function onReceive(code as Number, data as Dictionary or String or Null) as Void {
         if (code == 200 && data instanceof Lang.Dictionary) {
             Background.exit(data);
         } else {

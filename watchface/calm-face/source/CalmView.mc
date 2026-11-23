@@ -29,7 +29,7 @@ class CalmView extends WatchUi.WatchFace {
 
     // The ring colour and the word. Never a number.
     function look() {
-        var s = Application.Storage.getValue("state");
+        var s = Application.Storage.getValue("state") as Dictionary?;
         var fetched = Application.Storage.getValue("fetched");
         if (s == null || fetched == null) {
             return [GREY, "no data"];
