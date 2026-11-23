@@ -274,4 +274,47 @@ public class LowWarningTest {
         assertTrue(k.summary(), k.summary().startsWith("2 warnings kept: 1 went under 3.9, 0 did not, 1 waiting"));
         assertTrue(done.get(0).line("14:05").contains("went under 3.9 15 min later"));
     }
+
+    // ---- fast lows only, with insulin on board, and CamAPS's own words ----
+
+    @Test
+    public void fastModeNeedsAFastFallAndInsulinOnBoard() {
+        LowWarning.Params fast = LowWarning.preset(LowWarning.FAST);
+        List<double[]> r = ramp(7.2, -0.12, 15);                 // 7.2 -> 5.4 in 15 min
+        LowWarning.Projection pr = LowWarning.project(r, end(r), fast);
+        assertTrue("with 1.0 U on board", LowWarning.fires(5.4, pr, fast, 1.0));
+        assertFalse("0.2 U on board: not worth a buzz", LowWarning.fires(5.4, pr, fast, 0.2));
+        assertTrue("insulin unknown: do not lose the warning", LowWarning.fires(5.4, pr, fast, Double.NaN));
+    }
+
+    @Test
+    public void fastModeIgnoresSlowFallsAndHighStarts() {
+        LowWarning.Params fast = LowWarning.preset(LowWarning.FAST);
+        List<double[]> slow = ramp(6.0, -0.05, 15);              // 5.25: the projection rule is off in this mode
+        assertFalse(LowWarning.fires(5.3, LowWarning.project(slow, end(slow), fast), fast, 2.0));
+        List<double[]> high = ramp(10.0, -0.15, 15);             // fast, but only down to 7.8
+        assertFalse(LowWarning.fires(7.8, LowWarning.project(high, end(high), fast), fast, 2.0));
+    }
+
+    @Test
+    public void camapsOwnFallingWordsAreRecognised() {
+        assertTrue(LowWarning.camapsFalling("Alert: Urgent Low Soon. Glucose is falling quickly"));
+        assertTrue(LowWarning.camapsFalling("Glucose falling fast"));
+        assertTrue(LowWarning.camapsFalling("Glucose falling very fast"));
+        assertTrue(LowWarning.camapsFalling("Falling glucose alert."));
+        assertFalse("plain falling is not an alarm", LowWarning.camapsFalling("Glucose falling"));
+        assertFalse(LowWarning.camapsFalling("Delivered 1.3 U of insulin."));
+        assertFalse(LowWarning.camapsFalling(null));
+    }
+
+    @Test
+    public void camapsTriggerWarnsOnceWithTheSameDebounceAndSuppression() {
+        LowWarning.Tracker t = new LowWarning.Tracker();
+        assertEquals(LowWarning.Action.NONE, t.external(T0, 5.2, true));              // treating
+        assertEquals(LowWarning.Action.NONE, t.external(T0, 3.5, false));             // already low
+        assertEquals(LowWarning.Action.WARN, t.external(T0, 5.2, false));
+        assertEquals(LowWarning.Action.NONE, t.external(T0 + 5 * MIN, 5.0, false));   // still active
+        // the rule cannot warn again inside the cooldown either
+        assertEquals(LowWarning.Action.NONE, t.update(T0 + 6 * MIN, 5.0, falling(T0, 5.0, -0.2), P, false));
+    }
 }

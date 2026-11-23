@@ -37,6 +37,7 @@ final class LowWarning {
         final double fastRate;        // ... and falling at least this fast (mmol/L per min). fastBelow <= 0: off
         final int confirm;            // consecutive readings the rule must hold before warning (1 = at once)
         final double maxGlucose;      // never warn above this (a projection from a high start is rarely a low)
+        final double minIob;          // only warn with at least this much insulin on board (U); 0 = ignore insulin
 
         Params(int windowMin, int horizonMin, double projBelow, double fastBelow, double fastRate) {
             this(windowMin, horizonMin, projBelow, fastBelow, fastRate, 1, 99);
@@ -44,6 +45,12 @@ final class LowWarning {
 
         Params(int windowMin, int horizonMin, double projBelow, double fastBelow, double fastRate,
                int confirm, double maxGlucose) {
+            this(windowMin, horizonMin, projBelow, fastBelow, fastRate, confirm, maxGlucose, 0);
+        }
+
+        Params(int windowMin, int horizonMin, double projBelow, double fastBelow, double fastRate,
+               int confirm, double maxGlucose, double minIob) {
+            this.minIob = minIob;
             this.windowMin = windowMin;
             this.horizonMin = horizonMin;
             this.projBelow = projBelow;
@@ -65,12 +72,15 @@ final class LowWarning {
         }
     }
 
-    static final String OFF = "off", CALM = "calm", BALANCED = "balanced", EARLY = "early";
+    static final String OFF = "off", CALM = "calm", BALANCED = "balanced", EARLY = "early", FAST = "fast";
 
     /** The three sensitivity levels (null for off). Numbers and the trade-off: docs/early-low-backtest.md. */
     static Params preset(String mode) {
         if (CALM.equals(mode)) return new Params(20, 20, 3.8, 5.5, 0.10, 1, 7.0);
         if (EARLY.equals(mode)) return new Params(15, 25, 4.0, 5.5, 0.10, 1, 7.0);
+        // Fast lows only: a fall of 0.10 mmol/L per min or more over 15 min, under 6.0, with at least 0.5 U on board.
+        // Projection rule off (-99). See docs/early-low-backtest.md, "Fast lows".
+        if (FAST.equals(mode)) return new Params(15, 20, -99, 6.0, 0.10, 1, 99, 0.5);
         if (OFF.equals(mode)) return null;
         return Params.DEFAULT;
     }
@@ -129,7 +139,13 @@ final class LowWarning {
 
     /** Whether the rule says a low is coming at this reading. */
     static boolean fires(double glucose, Projection pr, Params p) {
+        return fires(glucose, pr, p, Double.NaN);
+    }
+
+    /** iob is insulin on board in units, NaN when unknown (then the insulin gate is skipped, not failed). */
+    static boolean fires(double glucose, Projection pr, Params p, double iob) {
         if (pr == null || glucose > p.maxGlucose) return false;
+        if (p.minIob > 0 && !Double.isNaN(iob) && iob < p.minIob) return false;
         return pr.projected < p.projBelow || fastFall(glucose, pr, p);
     }
 
@@ -145,6 +161,10 @@ final class LowWarning {
 
         /** Feed every reading, in order. `treating` suppresses everything (Treating mode). */
         Action update(long at, double glucose, Projection pr, Params p, boolean treating) {
+            return update(at, glucose, pr, p, treating, Double.NaN);
+        }
+
+        Action update(long at, double glucose, Projection pr, Params p, boolean treating, double iob) {
             if (glucose < LOW) {            // already low: CamAPS and the urgent low backstop own this now
                 active = false;
                 quietSince = 0;
@@ -153,7 +173,7 @@ final class LowWarning {
                 return Action.NONE;
             }
             if (pr == null) return Action.NONE;       // no usable fit: keep the state as it is
-            boolean fire = fires(glucose, pr, p);
+            boolean fire = fires(glucose, pr, p, iob);
             streak = fire ? streak + 1 : 0;
             if (fire) {
                 quietSince = 0;
@@ -177,6 +197,22 @@ final class LowWarning {
                 if (at - quietSince >= REARM_QUIET) active = false;
             }
             return Action.NONE;
+        }
+
+        /**
+         * CamAPS itself says glucose is falling fast or an urgent low is near (its own alert text).
+         * Same debounce as the rule: one warning, then quiet for the cooldown. Not while already low
+         * or treating.
+         */
+        Action external(long at, double glucose, boolean treating) {
+            if (treating || (glucose > 0 && glucose < LOW) || active || at - lastWarnAt < COOLDOWN) return Action.NONE;
+            active = true;
+            warnAt = lastWarnAt = at;
+            warnProjected = glucose;
+            rebuzzed = false;
+            quietSince = 0;
+            streak = 0;
+            return Action.WARN;
         }
 
         String save() {
@@ -327,6 +363,15 @@ final class LowWarning {
             return items.size() + " warnings kept: " + low + " went under " + LOW + ", " + none + " did not"
                     + (wait > 0 ? ", " + wait + " waiting" : "") + ".";
         }
+    }
+
+    private static final java.util.regex.Pattern CAMAPS_FALLING = java.util.regex.Pattern.compile(
+            "urgent\\s+low\\s+soon|glucose\\s+falling\\s+(very\\s+)?fast|falling\\s+glucose\\s+alert|fall\\s+rate\\s+alert",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** CamAPS's own words for a fast fall or a near urgent low (alert text or the status card). */
+    static boolean camapsFalling(String text) {
+        return text != null && CAMAPS_FALLING.matcher(text).find();
     }
 
     static final String TITLE = "Low coming";

@@ -69,3 +69,22 @@ Every warning goes into the app's log and a journal with what came of it ("gluco
 
 To re-run: `python tools/backtest/fetch_ns.py http://<nightscout> sgv.csv`, then
 `javac --release 11 -d out app/src/main/java/studio/alans/fxwatcher/LowWarning.java tools/backtest/Backtest.java` and `java -cp out studio.alans.fxwatcher.Backtest sgv.csv`.
+
+## Fast lows (added 23 Nov, the default level)
+
+Fast low: a fall of 2.0 or more in the 20 minutes before the first reading under 3.9. 151 of the 679 lows (0.26 a day, about 1 in 4). A fast drop shows nothing in the glucose line until it starts, so about 10 minutes of notice is the most a glucose-only rule can give. Grid of fall-rate rules: [early-low-fast-grid.md](early-low-fast-grid.md) (`tools/backtest/FastBacktest.java`).
+
+The "Fast lows only" level warns when glucose falls 0.10 mmol/L per minute or more over 15 minutes, is under 6.0, and there is at least 0.5 U on board (unknown insulin does not block it). It also warns when CamAPS itself says "Urgent Low Soon", "Glucose falling fast / very fast" or posts a falling glucose alert. Same debounce, same Treating suppression.
+
+Insulin on board, tested on the 46 days with logged boluses (`tools/backtest/IobBacktest.java`, 61 lows, only 7 of them fast, so this is a direction and not a proof):
+
+since 6 Oct: 46 days, 61 lows, 7 fast, of which 5 had >= 1.0 U on board
+| rule | fast lows warned 5+ min | 10+ min | all lows warned 10+ min | warnings/day | false/day |
+|---|---|---|---|---|---|
+| A fall >= 0.10/min, under 6.0 (no insulin info) | 100% (7/7) | 43% | 23% (14/61) | 0.94 | 0.53 |
+| B fall >= 0.12/min, under 6.0 (no insulin info) | 71% (5/7) | 43% | 15% (9/61) | 0.53 | 0.24 |
+| C 0.07/min if >= 1.0 U on board, else 0.12 | 100% (7/7) | 57% | 36% (22/61) | 1.35 | 0.77 |
+| D 0.08/min if >= 1.0 U on board, else 0.15 | 86% (6/7) | 43% | 26% (16/61) | 1.03 | 0.58 |
+| E 0.10/min only if >= 0.5 U on board | 100% (7/7) | 43% | 20% (12/61) | 0.73 | 0.38 |
+| F 0.08/min if >= 1.5 U on board, else off | 71% (5/7) | 43% | 21% (13/61) | 1.01 | 0.71 |
+| G 0.12/min if < 0.5 U on board, 0.08 if >= 0.5 U, under 6.5 | 100% (7/7) | 71% | 38% (23/61) | 1.50 | 0.96 |

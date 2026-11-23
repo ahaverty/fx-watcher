@@ -30,7 +30,7 @@ final class LowWarnings {
     private static final int REQ_OPEN = 401, REQ_DISMISS = 402, REQ_TREAT = 403;
 
     static String mode(SharedPreferences p) {
-        return p.getString(Store.LOWWARN_MODE, LowWarning.BALANCED);
+        return p.getString(Store.LOWWARN_MODE, LowWarning.FAST);
     }
 
     /** Called with every CamAPS reading (about every 5 min) after it is in the glucose log. */
@@ -48,7 +48,7 @@ final class LowWarnings {
             LowWarning.Projection pr = LowWarning.project(g.items, now, prm);
             LowWarning.Tracker t = LowWarning.Tracker.load(p.getString(Store.LOWWARN_TRACKER, ""));
             boolean treating = p.getLong(Store.TREAT_UNTIL, 0) > now;
-            LowWarning.Action a = t.update(now, mmol, pr, prm, treating);
+            LowWarning.Action a = t.update(now, mmol, pr, prm, treating, iob(p, now));
             ed.putString(Store.LOWWARN_TRACKER, t.save());
             if (a == LowWarning.Action.WARN && pr != null) {
                 String rule = pr.projected < prm.projBelow ? "projection" : "fast fall";
@@ -66,6 +66,34 @@ final class LowWarnings {
         }
         if (changed) ed.putString(Store.LOWWARN_JOURNAL, j.save());
         ed.apply();
+    }
+
+    /** Insulin on board in units: CamAPS's own figure when fresh, plus boluses since; NaN when nothing is known. */
+    static double iob(SharedPreferences p, long now) {
+        NudgeRules.BolusLog log = NudgeRules.BolusLog.load(p.getString(Store.NUDGE_BOLUSES, ""));
+        float reading = p.getFloat(Store.NUDGE_IOB, -1);
+        long readingAt = p.getLong(Store.NUDGE_IOB_AT, 0);
+        if (log.items.isEmpty() && (reading < 0 || now - readingAt > NudgeRules.IOB_FRESH)) return Double.NaN;
+        return NudgeRules.iob(log, reading, readingAt, now).units;
+    }
+
+    /**
+     * CamAPS says glucose is falling fast or an urgent low is near (alert text or status card).
+     * Turned into the same "Low coming" warning, with the same debounce, in every mode but off.
+     */
+    static synchronized void camaps(Context c, String text, long now) {
+        if (!LowWarning.camapsFalling(text)) return;
+        SharedPreferences p = Store.p(c);
+        if (LowWarning.preset(mode(p)) == null) return;
+        float g = p.getFloat(Store.MMOL, -1f);
+        LowWarning.Tracker t = LowWarning.Tracker.load(p.getString(Store.LOWWARN_TRACKER, ""));
+        boolean treating = p.getLong(Store.TREAT_UNTIL, 0) > now;
+        if (t.external(now, g, treating) != LowWarning.Action.WARN) return;
+        LowWarning.Journal j = LowWarning.Journal.load(p.getString(Store.LOWWARN_JOURNAL, ""));
+        j.add(new LowWarning.Entry(now, g, g, 0, "CamAPS alert"));
+        p.edit().putString(Store.LOWWARN_TRACKER, t.save()).putString(Store.LOWWARN_JOURNAL, j.save()).apply();
+        Store.logCam(c, "Low warning sent (CamAPS said: " + text.replace('\n', ' ').trim() + ")");
+        show(c, false);
     }
 
     static void channel(Context c) {

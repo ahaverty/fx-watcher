@@ -180,6 +180,7 @@ public class CamapsListener extends NotificationListenerService {
         // Any fresh "Delivered" notification answers the missed bolus check, Nightscout or not.
         double u = BolusTracker.units(text);
         if (u >= 0) BolusWatch.delivered(this, u, System.currentTimeMillis());
+        LowWarnings.camaps(this, title + " " + text, System.currentTimeMillis());
         sensorExpiry(this, text, at);
         SensorWatch.texts(this, java.util.Collections.singletonList(text), at);
         CamapsAlert a = CamapsAlert.parse(title, text);
@@ -353,6 +354,9 @@ public class CamapsListener extends NotificationListenerService {
         }
         if (status == null && glucose == null && !force) return false;
         if (status == null) status = "Unknown";
+        for (String s : texts) {
+            if (LowWarning.camapsFalling(s)) LowWarnings.camaps(this, s, System.currentTimeMillis());
+        }
         if (glucose != null) {
             try {
                 AlertAudio.onLowGlucose(this, Double.parseDouble(glucose.replace(',', '.')));

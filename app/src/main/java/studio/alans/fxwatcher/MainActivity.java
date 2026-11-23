@@ -301,11 +301,13 @@ public class MainActivity extends Activity {
                 + "readings and ignores Ease-off, Boost and suspension. Numbers are from your own history "
                 + "(docs/early-low-backtest.md): the more lows it catches early, the more warnings that "
                 + "turn out not to be needed.", 14));
-        final String[] lowModes = {LowWarning.OFF, LowWarning.CALM, LowWarning.BALANCED, LowWarning.EARLY};
+        final String[] lowModes = {LowWarning.OFF, LowWarning.CALM, LowWarning.BALANCED, LowWarning.EARLY, LowWarning.FAST};
         final String[] lowLabels = {"Off",
                 "Calm: catches about 2 in 3 lows 15+ min ahead, about 1.7 needless warnings a day",
                 "Balanced: about 3 in 4, about 2 needless a day (recommended)",
-                "Early: about 4 in 5, about 3 needless a day"};
+                "Early: about 4 in 5, about 3 needless a day",
+                "Fast lows only (recommended): fast falls with insulin on board, plus CamAPS's own falling alerts. "
+                        + "About 10 min notice, about 0.4 needless a day"};
         final RadioGroup lowMode = new RadioGroup(this);
         String lowNow = LowWarnings.mode(p);
         for (int i = 0; i < lowModes.length; i++) {
@@ -314,8 +316,9 @@ public class MainActivity extends Activity {
             rb.setId(1000 + i);
             lowMode.addView(rb);
             if (lowModes[i].equals(lowNow)) rb.setChecked(true);
+            if (lowModes[i].equals(LowWarning.FAST) && !p.contains(Store.LOWWARN_MODE)) rb.setChecked(true);
         }
-        if (lowMode.getCheckedRadioButtonId() < 0) lowMode.check(1002);   // unknown value: balanced
+        if (lowMode.getCheckedRadioButtonId() < 0) lowMode.check(1004);   // unknown value: fast lows only
         cur.addView(lowMode);
         cur.addView(button("Show a test warning", () -> LowWarnings.test(this)));
         EditText treatMin = number("Treating mode length (min, 10 to 30)",
