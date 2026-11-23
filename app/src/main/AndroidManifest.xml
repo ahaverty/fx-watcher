@@ -143,7 +143,20 @@
             <intent-filter>
                 <action android:name="studio.alans.fxwatcher.HA_SNOOZE" />
                 <action android:name="studio.alans.fxwatcher.HA_NUDGE" />
+                <action android:name="studio.alans.fxwatcher.HA_TREAT" />
             </intent-filter>
+        </receiver>
+
+        <!-- Home-screen widget: a state dot and one word, no number. Tap opens CamAPS. -->
+        <receiver
+            android:name=".CalmWidget"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/calm_widget_info" />
         </receiver>
 
         <!-- Self-update install progress (asks the user to confirm). -->

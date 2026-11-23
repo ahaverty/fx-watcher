@@ -87,6 +87,7 @@ final class Nudges {
         p.edit().putString(Store.NUDGE_GLUCOSE, g.save()).apply();
         Treating.reading(c, mmol, now);
         LowWarnings.reading(c, g, mmol, now);
+        Calm.refresh(c);
         NudgeRules.Trend trend = g.trend(now);
         BoostTracker t = boost(p);
         boolean easeOn = t.on(BoostTracker.EASE, now);

@@ -282,6 +282,13 @@ public class MainActivity extends Activity {
                 "Plus 10 s for each unit. Starts when the delivery countdown shows. 0 turns it off.",
                 p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
 
+        section("Calm view", "calm", false);
+        cur.addView(text("One word for how things are: steady, handled, check, low soon or treating. The "
+                + "status notification has no glucose number and is not shown at all while things are steady. "
+                + "Add the FX Watcher widget to the home screen for a dot and one word. Tap opens CamAPS.", 14));
+        CheckBox calmOn = box("Calm status notification (only when something is not steady)",
+                p.getBoolean(Store.CALM_ON, true));
+
         section("Early low warning", "lowwarn", false);
         cur.addView(text("A buzz and a notification, no sound, when glucose is on course to go under "
                 + "3.9 in the next 20 to 25 minutes: take 10 g. It looks at the last 15 to 20 minutes of "
@@ -413,6 +420,7 @@ public class MainActivity extends Activity {
                     .putInt(Store.PUMP_NUDGE, intOf(pumpNudge, Store.DEF_PUMP_NUDGE))
                     .putInt(Store.MISSED_BOLUS_MIN, intOf(missedBolus, Store.DEF_MISSED_BOLUS_MIN))
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
+                    .putBoolean(Store.CALM_ON, calmOn.isChecked())
                     .putInt(Store.TREAT_MIN, Treating.clampMinutes(intOf(treatMin, Treating.DEF_MIN)))
                     .putString(Store.LOWWARN_MODE, lowModes[Math.max(0, lowMode.getCheckedRadioButtonId() - 1000)])
                     .putBoolean(Store.NUDGE_DUPLICATE, nudgeDuplicate.isChecked())

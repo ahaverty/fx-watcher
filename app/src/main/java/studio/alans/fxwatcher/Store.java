@@ -63,6 +63,10 @@ final class Store {
     static final String LOWWARN_MODE = "lowwarn_mode";          // off / calm / balanced / early
     static final String LOWWARN_TRACKER = "lowwarn_tracker";    // LowWarning.Tracker state
     static final String LOWWARN_JOURNAL = "lowwarn_journal";    // every warning and what came of it
+    static final String CALM_ON = "calm_on";                    // calm status notification (default on)
+    static final String CALM_JSON = "calm_json";                // last state.json
+    static final String CALM_KEY = "calm_key";                  // state|nudge, to log changes
+    static final String CALM_YES_UNTIL = "calm_yes_until";      // "Did you bolus?" answered yes until then
     static final String TREAT_UNTIL = "treat_until";            // Treating mode end time (0 = not treating)
     static final String TREAT_AT = "treat_at";                  // when it was armed
     static final String TREAT_BASE = "treat_base";              // glucose when armed (NaN until the first reading)

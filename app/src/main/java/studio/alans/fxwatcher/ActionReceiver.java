@@ -30,6 +30,7 @@ public class ActionReceiver extends BroadcastReceiver {
     static final String QUIET_END = "studio.alans.fxwatcher.QUIET_END";
     static final String NUDGE_OPEN = "studio.alans.fxwatcher.NUDGE_OPEN";
     static final String LOWWARN_DISMISS = "studio.alans.fxwatcher.LOWWARN_DISMISS";
+    static final String CALM_YES = "studio.alans.fxwatcher.CALM_YES";
     static final String TREAT_START = "studio.alans.fxwatcher.TREAT_START";
     static final String TREAT_END = "studio.alans.fxwatcher.TREAT_END";
     static final String TREAT_TICK = "studio.alans.fxwatcher.TREAT_TICK";
@@ -49,6 +50,7 @@ public class ActionReceiver extends BroadcastReceiver {
                     Updater.check(c, false, null);
                     break;
                 case LOWWARN_DISMISS: LowWarnings.dismiss(c); break;
+                case CALM_YES: Calm.yesDone(c); break;
                 case TREAT_START: Treating.start(c, "the notification button"); break;
                 case TREAT_END: Treating.end(c, "ended by you"); break;
                 case TREAT_TICK: Treating.tick(c); break;

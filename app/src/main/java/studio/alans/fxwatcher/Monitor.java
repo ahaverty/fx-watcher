@@ -294,6 +294,7 @@ final class Monitor {
         if (p.getLong(Store.SIM_UNTIL, 0) <= now) Phone.refreshPump(c, Phone.UNKNOWN);
         refreshBattery(c, now);
         Problem pr = problem(c, now);
+        Calm.refresh(c);
         int prevLevel = p.getInt(Store.LEVEL, NONE);
         String prevCode = p.getString(Store.PROBLEM, "");
         String prevTitle = p.getString(Store.PROBLEM_TITLE, "");
