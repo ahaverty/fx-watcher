@@ -289,6 +289,12 @@ public class MainActivity extends Activity {
         CheckBox calmOn = box("Calm status notification (only when something is not steady)",
                 p.getBoolean(Store.CALM_ON, true));
 
+        CheckBox serverOn = box("Serve the calm state to the Garmin watch on this phone only (127.0.0.1)",
+                p.getBoolean(Store.SERVER_ON, true));
+        EditText serverPort = number("Watch server port", "Read-only http://127.0.0.1:<port>/state.json. Not reachable "
+                + "from the network. Any app on this phone can read it, glucose number included.",
+                p.getInt(Store.SERVER_PORT, CalmServer.DEF_PORT), false);
+
         section("Early low warning", "lowwarn", false);
         cur.addView(text("A buzz and a notification, no sound, when glucose is on course to go under "
                 + "3.9 in the next 20 to 25 minutes: take 10 g. It looks at the last 15 to 20 minutes of "
@@ -421,6 +427,8 @@ public class MainActivity extends Activity {
                     .putInt(Store.MISSED_BOLUS_MIN, intOf(missedBolus, Store.DEF_MISSED_BOLUS_MIN))
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
                     .putBoolean(Store.CALM_ON, calmOn.isChecked())
+                    .putBoolean(Store.SERVER_ON, serverOn.isChecked())
+                    .putInt(Store.SERVER_PORT, Math.max(1024, Math.min(65535, intOf(serverPort, CalmServer.DEF_PORT))))
                     .putInt(Store.TREAT_MIN, Treating.clampMinutes(intOf(treatMin, Treating.DEF_MIN)))
                     .putString(Store.LOWWARN_MODE, lowModes[Math.max(0, lowMode.getCheckedRadioButtonId() - 1000)])
                     .putBoolean(Store.NUDGE_DUPLICATE, nudgeDuplicate.isChecked())

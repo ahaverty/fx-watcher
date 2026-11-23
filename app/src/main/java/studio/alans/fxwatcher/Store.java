@@ -63,6 +63,8 @@ final class Store {
     static final String LOWWARN_MODE = "lowwarn_mode";          // off / calm / balanced / early
     static final String LOWWARN_TRACKER = "lowwarn_tracker";    // LowWarning.Tracker state
     static final String LOWWARN_JOURNAL = "lowwarn_journal";    // every warning and what came of it
+    static final String SERVER_ON = "server_on";                // 127.0.0.1 state.json for the watch (default on)
+    static final String SERVER_PORT = "server_port";
     static final String CALM_ON = "calm_on";                    // calm status notification (default on)
     static final String CALM_JSON = "calm_json";                // last state.json
     static final String CALM_KEY = "calm_key";                  // state|nudge, to log changes

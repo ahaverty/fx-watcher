@@ -263,6 +263,28 @@ playing at 0, 0.4, 1.2, 3 and 7 seconds, and every volume change in the first 15
 nothing. It exists to settle, on the next real Urgent low, whether CamAPS lifts the media volume and how
 fast. Copy it from the bottom of the app.
 
+### Calm view
+
+One word for how things are, with no glucose number: **steady** (teal), **handled** (amber), **check** (coral),
+**low soon** and **treating** (purple). *Handled* means above 10 but Boost is on, or a bolus or correction was
+delivered in the last 2 hours and glucose is flat or falling: no alerts, and the text says so ("Handled: Boost
+and correction working, back in range by about 22:00"). *Check* is one of three nudges that say what to do:
+"Did you bolus?" (rising like a meal with no bolus seen; buttons Yes done and Open CamAPS), "Check the site?"
+(above 12 for 90+ minutes after a correction) and "CamAPS isn't looping" (auto mode not On for 15+ minutes).
+
+The status notification is silent and low importance, never shows a number, and is not shown at all while
+steady. The home-screen widget (long press, Widgets, FX Watcher) is a state dot and one word; tap opens CamAPS.
+Setup notes, including which xDrip+ display and alert settings to switch off without touching collection or
+the Nightscout upload: `docs/calm-setup.md`.
+
+### Watch face (Garmin Forerunner 165)
+
+FX Watcher serves `http://127.0.0.1:17590/state.json` (state, word, colour, glucose, trend, age_min, updated),
+read only and on the phone itself, so the Garmin Connect app can fetch it for a watch face. Turn it off in
+Settings (Calm view) if you do not want any app on the phone to be able to read it. The watch face (ring
+and one word, no number) and a glance for when you want the number are in `watchface/`. They are not built
+yet: see `watchface/README.md`.
+
 ## Bolus broadcast
 
 Optional, for people who build their own apps. With **Settings > Connections > Share boluses with

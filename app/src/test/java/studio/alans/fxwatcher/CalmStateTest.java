@@ -269,7 +269,7 @@ public class CalmStateTest {
         String j = CalmState.json(r, in.glucose, "flat", in.glucoseAt, NOW + 3 * MIN, NOW);
         assertTrue(j, j.contains("\"state\":\"steady\""));
         assertTrue(j, j.contains("\"word\":\"Steady\""));
-        assertTrue(j, j.contains("\"color\":\"#1FA89A\""));
+        assertTrue(j, j.contains("\"colour\":\"#1FA89A\""));
         assertTrue(j, j.contains("\"glucose\":6.2"));
         assertTrue(j, j.contains("\"trend\":\"flat\""));
         assertTrue(j, j.contains("\"age_min\":3"));
@@ -283,7 +283,7 @@ public class CalmStateTest {
         CalmState.Result r = CalmState.compute(in);
         String j = CalmState.json(r, in.glucose, "flat", in.glucoseAt, in.now, in.now);
         assertTrue(j, j.contains("\"word\":\"No data\""));
-        assertTrue(j, j.contains("\"color\":\"#9AA0A6\""));
+        assertTrue(j, j.contains("\"colour\":\"#9AA0A6\""));
         assertTrue(j, j.contains("\"age_min\":20"));
     }
 

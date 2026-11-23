@@ -225,7 +225,7 @@ final class CalmState {
     static String json(Result r, double glucose, String trend, long glucoseAt, long now, long updated) {
         long ageMin = glucose < 0 ? -1 : Math.max(0, (now - glucoseAt) / MIN);
         return String.format(Locale.US,
-                "{\"state\":\"%s\",\"word\":\"%s\",\"color\":\"%s\",\"text\":\"%s\",\"glucose\":%s,\"trend\":\"%s\",\"age_min\":%d,\"updated\":%d}",
+                "{\"state\":\"%s\",\"word\":\"%s\",\"colour\":\"%s\",\"text\":\"%s\",\"glucose\":%s,\"trend\":\"%s\",\"age_min\":%d,\"updated\":%d}",
                 r.state, r.stale ? "No data" : r.word, r.stale ? GREY : r.color, esc(r.text),
                 glucose < 0 ? "null" : String.format(Locale.US, "%.1f", glucose), trend, ageMin, updated / 1000);
     }
