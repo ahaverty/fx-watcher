@@ -101,6 +101,7 @@ public class CamapsListener extends NotificationListenerService {
             screenRegistered = true;
         }
         scanActive();
+        Treating.tick(this);
         SensorWatch.checkBonds(this);
         SleepReceiver.sync(this);
         onInterruptionFilterChanged(getCurrentInterruptionFilter());
@@ -131,6 +132,7 @@ public class CamapsListener extends NotificationListenerService {
         if (isCamaps(sbn) && !handle(sbn, false)) logIgnored(sbn);
         else if (sbn != null && sbn.getPackageName() != null
                 && sbn.getPackageName().startsWith("com.camdiab.") && !sbn.isOngoing()) {
+            Store.p(this).edit().putLong(Store.CAM_ALERT_AT, System.currentTimeMillis()).apply();
             audio(sbn);
             info(sbn);
         }

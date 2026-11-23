@@ -192,6 +192,20 @@ public class MainActivity extends Activity {
         } else {
             root.addView(button("Quiet event (cinema, ceremony…)", this::pickQuietEnd));
         }
+        long treat = Treating.until(this);
+        if (treat > now) {
+            root.addView(text("Treating until " + Store.hm(treat) + ": media volume 0, FX urgent low buzzes. "
+                    + "Pump alarms still ring. It ends early and rings if glucose goes under 2.5 or is not "
+                    + "higher after 15 min.", 16));
+            LinearLayout tr = new LinearLayout(this);
+            tr.addView(button("End treating", () -> Treating.end(this, "ended by you")),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            tr.addView(button("What still rings?", this::treatingGuide),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            root.addView(tr);
+        } else {
+            root.addView(button("I'm treating a low (" + Treating.minutes(this) + " min)", this::treatingGuide));
+        }
         if (Alerts.sounding() || p.getInt(Store.LEVEL, 0) >= Monitor.ACKED) {
             root.addView(button("Silence alarm", () -> Monitor.silence(this)));
         }
@@ -291,6 +305,9 @@ public class MainActivity extends Activity {
         if (lowMode.getCheckedRadioButtonId() < 0) lowMode.check(1002);   // unknown value: balanced
         cur.addView(lowMode);
         cur.addView(button("Show a test warning", () -> LowWarnings.test(this)));
+        EditText treatMin = number("Treating mode length (min, 10 to 30)",
+                "How long the alerts stay quiet after you tap I'm treating. It ends early if glucose is under 2.5 "
+                        + "or not higher after 15 min.", Treating.minutes(this), false);
         cur.addView(text(LowWarnings.recent(this), 12));
 
         section("Nudges", "nudges", false);
@@ -396,6 +413,7 @@ public class MainActivity extends Activity {
                     .putInt(Store.PUMP_NUDGE, intOf(pumpNudge, Store.DEF_PUMP_NUDGE))
                     .putInt(Store.MISSED_BOLUS_MIN, intOf(missedBolus, Store.DEF_MISSED_BOLUS_MIN))
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
+                    .putInt(Store.TREAT_MIN, Treating.clampMinutes(intOf(treatMin, Treating.DEF_MIN)))
                     .putString(Store.LOWWARN_MODE, lowModes[Math.max(0, lowMode.getCheckedRadioButtonId() - 1000)])
                     .putBoolean(Store.NUDGE_DUPLICATE, nudgeDuplicate.isChecked())
                     .putBoolean(Store.NUDGE_BOOST, nudgeBoost.isChecked())
@@ -477,6 +495,24 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /** Treating mode: say exactly what it does and what still rings, then start on a tap. */
+    private void treatingGuide() {
+        boolean on = Treating.active(this);
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this)
+                .setTitle("Treating mode")
+                .setMessage(Treating.guide(this, Treating.minutes(this)));
+        if (on) {
+            b.setPositiveButton("OK", null);
+        } else {
+            b.setPositiveButton("Start", (d, w) -> {
+                Treating.start(this, "the app button");
+                Toast.makeText(this, "Treating until " + Store.hm(Treating.until(this)), Toast.LENGTH_SHORT).show();
+                build();
+            }).setNegativeButton("Cancel", null);
+        }
+        b.show();
     }
 
     private void quietGuide(long until, boolean offerStart) {

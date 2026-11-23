@@ -85,6 +85,7 @@ final class Nudges {
         NudgeRules.GlucoseLog g = NudgeRules.GlucoseLog.load(p.getString(Store.NUDGE_GLUCOSE, ""));
         g.add(now, mmol);
         p.edit().putString(Store.NUDGE_GLUCOSE, g.save()).apply();
+        Treating.reading(c, mmol, now);
         LowWarnings.reading(c, g, mmol, now);
         NudgeRules.Trend trend = g.trend(now);
         BoostTracker t = boost(p);

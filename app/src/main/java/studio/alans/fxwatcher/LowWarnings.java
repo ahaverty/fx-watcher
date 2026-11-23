@@ -27,7 +27,7 @@ final class LowWarnings {
 
     static final String CH = "low_soon";
     static final int ID = 40;
-    private static final int REQ_OPEN = 401, REQ_DISMISS = 402;
+    private static final int REQ_OPEN = 401, REQ_DISMISS = 402, REQ_TREAT = 403;
 
     static String mode(SharedPreferences p) {
         return p.getString(Store.LOWWARN_MODE, LowWarning.BALANCED);
@@ -86,6 +86,9 @@ final class LowWarnings {
         PendingIntent open = PendingIntent.getBroadcast(c, REQ_OPEN,
                 new Intent(c, ActionReceiver.class).setAction(ActionReceiver.OPEN_CAMAPS),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent treat = PendingIntent.getBroadcast(c, REQ_TREAT,
+                new Intent(c, ActionReceiver.class).setAction(ActionReceiver.TREAT_START),
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         PendingIntent dismiss = PendingIntent.getBroadcast(c, REQ_DISMISS,
                 new Intent(c, ActionReceiver.class).setAction(ActionReceiver.LOWWARN_DISMISS),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
@@ -104,6 +107,8 @@ final class LowWarnings {
                 .setContentIntent(open)
                 .addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
                         "Open CamAPS", open).build())
+                .addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
+                        "I'm treating", treat).build())
                 .addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
                         "Dismiss", dismiss).build());
         c.getSystemService(NotificationManager.class).notify(ID, b.build());
