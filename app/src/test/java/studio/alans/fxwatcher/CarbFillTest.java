@@ -160,6 +160,10 @@ public class CarbFillTest {
         // the click goes to the Carbs field the finder returned, and nothing is looked up by the words Confirm or Deliver to press
         assertTrue(code.contains("field.performAction(AccessibilityNodeInfo.ACTION_CLICK)"));
         assertFalse(code.contains("findAccessibilityNodeInfosByText"));
+        // the field typed into is the one inside the Carbohydrates box, never "the first editable field on screen"
+        assertTrue(code.contains("AccessibilityNodeInfo box = boxField;"));
+        assertTrue(code.contains("static AccessibilityNodeInfo dialogField("));
+        assertFalse(code.contains("firstEditable"));
         // typing happens only in the TYPE step, which decide() returns only for CARBS_DIALOG
         assertTrue(code.contains("case CARBS_DIALOG: return Step.TYPE;"));
     }

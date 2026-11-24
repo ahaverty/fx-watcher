@@ -154,19 +154,21 @@ final class CarbFill {
         if (r == null || r.finished) return;
         long now = System.currentTimeMillis();
         if (now > r.deadline) {
-            finish(c, r, false, "it took too long, so I stopped");
+            finish(c, r, false, "it took too long, so I stopped", root);
             return;
         }
         if (now - r.lastAt < STEP_GAP_MS) return;
         if (r.actions >= MAX_ACTIONS) {
-            finish(c, r, false, "too many steps, so I stopped");
+            finish(c, r, false, "too many steps, so I stopped", root);
             return;
         }
-        Screen screen = classify(texts, firstEditable(root) != null);
+        AccessibilityNodeInfo boxField = dialogField(root);
+        Screen screen = classify(texts, boxField != null);
         Step step = decide(screen, r.backs);
+        Store.logCam(c, "Carbs for CamAPS: step " + (r.actions + 1) + ": " + screen + " -> " + step);
         if (step == r.lastStep) {
             if (++r.sameStep > 2) {
-                finish(c, r, false, "the same step didn't work three times (" + screen + ")");
+                finish(c, r, false, "the same step didn't work three times (" + screen + ")", root);
                 return;
             }
         } else {
@@ -177,13 +179,12 @@ final class CarbFill {
             case OPEN_TAB:
                 r.actions++;
                 r.lastAt = now;
-                if (!BolusTab.openTab(root)) finish(c, r, false, "I couldn't find the Bolus tab");
+                if (!BolusTab.openTab(root)) finish(c, r, false, "I couldn't find the Bolus tab", root);
                 break;
             case OPEN_CARBS: {
                 AccessibilityNodeInfo field = carbsField(root);
                 if (field == null) {
-                    Store.logCam(c, "Carbs for CamAPS: no Carbs field found. Screen: " + dump(root));
-                    finish(c, r, false, "I couldn't find the Carbs field");
+                    finish(c, r, false, "I couldn't find the Carbs field", root);
                     return;
                 }
                 r.actions++;
@@ -192,9 +193,9 @@ final class CarbFill {
                 break;
             }
             case TYPE: {
-                AccessibilityNodeInfo box = firstEditable(root);
+                AccessibilityNodeInfo box = boxField;
                 if (box == null) {
-                    finish(c, r, false, "the Carbohydrates box has no field");
+                    finish(c, r, false, "the Carbohydrates box has no field", root);
                     return;
                 }
                 r.actions++;
@@ -205,9 +206,9 @@ final class CarbFill {
                 box.refresh();
                 String shown = box.getText() == null ? "" : box.getText().toString();
                 if (ok && verified(shown, r.grams)) {
-                    finish(c, r, true, null);
+                    finish(c, r, true, null, null);
                 } else {
-                    finish(c, r, false, "the box shows \"" + shown + "\" instead of " + r.grams + ". Fix it before you confirm");
+                    finish(c, r, false, "the box shows \"" + shown + "\" instead of " + r.grams + ". Fix it before you confirm", root);
                 }
                 break;
             }
@@ -218,13 +219,14 @@ final class CarbFill {
                 svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
                 break;
             default:
-                finish(c, r, false, why(step));
+                finish(c, r, false, why(step), root);
         }
     }
 
-    private static void finish(Context c, Req r, boolean ok, String problem) {
+    private static void finish(Context c, Req r, boolean ok, String problem, AccessibilityNodeInfo root) {
         r.finished = true;
         req = null;
+        if (!ok && root != null) Store.logCam(c, "Carbs for CamAPS: the screen was:" + dump(root));
         Store.logCam(c, ok ? "Carbs for CamAPS: " + r.grams + " g typed in, waiting for you to confirm"
                 : "Carbs for CamAPS: stopped, " + problem);
         notifyResult(c, r.grams, ok, problem);
@@ -232,12 +234,30 @@ final class CarbFill {
 
     // ---- finding things ----
 
-    static AccessibilityNodeInfo firstEditable(AccessibilityNodeInfo n) {
-        if (n == null) return null;
-        if (n.isVisibleToUser() && n.isEditable()) return n;
-        for (int i = 0; i < n.getChildCount(); i++) {
-            AccessibilityNodeInfo f = firstEditable(n.getChild(i));
-            if (f != null) return f;
+    /**
+     * The one field that may be typed into: an editable field that sits between the "Carbohydrates"
+     * title and the Confirm button of the box that is open. Fields behind the box (Glucose, Carbs on the
+     * calculator) are never chosen. Null if the title, the Confirm button or such a field is missing.
+     */
+    static AccessibilityNodeInfo dialogField(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> all = new ArrayList<>();
+        flatten(root, all, 0);
+        AccessibilityNodeInfo title = null, confirm = null;
+        for (AccessibilityNodeInfo n : all) {
+            CharSequence t = n.getText();
+            if (!n.isVisibleToUser() || t == null) continue;
+            String s = t.toString().trim();
+            if (title == null && s.equalsIgnoreCase("Carbohydrates")) title = n;
+            if (confirm == null && s.equalsIgnoreCase("Confirm")) confirm = n;
+        }
+        if (title == null || confirm == null) return null;
+        Rect tb = new Rect(), cb = new Rect(), b = new Rect();
+        title.getBoundsInScreen(tb);
+        confirm.getBoundsInScreen(cb);
+        for (AccessibilityNodeInfo n : all) {
+            if (!n.isVisibleToUser() || !n.isEditable()) continue;
+            n.getBoundsInScreen(b);
+            if (b.centerY() > tb.bottom - 4 && b.centerY() < cb.top + 4) return n;
         }
         return null;
     }
