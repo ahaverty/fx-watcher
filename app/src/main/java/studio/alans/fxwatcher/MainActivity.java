@@ -283,8 +283,9 @@ public class MainActivity extends Activity {
                 p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
 
         section("Carbs for CamAPS", "carbs", false);
-        cur.addView(text("Tap an amount (here or on the home-screen widget) and FX Watcher opens CamAPS, goes to the "
-                + "bolus calculator and types the carbs into its Carbohydrates box. Then it stops and tells you. "
+        cur.addView(text("Tap an amount (here, on the widget or in the carbs sheet) and FX Watcher opens CamAPS, goes to the "
+                + "bolus calculator and types the carbs into its Carbohydrates box. A low treatment is separate: it goes to "
+                + "Add meal, selects Hypoglycaemia treatment and types the amount, and is only offered when you are low or heading low. Then it stops and tells you. "
                 + "YOU check the number, tap Confirm and deliver. It never taps Confirm or Deliver, only types "
                 + "whole grams from 1 to 150, and gives up after 60 seconds, 8 steps or anything it does not "
                 + "recognise. Needs the CamAPS screen reader on. Off by default.", 14));
@@ -294,7 +295,7 @@ public class MainActivity extends Activity {
                 + "from Meal Log. Whole grams from 1 to 150.", p.getString(Store.CARB_PRESETS, CarbOptions.DEFAULT_PRESETS));
         for (CarbOptions.Option o : CarbWidget.options(this)) {
             cur.addView(button((o.plan ? "Plan: " : "") + o.label, () -> {
-                String no = CarbFill.request(this, o.grams, o.label);
+                String no = CarbFill.request(this, o.grams, o.label, CarbFill.Kind.MEAL);
                 if (no != null) Toast.makeText(this, no, Toast.LENGTH_LONG).show();
             }));
         }

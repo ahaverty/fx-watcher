@@ -16,21 +16,25 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Fills the carbs into CamAPS's bolus calculator after YOU tap an amount (widget, app, or a plan
- * from Meal Log). Off by default (Settings > Carbs for CamAPS).
+ * Fills an amount into CamAPS after YOU tap it (the carbs sheet or the widget). Off by default
+ * (Settings > Carbs for CamAPS). Two kinds, never mixed:
  *
- * What it does: gets to CamAPS's bolus calculator from wherever CamAPS is, opens the Carbs entry,
- * and types the amount into the box titled "Carbohydrates". Then it stops, with the box open, and
- * tells you. You check it, tap Confirm, and deliver yourself.
+ *  MEAL: gets to the bolus calculator, opens the Carbs entry and types the grams into the box titled
+ *        "Carbohydrates". Stops with the box open.
+ *  LOW:  a low treatment. Goes through the menu to Add meal, makes sure "Hypoglycaemia treatment" is the
+ *        selected option (the page opens on "Meal or snack"), and types the grams into Amount. Stops
+ *        there. It never types a low treatment into the bolus calculator, and never a meal into Add meal.
  *
- * What it never does: tap Confirm, Deliver, Next, Cancel or anything on a delivery; type into any
- * box that is not titled "Carbohydrates"; type anything but a whole number from 1 to 150; go on
- * for more than 60 seconds or 8 actions; act without a tap from you in the last 60 seconds; act on
- * a request twice. From the side menu, the Add meal pages, a half-entered Boost, Ease-off or Glucose box or any
- * other CamAPS page it presses Back (at most 6 times in all) to get to the home screen; any other box (an alert, a
- * warning) or a delivery on screen it leaves alone and stops. If it can't tell where it is it gives up and
- * says so. The tab tap is {@link BolusTab#openTab}; the only other actions are in this file and CI
- * counts them: one Carbs field tap, one text set, one Back.
+ * What it never does, either kind: tap Confirm, Deliver, Next, Continue or Cancel; type into any box
+ * that is not the one for that kind; type anything but a whole number in range (meals 1 to 150, low
+ * treatments 5 to 30); go on for more than 60 seconds or 12 actions; act without a tap from you in the
+ * last 60 seconds; act on a request twice. From the side menu, other pages, or a half-entered box it
+ * presses Back (at most 6 times in all); an alert, a warning or a delivery on screen it leaves alone and
+ * stops. If it can't tell where it is it gives up and says so.
+ *
+ * The only actions in this file are tap() (one click call), type() (one text-set call) and one Back,
+ * and CI counts them. What tap() may be pointed at is limited to four finders: the Carbs field, the menu
+ * button, the Add meal item, the Hypoglycaemia option; the Bolus tab is {@link BolusTab#openTab}.
  */
 final class CarbFill {
 
@@ -38,6 +42,8 @@ final class CarbFill {
 
     static final long TTL_MS = 60_000L, STEP_GAP_MS = 700L, SETTLE_MS = 3_000L;
     static final int MAX_ACTIONS = 12, MAX_BACKS = 6;
+
+    enum Kind { MEAL, LOW }
 
     // ---- pure: what screen is this, and what is the one next step (unit tested) ----
 
@@ -48,7 +54,11 @@ final class CarbFill {
      */
     enum Screen { HOME, CALCULATOR, CARBS_DIALOG, ENTRY_DIALOG, OTHER_DIALOG, DRAWER, ADD_MEAL, BUSY, UNKNOWN }
 
-    enum Step { OPEN_TAB, OPEN_CARBS, TYPE, BACK, ABORT_BUSY, ABORT_OTHER_DIALOG, ABORT_LOST }
+    enum Step {
+        OPEN_TAB, OPEN_CARBS, TYPE,
+        OPEN_MENU, OPEN_ADD_MEAL, PICK_HYPO, TYPE_LOW,
+        BACK, ABORT_BUSY, ABORT_OTHER_DIALOG, ABORT_LOST, ABORT_NO_FIELD
+    }
 
     static Screen classify(List<String> texts, boolean hasEditable) {
         boolean confirm = false, carbsTitle = false, glucoseTitle = false, calc = false, home = false;
@@ -81,13 +91,31 @@ final class CarbFill {
         return Screen.UNKNOWN;
     }
 
+    /** Meal: the one step from this screen. */
     static Step decide(Screen s, int backs) {
+        return decide(s, backs, Kind.MEAL, false, false);
+    }
+
+    /**
+     * The one step from this screen for this kind of request. hypoSelected: the Add meal page has
+     * "Hypoglycaemia treatment" selected (and "Meal or snack" not). hasAmount: it has its Amount field.
+     */
+    static Step decide(Screen s, int backs, Kind kind, boolean hypoSelected, boolean hasAmount) {
+        if (s == Screen.BUSY) return Step.ABORT_BUSY;
+        if (s == Screen.OTHER_DIALOG) return Step.ABORT_OTHER_DIALOG;
+        if (kind == Kind.LOW) {
+            switch (s) {
+                case HOME:
+                case CALCULATOR: return Step.OPEN_MENU;
+                case DRAWER: return Step.OPEN_ADD_MEAL;
+                case ADD_MEAL: return !hypoSelected ? Step.PICK_HYPO : hasAmount ? Step.TYPE_LOW : Step.ABORT_NO_FIELD;
+                default: return backs < MAX_BACKS ? Step.BACK : Step.ABORT_LOST;   // the bolus box, entry boxes, other pages
+            }
+        }
         switch (s) {
             case HOME: return Step.OPEN_TAB;
             case CALCULATOR: return Step.OPEN_CARBS;
             case CARBS_DIALOG: return Step.TYPE;
-            case BUSY: return Step.ABORT_BUSY;
-            case OTHER_DIALOG: return Step.ABORT_OTHER_DIALOG;
             default: return backs < MAX_BACKS ? Step.BACK : Step.ABORT_LOST;   // DRAWER, ADD_MEAL, ENTRY_DIALOG, UNKNOWN
         }
     }
@@ -103,7 +131,8 @@ final class CarbFill {
     static String why(Step s) {
         switch (s) {
             case ABORT_BUSY: return "a delivery is on screen";
-            case ABORT_OTHER_DIALOG: return "a different box is open (not Carbohydrates)";
+            case ABORT_OTHER_DIALOG: return "a different box is open (not one I fill in)";
+            case ABORT_NO_FIELD: return "the Add meal page has no Amount field";
             default: return "I couldn't tell which CamAPS screen this is";
         }
     }
@@ -113,6 +142,7 @@ final class CarbFill {
     private static final class Req {
         final int grams;
         final String label;
+        final Kind kind;
         final long deadline;
         int actions, backs;
         long lastAt;
@@ -120,9 +150,10 @@ final class CarbFill {
         int sameStep;
         boolean finished;
 
-        Req(int grams, String label, long deadline) {
+        Req(int grams, String label, Kind kind, long deadline) {
             this.grams = grams;
             this.label = label;
+            this.kind = kind;
             this.deadline = deadline;
         }
     }
@@ -134,9 +165,13 @@ final class CarbFill {
     }
 
     /** Why a tap can't start now, or null if it can. */
-    static String refusal(Context c, int grams) {
+    static String refusal(Context c, int grams, Kind kind) {
         if (!enabled(c)) return "Carbs for CamAPS is off. Turn it on in FX Watcher Settings.";
-        if (!CarbOptions.valid(grams)) return "Only whole grams from " + CarbOptions.MIN_G + " to " + CarbOptions.MAX_G + ".";
+        if (kind == Kind.LOW ? !CarbOptions.validLow(grams) : !CarbOptions.valid(grams)) {
+            return kind == Kind.LOW
+                    ? "A low treatment is whole grams from " + CarbOptions.LOW_MIN_G + " to " + CarbOptions.LOW_MAX_G + "."
+                    : "Only whole grams from " + CarbOptions.MIN_G + " to " + CarbOptions.MAX_G + ".";
+        }
         if (!Phone.readerOn(c)) return "Turn on FX Watcher's CamAPS screen reader first.";
         if (Calm.camapsLaunch(c) == null) return "CamAPS isn't installed.";
         return null;
@@ -144,15 +179,14 @@ final class CarbFill {
 
     /**
      * A person tapped an amount. Opens CamAPS, and the screen reader does the rest. Call it from a
-     * foreground activity (the widget goes through CarbFillActivity). Returns a reason it did not
-     * start, or null.
+     * foreground activity. Returns a reason it did not start, or null.
      */
-    static String request(Context c, int grams, String label) {
-        String no = refusal(c, grams);
+    static String request(Context c, int grams, String label, Kind kind) {
+        String no = refusal(c, grams, kind);
         if (no != null) return no;
         long now = System.currentTimeMillis();
-        req = new Req(grams, label, now + TTL_MS);
-        Store.logCam(c, "Carbs for CamAPS: asked for " + grams + " g (" + label + ")");
+        req = new Req(grams, label, kind, now + TTL_MS);
+        Store.logCam(c, "Carbs for CamAPS: asked for " + grams + " g " + (kind == Kind.LOW ? "LOW TREATMENT" : "meal") + " (" + label + ")");
         Intent i = Calm.camapsLaunch(c);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
@@ -179,17 +213,19 @@ final class CarbFill {
             return;
         }
         if (now - r.lastAt < STEP_GAP_MS) return;
-        // Right after a tap on the tab or the Carbs field the next page is still animating in and looks unknown:
-        // give it a moment instead of pressing Back.
-        boolean justTapped = r.lastStep == Step.OPEN_TAB || r.lastStep == Step.OPEN_CARBS;
         if (r.actions >= MAX_ACTIONS) {
             finish(c, r, false, "too many steps, so I stopped", root);
             return;
         }
+        // Right after a tap the next page is still animating in and looks unknown: give it a moment.
+        boolean justTapped = r.lastStep == Step.OPEN_TAB || r.lastStep == Step.OPEN_CARBS
+                || r.lastStep == Step.OPEN_MENU || r.lastStep == Step.OPEN_ADD_MEAL || r.lastStep == Step.PICK_HYPO;
         AccessibilityNodeInfo boxField = dialogField(root);
         Screen screen = classify(texts, boxField != null);
+        AccessibilityNodeInfo amountBox = screen == Screen.ADD_MEAL ? amountField(root) : null;
+        boolean hypo = screen == Screen.ADD_MEAL && hypoSelected(root);
         if (screen == Screen.UNKNOWN && justTapped && now - r.lastAt < SETTLE_MS) return;
-        Step step = decide(screen, r.backs);
+        Step step = decide(screen, r.backs, r.kind, hypo, amountBox != null);
         Store.logCam(c, "Carbs for CamAPS: step " + (r.actions + 1) + ": " + screen + " -> " + step);
         if (step == r.lastStep) {
             if (++r.sameStep > 2) {
@@ -214,7 +250,40 @@ final class CarbFill {
                 }
                 r.actions++;
                 r.lastAt = now;
-                field.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                tap(field);
+                break;
+            }
+            case OPEN_MENU: {
+                AccessibilityNodeInfo menu = menuButton(root);
+                if (menu == null) {
+                    finish(c, r, false, "I couldn't find CamAPS's menu button", root);
+                    return;
+                }
+                r.actions++;
+                r.lastAt = now;
+                tap(menu);
+                break;
+            }
+            case OPEN_ADD_MEAL: {
+                AccessibilityNodeInfo item = addMealItem(root);
+                if (item == null) {
+                    finish(c, r, false, "I couldn't find Add meal in the menu", root);
+                    return;
+                }
+                r.actions++;
+                r.lastAt = now;
+                tap(item);
+                break;
+            }
+            case PICK_HYPO: {
+                AccessibilityNodeInfo radio = hypoOption(root);
+                if (radio == null) {
+                    finish(c, r, false, "I couldn't find the Hypoglycaemia treatment option", root);
+                    return;
+                }
+                r.actions++;
+                r.lastAt = now;
+                tap(radio);
                 break;
             }
             case TYPE: {
@@ -225,15 +294,24 @@ final class CarbFill {
                 }
                 r.actions++;
                 r.lastAt = now;
-                Bundle args = new Bundle();
-                args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, String.valueOf(r.grams));
-                boolean ok = box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
-                box.refresh();
-                String shown = box.getText() == null ? "" : box.getText().toString();
-                if (ok && verified(shown, r.grams)) {
+                String shown = type(box, r.grams);
+                if (verified(shown, r.grams)) {
                     finish(c, r, true, null, null);
                 } else {
                     finish(c, r, false, "the box shows \"" + shown + "\" instead of " + r.grams + ". Fix it before you confirm", root);
+                }
+                break;
+            }
+            case TYPE_LOW: {
+                r.actions++;
+                r.lastAt = now;
+                String shown = type(amountBox, r.grams);
+                boolean stillHypo = hypoSelected(root);
+                if (verified(shown, r.grams) && stillHypo) {
+                    finish(c, r, true, null, null);
+                } else {
+                    finish(c, r, false, "the Amount shows \"" + shown + "\" and Hypoglycaemia treatment is "
+                            + (stillHypo ? "selected" : "NOT selected") + ". Check both before you continue", root);
                 }
                 break;
             }
@@ -248,21 +326,36 @@ final class CarbFill {
         }
     }
 
+    /** The only click in this file. */
+    private static boolean tap(AccessibilityNodeInfo n) {
+        return n.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+    }
+
+    /** The only text entry in this file: sets the grams, then reads the field back. */
+    private static String type(AccessibilityNodeInfo box, int grams) {
+        Bundle args = new Bundle();
+        args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, String.valueOf(grams));
+        boolean ok = box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
+        box.refresh();
+        String shown = box.getText() == null ? "" : box.getText().toString();
+        return ok ? shown : "(not set) " + shown;
+    }
+
     private static void finish(Context c, Req r, boolean ok, String problem, AccessibilityNodeInfo root) {
         r.finished = true;
         req = null;
         if (!ok && root != null) Store.logCam(c, "Carbs for CamAPS: the screen was:" + dump(root));
-        Store.logCam(c, ok ? "Carbs for CamAPS: " + r.grams + " g typed in, waiting for you to confirm"
+        Store.logCam(c, ok ? "Carbs for CamAPS: " + r.grams + " g typed in (" + r.kind + "), waiting for you"
                 : "Carbs for CamAPS: stopped, " + problem);
-        notifyResult(c, r.grams, ok, problem);
+        notifyResult(c, r.grams, r.kind, ok, problem);
     }
 
     // ---- finding things ----
 
     /**
-     * The one field that may be typed into: an editable field that sits between the "Carbohydrates"
-     * title and the Confirm button of the box that is open. Fields behind the box (Glucose, Carbs on the
-     * calculator) are never chosen. Null if the title, the Confirm button or such a field is missing.
+     * The one field that may be typed into for a meal: an editable field that sits between the
+     * "Carbohydrates" title and the Confirm button of the box that is open. Fields behind the box
+     * are never chosen.
      */
     static AccessibilityNodeInfo dialogField(AccessibilityNodeInfo root) {
         List<AccessibilityNodeInfo> all = new ArrayList<>();
@@ -287,12 +380,84 @@ final class CarbFill {
         return null;
     }
 
+    /** The Add meal page's Amount field: the first visible editable field on that page. */
+    static AccessibilityNodeInfo amountField(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> all = new ArrayList<>();
+        flatten(root, all, 0);
+        for (AccessibilityNodeInfo n : all) {
+            if (n.isVisibleToUser() && n.isEditable()) return n;
+        }
+        return null;
+    }
+
+    private static AccessibilityNodeInfo byText(List<AccessibilityNodeInfo> all, String text) {
+        for (AccessibilityNodeInfo n : all) {
+            CharSequence t = n.getText() != null ? n.getText() : n.getContentDescription();
+            if (n.isVisibleToUser() && t != null && t.toString().trim().equalsIgnoreCase(text)) return n;
+        }
+        return null;
+    }
+
+    private static boolean checked(AccessibilityNodeInfo n) {
+        for (int up = 0; n != null && up < 3; up++, n = n.getParent()) {
+            if (n.isChecked() || (n.isCheckable() && n.isSelected())) return true;
+        }
+        return false;
+    }
+
+    /** The Hypoglycaemia treatment option is selected and "Meal or snack" is not. */
+    static boolean hypoSelected(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> all = new ArrayList<>();
+        flatten(root, all, 0);
+        AccessibilityNodeInfo hypo = byText(all, "Hypoglycaemia treatment");
+        AccessibilityNodeInfo meal = byText(all, "Meal or snack");
+        return hypo != null && checked(hypo) && (meal == null || !checked(meal));
+    }
+
+    /** The Hypoglycaemia treatment option (or its clickable parent). */
+    static AccessibilityNodeInfo hypoOption(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> all = new ArrayList<>();
+        flatten(root, all, 0);
+        return clickableUp(byText(all, "Hypoglycaemia treatment"));
+    }
+
+    /** The Add meal entry in the side menu (or its clickable parent). */
+    static AccessibilityNodeInfo addMealItem(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> all = new ArrayList<>();
+        flatten(root, all, 0);
+        return clickableUp(byText(all, "Add meal"));
+    }
+
+    /** The toolbar's menu button: the leftmost clickable node in the top-left corner of CamAPS's window. */
+    static AccessibilityNodeInfo menuButton(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> all = new ArrayList<>();
+        flatten(root, all, 0);
+        Rect r = new Rect(), b = new Rect();
+        root.getBoundsInScreen(r);
+        AccessibilityNodeInfo best = null;
+        int bestX = Integer.MAX_VALUE;
+        for (AccessibilityNodeInfo n : all) {
+            if (!n.isVisibleToUser() || !n.isClickable()) continue;
+            n.getBoundsInScreen(b);
+            if (b.centerX() < r.left + r.width() * 0.22 && b.centerY() < r.top + r.height() * 0.14 && b.centerX() < bestX) {
+                best = n;
+                bestX = b.centerX();
+            }
+        }
+        return best;
+    }
+
+    private static AccessibilityNodeInfo clickableUp(AccessibilityNodeInfo n) {
+        AccessibilityNodeInfo t = n;
+        for (int up = 0; t != null && !t.isClickable() && up < 3; up++) t = t.getParent();
+        return t != null && t.isClickable() ? t : null;
+    }
+
     private static final Pattern AMOUNT = Pattern.compile("^(---|\\d{1,3}([.,]\\d)?)$");
 
     /**
      * The Carbs value on the calculator: a number or "---" on the same row as the "Carbs" label,
-     * nearest to it, or its clickable parent. If the calculator's layout is not what this expects it
-     * finds nothing and the request stops with a dump of the screen in the log.
+     * nearest to it, or its clickable parent.
      */
     static AccessibilityNodeInfo carbsField(AccessibilityNodeInfo root) {
         List<AccessibilityNodeInfo> all = new ArrayList<>();
@@ -322,10 +487,7 @@ final class CarbFill {
                 best = n;
             }
         }
-        if (best == null) return null;
-        AccessibilityNodeInfo t = best;
-        for (int up = 0; t != null && !t.isClickable() && up < 3; up++) t = t.getParent();
-        return t != null && t.isClickable() ? t : null;
+        return best == null ? null : clickableUp(best);
     }
 
     private static void flatten(AccessibilityNodeInfo n, List<AccessibilityNodeInfo> out, int depth) {
@@ -350,6 +512,7 @@ final class CarbFill {
             sb.append("\n  ").append(cls.substring(cls.lastIndexOf('.') + 1))
                     .append(t == null ? "" : " \"" + t + "\"")
                     .append(n.isClickable() ? " [click]" : "").append(n.isEditable() ? " [edit]" : "")
+                    .append(n.isChecked() ? " [checked]" : "")
                     .append(n.getViewIdResourceName() == null ? "" : " #" + n.getViewIdResourceName())
                     .append(" ").append(b.toShortString());
             if (++shown >= 60) break;
@@ -362,14 +525,18 @@ final class CarbFill {
     static final String CH = "carbfill";
     static final int ID = 7;
 
-    static void notifyResult(Context c, int grams, boolean ok, String problem) {
+    static void notifyResult(Context c, int grams, Kind kind, boolean ok, String problem) {
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         nm.createNotificationChannel(new NotificationChannel(CH, "Carbs for CamAPS", NotificationManager.IMPORTANCE_DEFAULT));
-        String text = ok ? grams + " g is in CamAPS's Carbohydrates box. Check it, then tap Confirm yourself."
-                : "Couldn't fill in " + grams + " g: " + problem + ". CamAPS was not confirmed or delivered.";
+        String what = kind == Kind.LOW ? "Low treatment" : "Meal carbs";
+        String text = ok
+                ? (kind == Kind.LOW
+                        ? "Low treatment " + grams + " g is in CamAPS's Add meal page, with Hypoglycaemia treatment selected. Check both, then tap Continue yourself."
+                        : "Meal carbs " + grams + " g are in CamAPS's Carbohydrates box. Check it, then tap Confirm yourself.")
+                : "Couldn't fill in " + grams + " g (" + what.toLowerCase(Locale.UK) + "): " + problem + ". Nothing was confirmed or delivered.";
         Notification n = new Notification.Builder(c, CH)
                 .setSmallIcon(R.drawable.ic_stat)
-                .setContentTitle(ok ? "Carbs ready in CamAPS" : "Carbs not filled in")
+                .setContentTitle(ok ? what + " ready in CamAPS" : what + " not filled in")
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))
                 .setAutoCancel(true)

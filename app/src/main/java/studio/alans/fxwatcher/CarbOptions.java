@@ -16,13 +16,32 @@ final class CarbOptions {
     private CarbOptions() { }
 
     static final int MIN_G = 1, MAX_G = 150;
-    static final String DEFAULT_PRESETS = "10,15,20,30,45,60";
+    static final String DEFAULT_PRESETS = "20,30,45,60";
+    /** One-tap meal amounts start here, so a quick tap is never a hypo-sized number (those are a separate, coral path). */
+    static final int MEAL_QUICK_MIN = 20;
+    static final int LOW_MIN_G = 5, LOW_MAX_G = 30, LOW_DEFAULT_G = 15;
+    static final int[] LOW_CHIPS = {10, 15, 20};
     static final long PLAN_TTL_MS = 2 * 3_600_000L;
     static final int SLOTS = 6, MAX_PLAN_ITEMS = 2, MAX_PRESETS = 12;
 
     /** A whole number of grams from 1 to 150: the only thing that is ever typed into CamAPS. */
     static boolean valid(int grams) {
         return grams >= MIN_G && grams <= MAX_G;
+    }
+
+    /** A low treatment: whole grams 5 to 30. */
+    static boolean validLow(int grams) {
+        return grams >= LOW_MIN_G && grams <= LOW_MAX_G;
+    }
+
+    /**
+     * Whether the widget shows "Treat low": a reading from the last 12 min that is under 5.0, or the
+     * calm state is low soon or treating. Never when there is no fresh reading, and never otherwise, so it
+     * is not there to be tapped by accident.
+     */
+    static boolean lowOffered(double glucose, long glucoseAt, String state, long now) {
+        if (glucose <= 0 || now - glucoseAt > 12 * 60_000L) return false;
+        return glucose < 5.0 || CalmState.LOW_SOON.equals(state) || CalmState.TREATING.equals(state);
     }
 
     /** "10, 15 20;30" to [10, 15, 20, 30]. Drops anything not a whole number in range, and repeats. */
@@ -137,6 +156,7 @@ final class CarbOptions {
             for (PlanItem i : plan.items) out.add(new Option(i.name + " " + i.grams + " g", i.grams, true));
         }
         for (int g : presets) {
+            if (g < MEAL_QUICK_MIN) continue;
             if (out.size() >= SLOTS) break;
             boolean dup = false;
             for (Option o : out) if (o.grams == g && !o.plan) dup = true;

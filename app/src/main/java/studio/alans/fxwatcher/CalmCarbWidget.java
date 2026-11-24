@@ -13,24 +13,16 @@ import android.widget.RemoteViews;
 import java.util.List;
 
 /**
- * One widget for the calm status and the carbs: how things are (dot, word, why), four quick amounts
- * coloured by size (the plan from Meal Log first), and a stepper (minus 5, amount, plus 5) with a Set
- * button. Every amount goes the same way as the carbs widget: CarbFillActivity, then CarbFill, which
- * only types into CamAPS's Carbohydrates box and never confirms or delivers.
+ * The calm status and one button for carbs. The status is what the other widget shows (dot, word, the
+ * reason). "Carbs" opens the carbs sheet (a fresh plan from Meal Log makes it "Plan 45 g" and preselects
+ * it). "Treat low" is only there when glucose is under 5.0 or heading low; it opens the sheet in its coral
+ * low-treatment mode. Nothing is sent to CamAPS from the widget itself: the sheet's big button does that.
  */
 public class CalmCarbWidget extends AppWidgetProvider {
-
-    static final String STEP = "studio.alans.fxwatcher.action.CARB_STEP";
-    private static final int[] QUICK = {R.id.cc_q1, R.id.cc_q2, R.id.cc_q3, R.id.cc_q4};
-    private static final int[] CARDS = {0, 0, 0, 0, 0};
 
     @Override
     public void onUpdate(Context c, AppWidgetManager mgr, int[] ids) {
         push(c, mgr, ids, CalmState.compute(Calm.input(c, System.currentTimeMillis())));
-    }
-
-    static int stepAmount(Context c) {
-        return CarbOptions.stepped(Store.p(c).getInt(Store.CARB_STEP, CarbOptions.STEP_DEFAULT), 0);
     }
 
     static void update(Context c) {
@@ -47,13 +39,17 @@ public class CalmCarbWidget extends AppWidgetProvider {
         }
     }
 
-    private static PendingIntent step(Context c, int delta, int req) {
-        Intent i = new Intent(c, CarbStepReceiver.class).setAction(STEP).putExtra("delta", delta);
-        return PendingIntent.getBroadcast(c, 800 + req, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    private static PendingIntent sheet(Context c, boolean low, int grams, int req) {
+        Intent i = new Intent(c, CarbSheetActivity.class)
+                .putExtra(CarbSheetActivity.EXTRA_LOW, low)
+                .putExtra(CarbSheetActivity.EXTRA_GRAMS, grams)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        return PendingIntent.getActivity(c, 900 + req, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     private static void push(Context c, AppWidgetManager mgr, int[] ids, CalmState.Result r) {
         RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_calm_carbs);
+        long now = System.currentTimeMillis();
         String colour = r.stale ? CalmState.GREY : r.color;
         v.setInt(R.id.cc_dot, "setColorFilter", Color.parseColor(colour));
         v.setTextViewText(R.id.cc_word, r.stale ? "No data" : r.word);
@@ -63,27 +59,14 @@ public class CalmCarbWidget extends AppWidgetProvider {
         v.setOnClickPendingIntent(R.id.cc_status, Calm.open(c));
 
         List<CarbOptions.Option> opts = CarbWidget.options(c);
-        for (int s = 0; s < QUICK.length; s++) {
-            if (s < opts.size()) {
-                CarbOptions.Option o = opts.get(s);
-                v.setViewVisibility(QUICK[s], View.VISIBLE);
-                v.setTextViewText(QUICK[s], CarbWidget.face(o));
-                v.setInt(QUICK[s], "setBackgroundResource", CarbWidget.chip(o));
-                v.setTextColor(QUICK[s], 0xFFFFFFFF);
-                v.setOnClickPendingIntent(QUICK[s], CarbWidget.tap(c, o, 10 + s));
-            } else {
-                v.setViewVisibility(QUICK[s], View.GONE);
-            }
-        }
+        CarbOptions.Option plan = !opts.isEmpty() && opts.get(0).plan ? opts.get(0) : null;
+        v.setTextViewText(R.id.cc_meal, plan != null ? "Plan " + plan.grams + " g" : "Carbs");
+        v.setOnClickPendingIntent(R.id.cc_meal, sheet(c, false, plan != null ? plan.grams : -1, 0));
 
-        int amount = stepAmount(c);
-        boolean on = CarbFill.enabled(c);
-        v.setTextViewText(R.id.cc_amount, amount + " g");
-        v.setOnClickPendingIntent(R.id.cc_down, step(c, -CarbOptions.STEP, 0));
-        v.setOnClickPendingIntent(R.id.cc_up, step(c, CarbOptions.STEP, 1));
-        v.setTextViewText(R.id.cc_set, on ? "Set " + amount + " g in CamAPS" : "Turn on carbs in Settings");
-        v.setInt(R.id.cc_set, "setBackgroundResource", on ? R.drawable.carb_set : R.drawable.carb_btn_off);
-        v.setOnClickPendingIntent(R.id.cc_set, CarbWidget.tap(c, new CarbOptions.Option(amount + " g", amount, false), 20));
+        CalmState.Input in = Calm.input(c, now);
+        boolean low = CarbFill.enabled(c) && CarbOptions.lowOffered(in.glucose, in.glucoseAt, r.state, now);
+        v.setViewVisibility(R.id.cc_low, low ? View.VISIBLE : View.GONE);
+        v.setOnClickPendingIntent(R.id.cc_low, sheet(c, true, CarbOptions.LOW_DEFAULT_G, 1));
         mgr.updateAppWidget(ids, v);
     }
 }

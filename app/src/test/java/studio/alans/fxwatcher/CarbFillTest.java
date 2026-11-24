@@ -34,7 +34,7 @@ public class CarbFillTest {
         assertEquals(Arrays.asList(5, 45), CarbOptions.parsePresets("5,0,45,200,abc,45,-3,2.5"));
         assertTrue(CarbOptions.parsePresets("").isEmpty());
         assertTrue(CarbOptions.parsePresets(null).isEmpty());
-        assertEquals("10,15,20,30,45,60", CarbOptions.joinPresets(CarbOptions.parsePresets(CarbOptions.DEFAULT_PRESETS)));
+        assertEquals("20,30,45,60", CarbOptions.joinPresets(CarbOptions.parsePresets(CarbOptions.DEFAULT_PRESETS)));
     }
 
     @Test
@@ -65,15 +65,15 @@ public class CarbFillTest {
     public void widgetShowsPlanFirstThenPresetsUpToSix() {
         CarbOptions.Plan p = CarbOptions.fromBroadcast("Plan|45", 1000);
         List<CarbOptions.Option> o = CarbOptions.options(p, CarbOptions.parsePresets("10,15,20,30,45,60,90"), 2000);
-        assertEquals(6, o.size());
+        assertEquals("10 and 15 are hypo-sized and never offered as a quick meal tap", 6, o.size());
         assertTrue(o.get(0).plan);
         assertEquals("Plan 45 g", o.get(0).label);
         assertEquals(45, o.get(0).grams);
-        assertEquals(10, o.get(1).grams);
+        assertEquals(20, o.get(1).grams);
         assertFalse(o.get(1).plan);
         // a stale plan is not offered
         List<CarbOptions.Option> stale = CarbOptions.options(p, Arrays.asList(10, 20), 1000 + CarbOptions.PLAN_TTL_MS + 5);
-        assertEquals(2, stale.size());
+        assertEquals("only 20 is meal-sized", 1, stale.size());
         assertFalse(stale.get(0).plan);
     }
 
@@ -220,6 +220,76 @@ public class CarbFillTest {
 
     // ---- the source can only do what it says ----
 
+    // ---- low treatment: a separate path, never mixed with a meal ----
+
+    @Test
+    public void aLowTreatmentIsWholeGramsFiveToThirty() {
+        assertFalse(CarbOptions.validLow(4));
+        assertTrue(CarbOptions.validLow(5));
+        assertTrue(CarbOptions.validLow(15));
+        assertTrue(CarbOptions.validLow(30));
+        assertFalse(CarbOptions.validLow(31));
+        assertFalse("a meal-sized amount is never a low treatment", CarbOptions.validLow(45));
+    }
+
+    @Test
+    public void lowTreatmentIsOnlyOfferedWhenLowOrHeadingLow() {
+        long now = 10_000_000L;
+        assertTrue(CarbOptions.lowOffered(4.6, now - 60_000L, CalmState.STEADY, now));
+        assertTrue(CarbOptions.lowOffered(6.5, now - 60_000L, CalmState.LOW_SOON, now));
+        assertTrue(CarbOptions.lowOffered(5.5, now - 60_000L, CalmState.TREATING, now));
+        assertFalse("in range and steady", CarbOptions.lowOffered(6.0, now - 60_000L, CalmState.STEADY, now));
+        assertFalse("high", CarbOptions.lowOffered(12.0, now - 60_000L, CalmState.HANDLED, now));
+        assertFalse("no fresh reading", CarbOptions.lowOffered(4.0, now - 20 * 60_000L, CalmState.STEADY, now));
+        assertFalse("no reading", CarbOptions.lowOffered(-1, 0, CalmState.STEADY, now));
+    }
+
+    @Test
+    public void aLowRequestGoesViaTheMenuToAddMealAndNeverTouchesTheBolusCalculator() {
+        CarbFill.Kind low = CarbFill.Kind.LOW;
+        assertEquals(CarbFill.Step.OPEN_MENU, CarbFill.decide(CarbFill.Screen.HOME, 0, low, false, false));
+        assertEquals(CarbFill.Step.OPEN_MENU, CarbFill.decide(CarbFill.Screen.CALCULATOR, 0, low, false, false));
+        assertEquals(CarbFill.Step.OPEN_ADD_MEAL, CarbFill.decide(CarbFill.Screen.DRAWER, 0, low, false, false));
+        assertEquals("the page opens on Meal or snack: select Hypoglycaemia first", CarbFill.Step.PICK_HYPO,
+                CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0, low, false, true));
+        assertEquals(CarbFill.Step.TYPE_LOW, CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0, low, true, true));
+        assertEquals("selected but no Amount field: stop", CarbFill.Step.ABORT_NO_FIELD,
+                CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0, low, true, false));
+        assertEquals("a bolus Carbohydrates box left open is cancelled, never typed into", CarbFill.Step.BACK,
+                CarbFill.decide(CarbFill.Screen.CARBS_DIALOG, 0, low, false, false));
+        assertEquals(CarbFill.Step.ABORT_BUSY, CarbFill.decide(CarbFill.Screen.BUSY, 0, low, true, true));
+        assertEquals(CarbFill.Step.ABORT_OTHER_DIALOG, CarbFill.decide(CarbFill.Screen.OTHER_DIALOG, 0, low, true, true));
+    }
+
+    @Test
+    public void aMealRequestNeverTypesIntoAddMealAndNeverPicksTheHypoOption() {
+        CarbFill.Kind meal = CarbFill.Kind.MEAL;
+        for (CarbFill.Screen sc : CarbFill.Screen.values()) {
+            CarbFill.Step st = CarbFill.decide(sc, 0, meal, true, true);
+            assertTrue(sc + " -> " + st, st != CarbFill.Step.TYPE_LOW && st != CarbFill.Step.PICK_HYPO
+                    && st != CarbFill.Step.OPEN_MENU && st != CarbFill.Step.OPEN_ADD_MEAL);
+        }
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0, meal, true, true));
+    }
+
+    @Test
+    public void aLowRequestNeverTypesIntoTheBolusBox() {
+        CarbFill.Kind low = CarbFill.Kind.LOW;
+        for (CarbFill.Screen sc : CarbFill.Screen.values()) {
+            CarbFill.Step st = CarbFill.decide(sc, 0, low, true, true);
+            assertTrue(sc + " -> " + st, st != CarbFill.Step.TYPE && st != CarbFill.Step.OPEN_CARBS && st != CarbFill.Step.OPEN_TAB);
+        }
+    }
+
+    @Test
+    public void theSheetStartsInTheRightPlace() {
+        assertEquals(15, CarbSheetActivity.start(true, -1));
+        assertEquals(10, CarbSheetActivity.start(true, 10));
+        assertEquals("a meal amount is not a low amount", 15, CarbSheetActivity.start(true, 45));
+        assertEquals(30, CarbSheetActivity.start(false, -1));
+        assertEquals(45, CarbSheetActivity.start(false, 45));
+    }
+
     private static String source(String name) throws Exception {
         for (String p : new String[]{"src/main/java/studio/alans/fxwatcher/", "app/src/main/java/studio/alans/fxwatcher/"}) {
             File f = new File(p + name);
@@ -239,7 +309,17 @@ public class CarbFillTest {
         assertFalse(code.contains("ACTION_PASTE"));
         assertFalse(code.contains("ACTION_SCROLL"));
         // the click goes to the Carbs field the finder returned, and nothing is looked up by the words Confirm or Deliver to press
-        assertTrue(code.contains("field.performAction(AccessibilityNodeInfo.ACTION_CLICK)"));
+        assertTrue(code.contains("return n.performAction(AccessibilityNodeInfo.ACTION_CLICK);"));
+        // tap() is only ever called on what one of four finders returned
+        java.util.TreeSet<String> targets = new java.util.TreeSet<>();
+        java.util.regex.Matcher tm = java.util.regex.Pattern.compile("\\btap\\((\\w+)\\)").matcher(code);
+        while (tm.find()) if (!tm.group(1).equals("AccessibilityNodeInfo")) targets.add(tm.group(1));
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("field", "item", "menu", "radio")), targets);
+        // the words looked up to find something to press or read: never Confirm, Continue, Deliver, Next or Cancel
+        java.util.TreeSet<String> looked = new java.util.TreeSet<>();
+        java.util.regex.Matcher bm = java.util.regex.Pattern.compile("byText\\(all, \"([^\"]+)\"\\)").matcher(code);
+        while (bm.find()) looked.add(bm.group(1));
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal", "Hypoglycaemia treatment", "Meal or snack")), looked);
         assertFalse(code.contains("findAccessibilityNodeInfosByText"));
         // the field typed into is the one inside the Carbohydrates box, never "the first editable field on screen"
         assertTrue(code.contains("AccessibilityNodeInfo box = boxField;"));
@@ -262,7 +342,7 @@ public class CarbFillTest {
             if (text.contains("CarbFill.request(")) callers.add(f.getName());
         }
         // the app's own buttons, and the activity a widget tap lands on
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("CarbFillActivity.java", "MainActivity.java")), callers);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("CarbFillActivity.java", "CarbSheetActivity.java", "MainActivity.java")), callers);
     }
 
     private static int count(String s, String what) {

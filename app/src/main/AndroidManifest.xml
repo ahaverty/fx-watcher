@@ -180,9 +180,12 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/calm_carb_widget_info" />
         </receiver>
-        <receiver
-            android:name=".CarbStepReceiver"
-            android:exported="false" />
+        <activity
+            android:name=".CarbSheetActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity
             android:name=".CarbFillActivity"
             android:exported="false"

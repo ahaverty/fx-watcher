@@ -11,14 +11,15 @@ import android.widget.Toast;
  */
 public class CarbFillActivity extends Activity {
 
-    static final String EXTRA_GRAMS = "grams", EXTRA_LABEL = "label";
+    static final String EXTRA_GRAMS = "grams", EXTRA_LABEL = "label", EXTRA_LOW = "low";
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         int grams = getIntent().getIntExtra(EXTRA_GRAMS, -1);
         String label = getIntent().getStringExtra(EXTRA_LABEL);
-        String no = CarbFill.request(this, grams, label == null ? "widget" : label);
+        CarbFill.Kind kind = getIntent().getBooleanExtra(EXTRA_LOW, false) ? CarbFill.Kind.LOW : CarbFill.Kind.MEAL;
+        String no = CarbFill.request(this, grams, label == null ? "widget" : label, kind);
         if (no != null) Toast.makeText(this, no, Toast.LENGTH_LONG).show();
         finish();
     }

@@ -5,5 +5,5 @@
     <string name="perm_receive_bolus">Hear about each bolus FX Watcher records (units, carbs and time), if sharing is turned on in FX Watcher.</string>
     <string name="calm_widget_description">A coloured dot and one word for how things are. No number. Tap opens CamAPS.</string>
     <string name="carb_widget_description">Quick carb amounts. A tap opens CamAPS and fills the carbs in. You confirm and deliver yourself.</string>
-    <string name="calm_carb_widget_description">How things are, four quick carb amounts and a stepper. Set types the carbs into CamAPS; you confirm and deliver yourself.</string>
+    <string name="calm_carb_widget_description">How things are, and a button for carbs. Treat low appears only when you are low or heading low. You confirm and deliver in CamAPS.</string>
 </resources>
