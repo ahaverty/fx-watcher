@@ -152,6 +152,16 @@ public class CarbFillTest {
     }
 
     @Test
+    public void theSensorExpiresReminderIsClosedLikeTheDeliveredOne() {
+        List<String> pop = t("Information", "Sensor expires in less than 2 hours.", "Then you get a 12 hour grace period to replace the sensor.");
+        assertEquals(CarbFill.Screen.INFO_POPUP, CarbFill.classify(pop, false));
+        assertEquals(CarbFill.Step.DISMISS_INFO, CarbFill.decide(CarbFill.Screen.INFO_POPUP, 0));
+        // but a sensor that HAS expired or failed is a real alert and stays alone
+        assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Information", "Sensor expired."), false));
+        assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Information", "Sensor failed. Replace the sensor."), false));
+    }
+
+    @Test
     public void anyOtherInformationPopupIsLeftAlone() {
         assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Information", "Unable to connect to your pump."), false));
         assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Information", "Very low level of insulin in reservoir."), false));

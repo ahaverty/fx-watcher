@@ -89,6 +89,8 @@ final class CarbFill {
      * Any other Information popup (a pump problem, say) is OTHER_DIALOG and left alone.
      */
     private static final Pattern DELIVERED_AGO = Pattern.compile("^\\d+([.,]\\d+)?\\s*u\\s+delivered\\b.*\\bago\\.?$", Pattern.CASE_INSENSITIVE);
+    /** "Sensor expires in less than 2 hours." with its grace-period note: a reminder with nothing to act on, so its X is tapped too. */
+    private static final Pattern SENSOR_EXPIRES = Pattern.compile("^sensor expires in\\b.*", Pattern.CASE_INSENSITIVE);
     private static final Pattern TIMER = Pattern.compile("^\\d{1,2}:\\d{2}:\\d{2}$");
 
     enum Step {
@@ -120,12 +122,13 @@ final class CarbFill {
     static Screen classify(List<String> texts, boolean hasEditable, boolean hasGlucoseField) {
         boolean confirm = false, carbsTitle = false, glucoseTitle = false, calc = false, home = false;
         boolean addMeal = false, alerts = false, settings = false, amount = false, cont = false, durationBox = false;
-        boolean infoTitle = false, deliveredAgo = false, startBox = false, off = false, modeWord = false, gcho = false;
+        boolean infoTitle = false, deliveredAgo = false, benignInfo = false, startBox = false, off = false, modeWord = false, gcho = false;
         for (String raw : texts) {
             String l = raw.trim().toLowerCase(Locale.UK);
             if (l.startsWith("delivery") || l.startsWith("delivered") || l.startsWith("delivering")) return Screen.BUSY;
             if (l.equals("information")) infoTitle = true;
             if (DELIVERED_AGO.matcher(raw.trim()).matches()) deliveredAgo = true;
+            if (SENSOR_EXPIRES.matcher(raw.trim()).matches()) benignInfo = true;
             if (l.equals("confirm")) confirm = true;
             if (l.equals("carbohydrates") || l.equals("carbohydrate")) carbsTitle = true;
             if (l.equals("glucose")) glucoseTitle = true;
@@ -145,7 +148,7 @@ final class CarbFill {
             if (l.equals("off")) off = true;
             if (l.equals("boost") || l.equals("ease-off")) modeWord = true;
         }
-        if (infoTitle && deliveredAgo) return Screen.INFO_POPUP;
+        if (infoTitle && (deliveredAgo || benignInfo)) return Screen.INFO_POPUP;
         if (infoTitle) return Screen.OTHER_DIALOG;
         if (addMeal && alerts && settings) return Screen.DRAWER;
         if (startBox && confirm) return Screen.MODE_START;
