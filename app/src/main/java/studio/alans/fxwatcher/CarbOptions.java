@@ -133,6 +133,24 @@ final class CarbOptions {
         }
     }
 
+    /**
+     * The plan after a bolus with these carbs was delivered: the item that matches (within 3 g or 15%) is used up, so the
+     * widgets stop offering it. Nothing else is removed. Returns the same plan when nothing matched.
+     */
+    static Plan without(Plan p, double carbs) {
+        if (Double.isNaN(carbs) || carbs <= 0) return p;
+        Plan q = new Plan(p.at);
+        boolean used = false;
+        for (PlanItem i : p.items) {
+            if (!used && Math.abs(i.grams - carbs) <= Math.max(3.0, i.grams * 0.15)) {
+                used = true;
+                continue;
+            }
+            q.items.add(i);
+        }
+        return used ? q : p;
+    }
+
     /** "Plan|45" to an item, or null if the name is empty or the grams are out of range. */
     static PlanItem parseItem(String s) {
         if (s == null) return null;

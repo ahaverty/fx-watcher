@@ -680,6 +680,20 @@ public class CarbFillTest {
     }
 
     @Test
+    public void aDeliveredBolusUsesUpItsPlanAmountOnly() {
+        CarbOptions.Plan p = new CarbOptions.Plan(1000L);
+        p.items.add(new CarbOptions.PlanItem("Plan", 36));
+        p.items.add(new CarbOptions.PlanItem("Usual", 60));
+        CarbOptions.Plan after = CarbOptions.without(p, 36.0);
+        assertEquals(1, after.items.size());
+        assertEquals(60, after.items.get(0).grams);
+        assertEquals(1000L, after.at);
+        assertTrue("nothing close in the plan: unchanged", p == CarbOptions.without(p, 20.0));
+        assertTrue(p == CarbOptions.without(p, Double.NaN));
+        assertEquals(1, CarbOptions.without(p, 34.0).items.size());
+    }
+
+    @Test
     public void onlyAPersonsTapStartsARequest() throws Exception {
         java.util.TreeSet<String> callers = new java.util.TreeSet<>();
         File dir = null;
