@@ -76,6 +76,7 @@ final class Calm {
         p.edit().putString(Store.CALM_JSON, json).putString(Store.CALM_KEY, key).apply();
         if (changed) Store.logCam(c, "Calm state: " + r.state + (r.nudge.isEmpty() ? "" : " (" + r.nudge + ")"));
         CalmWidget.update(c, r);
+        GarminPush.push(c, CalmState.message(r, in.glucose, CalmState.trend(slope), in.glucoseAt, now));
         if (!enabled(p)) {
             cancel(c);
             return;

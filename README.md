@@ -277,6 +277,13 @@ steady. The home-screen widget (long press, Widgets, FX Watcher) is a state dot 
 Setup notes, including which xDrip+ display and alert settings to switch off without touching collection or
 the Nightscout upload: `docs/calm-setup.md`.
 
+### Night watch, and the buzz on a silent phone
+
+Settings, Early low warning: **At night also warn on slow falls** (off by default, Fast lows level only) adds a gentle
+slow-fall projection during your night hours, without the insulin gate. More warnings, which is why it is off.
+If the phone's ringer is set to silent, Android also mutes a notification's buzz, so "Low coming" adds its own
+alarm-type buzz in that case.
+
 ### Watch face (Garmin Forerunner 165)
 
 FX Watcher serves `http://127.0.0.1:17590/state.json` (state, word, colour, glucose, trend, age_min, updated),

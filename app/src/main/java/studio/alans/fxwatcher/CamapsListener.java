@@ -103,6 +103,7 @@ public class CamapsListener extends NotificationListenerService {
         scanActive();
         Treating.tick(this);
         CalmServer.sync(this);
+        GarminPush.sync(this);
         SensorWatch.checkBonds(this);
         SleepReceiver.sync(this);
         onInterruptionFilterChanged(getCurrentInterruptionFilter());

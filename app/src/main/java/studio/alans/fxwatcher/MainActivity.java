@@ -289,6 +289,8 @@ public class MainActivity extends Activity {
         CheckBox calmOn = box("Calm status notification (only when something is not steady)",
                 p.getBoolean(Store.CALM_ON, true));
 
+        CheckBox garminPush = box("Push the state to the Garmin watch face as it changes (needs Garmin Connect)",
+                p.getBoolean(Store.GARMIN_PUSH, true));
         CheckBox serverOn = box("Serve the calm state to the Garmin watch on this phone only (127.0.0.1)",
                 p.getBoolean(Store.SERVER_ON, true));
         EditText serverPort = number("Watch server port", "Read-only http://127.0.0.1:<port>/state.json. Not reachable "
@@ -320,6 +322,8 @@ public class MainActivity extends Activity {
         }
         if (lowMode.getCheckedRadioButtonId() < 0) lowMode.check(1004);   // unknown value: fast lows only
         cur.addView(lowMode);
+        CheckBox nightWatch = box("At night also warn on slow falls (Fast lows level only; more warnings)",
+                p.getBoolean(Store.NIGHT_WATCH, false));
         cur.addView(button("Show a test warning", () -> LowWarnings.test(this)));
         EditText treatMin = number("Treating mode length (min, 10 to 30)",
                 "How long the alerts stay quiet after you tap I'm treating. It ends early if glucose is under 2.5 "
@@ -431,6 +435,8 @@ public class MainActivity extends Activity {
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
                     .putBoolean(Store.CALM_ON, calmOn.isChecked())
                     .putBoolean(Store.SERVER_ON, serverOn.isChecked())
+                    .putBoolean(Store.GARMIN_PUSH, garminPush.isChecked())
+                    .putBoolean(Store.NIGHT_WATCH, nightWatch.isChecked())
                     .putInt(Store.SERVER_PORT, Math.max(1024, Math.min(65535, intOf(serverPort, CalmServer.DEF_PORT))))
                     .putInt(Store.TREAT_MIN, Treating.clampMinutes(intOf(treatMin, Treating.DEF_MIN)))
                     .putString(Store.LOWWARN_MODE, lowModes[Math.max(0, lowMode.getCheckedRadioButtonId() - 1000)])
@@ -472,6 +478,8 @@ public class MainActivity extends Activity {
             SleepReceiver.sync(this);
             Bedtime.tick(this);
             Store.log(this, "Settings saved");
+            CalmServer.sync(this);
+            GarminPush.sync(this);
             Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         }));
 

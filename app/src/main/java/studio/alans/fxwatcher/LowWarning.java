@@ -85,6 +85,11 @@ final class LowWarning {
         return Params.DEFAULT;
     }
 
+    /** At night, with "also watch slow falls" on: the fast rule without the insulin gate, plus a gentle projection. */
+    static Params night() {
+        return new Params(20, 20, 3.8, 6.0, 0.10, 1, 7.0, 0);
+    }
+
     static final class Projection {
         final double now;        // glucose on the fitted line at the newest reading
         final double slope;      // mmol/L per minute, negative when falling

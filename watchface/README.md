@@ -18,7 +18,9 @@ xDrip+'s own watch faces use with its local web server). Open that address in th
 {"state":"steady","word":"Steady","colour":"#1FA89A","text":"","glucose":6.2,"trend":"flat","age_min":3,"updated":1795471429}
 ```
 
-The face asks every 5 minutes, the fastest a watch face may. **Urgent things do not come through this**: they
+**Push (v1.1.0):** FX Watcher also pushes the state to the face the moment CamAPS has a reading, through Garmin Connect's
+phone SDK (needs Garmin Connect on the phone; switch in FX Watcher Settings, Calm view). So the face is usually within a
+minute of the phone. The face still asks every 5 minutes, the fastest a watch face may, as a fallback if a push is missed. **Urgent things do not come through this**: they
 arrive as notifications (the Low coming buzz, Treating, CamAPS alerts) through Garmin Connect as before.
 
 | State | Ring | Word |

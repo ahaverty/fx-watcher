@@ -230,6 +230,20 @@ final class CalmState {
                 glucose < 0 ? "null" : String.format(Locale.US, "%.1f", glucose), trend, ageMin, updated / 1000);
     }
 
+    /** The same fields as the json, as a map for the Garmin push. */
+    static java.util.Map<String, Object> message(Result r, double glucose, String trend, long glucoseAt, long now) {
+        java.util.Map<String, Object> m = new java.util.HashMap<>();
+        m.put("state", r.state);
+        m.put("word", r.stale ? "No data" : r.word);
+        m.put("colour", r.stale ? GREY : r.color);
+        m.put("text", r.text);
+        m.put("glucose", glucose < 0 ? -1.0 : Math.round(glucose * 10) / 10.0);
+        m.put("trend", trend);
+        m.put("age_min", glucose < 0 ? -1 : (int) Math.max(0, (now - glucoseAt) / MIN));
+        m.put("updated", now / 1000);
+        return m;
+    }
+
     private static String esc(String s) {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }

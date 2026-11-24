@@ -1,5 +1,6 @@
 import Toybox.Application;
 import Toybox.Background;
+import Toybox.Communications;
 import Toybox.Lang;
 import Toybox.System;
 import Toybox.Time;
@@ -24,7 +25,23 @@ class CalmApp extends Application.AppBase {
     }
 
     function getInitialView() {
+        // FX Watcher on the phone pushes the state the moment CamAPS has a reading.
+        Communications.registerForPhoneAppMessages(method(:onPhone));
         return [new CalmView()];
+    }
+
+    function onPhone(msg as Communications.PhoneAppMessage) as Void {
+        var d = msg.data;
+        if (d instanceof Lang.Dictionary && d.hasKey("state")) {
+            remember(d);
+        }
+    }
+
+    // Keep a state, and when it arrived. The face computes the age from this.
+    function remember(d as Dictionary) as Void {
+        Application.Storage.setValue("state", d);
+        Application.Storage.setValue("fetched", Time.now().value());
+        WatchUi.requestUpdate();
     }
 
     function getServiceDelegate() {
@@ -34,8 +51,7 @@ class CalmApp extends Application.AppBase {
     // The background service finished: keep what it fetched, and when.
     function onBackgroundData(data) {
         if (data instanceof Lang.Dictionary && data.hasKey("state")) {
-            Application.Storage.setValue("state", data);
-            Application.Storage.setValue("fetched", Time.now().value());
+            remember(data);
         } else if (data instanceof Lang.Dictionary && data.hasKey("error")) {
             Application.Storage.setValue("error", data["error"]);
         }

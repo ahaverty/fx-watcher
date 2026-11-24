@@ -43,6 +43,9 @@ final class LowWarnings {
             changed = true;
         }
         LowWarning.Params prm = LowWarning.preset(mode(p));
+        if (prm != null && LowWarning.FAST.equals(mode(p)) && p.getBoolean(Store.NIGHT_WATCH, false) && Phone.night(c, now)) {
+            prm = LowWarning.night();
+        }
         SharedPreferences.Editor ed = p.edit();
         if (prm != null) {
             LowWarning.Projection pr = LowWarning.project(g.items, now, prm);
@@ -140,6 +143,23 @@ final class LowWarnings {
                 .addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
                         "Dismiss", dismiss).build());
         c.getSystemService(NotificationManager.class).notify(ID, b.build());
+        directBuzz(c);
+    }
+
+    /** A silent ringer also mutes a notification channel's buzz. This one is an alarm-type buzz and still gets through. */
+    static boolean needsDirectBuzz(int ringerMode) {
+        return ringerMode == android.media.AudioManager.RINGER_MODE_SILENT;
+    }
+
+    private static void directBuzz(Context c) {
+        try {
+            android.media.AudioManager am = c.getSystemService(android.media.AudioManager.class);
+            if (am == null || !needsDirectBuzz(am.getRingerMode())) return;
+            android.os.Vibrator v = c.getSystemService(android.os.Vibrator.class);
+            if (v == null) return;
+            v.vibrate(android.os.VibrationEffect.createWaveform(new long[]{0, 900, 250, 900}, -1),
+                    new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM).build());
+        } catch (Exception ignored) { }
     }
 
     static void dismiss(Context c) {
