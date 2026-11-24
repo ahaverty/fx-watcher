@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  *        calculator: Next and Deliver are yours.
  *  SLOW / LOW: the Add meal route. Selects "Slowly absorbed meal" or "Hypoglycaemia treatment", types the
  *        grams into Amount, reads both back, taps Continue, and on the final box (which must show the same
- *        grams and must not be a plain "Meal") taps Confirm.
+ *        grams) taps Confirm.
  *  BOOST / EASE: taps Boost or Ease-off on the home card (first cancelling one that is already running, by
  *        its X and the "Off" box), types the duration into the Hrs and Mins fields, reads it back, taps
  *        Next, picks Now and taps Confirm. Then checks the running banner shows that mode and duration.
@@ -222,7 +222,7 @@ final class CarbFill {
     /**
      * Slow meal or low treatment through Add meal. selected: this kind's option is on (and the others off).
      * hasAmount: the Amount field exists. amountOk: it reads back as the grams. confirmOk: the final box shows the
-     * same grams and is not a plain "Meal". settled: the final box has been gone for a moment.
+     * same grams. settled: the final box has been gone for a moment.
      */
     static Step decideAdd(Screen s, int backs, Phase phase, boolean selected, boolean hasAmount, boolean amountOk, boolean confirmOk) {
         return decideAdd(s, backs, phase, selected, hasAmount, amountOk, confirmOk, false);
@@ -532,7 +532,7 @@ final class CarbFill {
         req = new Req(first.amount, first.label, first.kind, correction, now + TTL_MS);
         StringBuilder sb = new StringBuilder();
         for (Item it : items) sb.append(sb.length() == 0 ? "" : ", ").append(describe(it));
-        Store.logCam(c, "Carbs for CamAPS: asked for " + sb + (correction ? " WITH CORRECTION" : ""));
+        Store.logCam(c, "Carbs for CamAPS: asked for " + sb + (correction && items.get(items.size() - 1).kind == Kind.MEAL ? " WITH CORRECTION" : ""));
         Intent i = Calm.camapsLaunch(c);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
@@ -1208,8 +1208,7 @@ final class CarbFill {
     }
 
     /**
-     * The final box after Continue: it shows the same whole grams as asked, and its title is not a plain
-     * "Meal" (that would be a meal, not this kind). Also logs the title, since it is only a guess for the other kinds.
+     * The final box after Continue: it shows the same whole grams as asked.
      */
     static boolean addConfirmMatches(AccessibilityNodeInfo root, List<String> texts, int grams) {
         List<AccessibilityNodeInfo> all = new ArrayList<>();
@@ -1235,9 +1234,9 @@ final class CarbFill {
                 best = t.toString().trim();
             }
         }
-        if (best == null || !verified(best, grams)) return false;
-        for (String t : texts) if (t.trim().equalsIgnoreCase("meal")) return false;
-        return true;
+        // CamAPS titles this box "Meal" for every kind, so the title can't tell them apart: the option and amount
+        // were read back on the Add meal page just before Continue, and the grams are checked again here.
+        return best != null && verified(best, grams);
     }
 
     private static AccessibilityNodeInfo clickableUp(AccessibilityNodeInfo n) {

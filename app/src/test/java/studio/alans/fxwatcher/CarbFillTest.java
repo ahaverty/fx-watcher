@@ -588,7 +588,7 @@ public class CarbFillTest {
     }
 
     @Test
-    public void theFinalBoxIsRecognisedAndAPlainMealBoxIsNotAcceptedForSlowOrLow() {
+    public void theFinalBoxIsRecognisedWhateverItsTitle() {
         List<String> box = t("Meal", "1", "g CHO", "Cancel", "Confirm", "Add meal");
         assertEquals(CarbFill.Screen.ADD_CONFIRM, CarbFill.classify(box, false));
         // behind-the-box editable fields (the dimmed Add meal page) don't stop it being recognised
