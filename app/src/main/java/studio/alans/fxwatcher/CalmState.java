@@ -45,6 +45,8 @@ final class CalmState {
         boolean treating;
         long treatingUntil;
         boolean lowSoon;               // the early low warning is active
+        long hypoAt;                   // the last hypo treatment logged in CamAPS (0 = none)
+        double hypoGrams, hypoMmol;    // its grams, and the glucose when it was logged (<= 0 unknown)
         long autoOffSince;             // CamAPS auto mode not On since then; 0 when on
         long bolusYesUntil;            // "Yes done" tapped: no "Did you bolus?" until then
     }
@@ -94,6 +96,21 @@ final class CalmState {
     }
 
     /** Flat is within 0.3 mmol/L over 15 min, the same as the nudges use. */
+    /** A logged hypo treatment counts as handled for this long... */
+    static final long TREATED_WINDOW = 20 * MIN, TREATED_MUST_RISE = 15 * MIN;
+
+    /**
+     * A hypo treatment was logged in CamAPS within the last 20 min and glucose is not already low (under 3.9
+     * always says "take 10 g"). From 15 min in, it stops counting unless glucose is above where it was when
+     * logged: a treatment that has not worked puts the warnings back. Display only: it never silences an alert.
+     */
+    static boolean treatedRecently(Input in, boolean stale) {
+        if (stale || in.hypoAt <= 0 || in.now < in.hypoAt || in.now - in.hypoAt > TREATED_WINDOW) return false;
+        if (in.glucose < LOW) return false;
+        if (in.now - in.hypoAt >= TREATED_MUST_RISE && in.hypoMmol > 0 && in.glucose <= in.hypoMmol + 0.05) return false;
+        return true;
+    }
+
     static boolean flatOrFalling(double slope) {
         return !Double.isNaN(slope) && slope <= NudgeRules.TREND_DELTA / 15.0 + 1e-9;
     }
@@ -161,6 +178,9 @@ final class CalmState {
         if (in.treating) return set(r, TREATING, "Treating, alarm still buzzes");
         boolean low = !r.stale && in.glucose < LOW;
         if (low) return set(r, LOW_SOON, "Low: take 10 g of fast carbs");
+        if (treatedRecently(in, r.stale)) {
+            return set(r, HANDLED, String.format(java.util.Locale.US, "Treated %d g, waiting for it to work", Math.round(in.hypoGrams)));
+        }
         if (in.lowSoon) return set(r, LOW_SOON, "Low coming: take 10 g");
         // Near a low and falling by the glance's own definition: never "Steady", whatever the buzz rule decided
         // (24 Nov 2026: 3.9 and "falling" on the watch glance, "Steady" on the face).

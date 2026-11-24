@@ -61,6 +61,9 @@ final class Calm {
         in.autoOffSince = p.getBoolean(Store.PRESENT, false) && !status.isEmpty() && !"On".equalsIgnoreCase(status)
                 ? p.getLong(Store.BAD_SINCE, 0) : 0;
         in.bolusYesUntil = p.getLong(Store.CALM_YES_UNTIL, 0);
+        in.hypoAt = p.getLong(Store.HYPO_AT, 0);
+        in.hypoGrams = p.getFloat(Store.HYPO_G, 0);
+        in.hypoMmol = p.getFloat(Store.HYPO_MMOL, -1f);
         return in;
     }
 

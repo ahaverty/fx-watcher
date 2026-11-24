@@ -431,6 +431,11 @@ public class CamapsReader extends AccessibilityService {
                         ? "hypo treatment" : "slow".equals(mealType) ? "slowly absorbed meal" : "meal or snack"));
                 Store.logCam(this, t.getString("notes"));
                 if ("slow".equals(mealType)) Nudges.slowMeal(this, now);
+                if ("hypo".equals(mealType)) {
+                    p.edit().putLong(Store.HYPO_AT, now).putFloat(Store.HYPO_G, (float) mealAmount)
+                            .putFloat(Store.HYPO_MMOL, p.getFloat(Store.MMOL, -1f)).apply();
+                    Calm.refresh(this);
+                }
                 Nightscout.postTreatment(this, t);
                 BolusBroadcast.carbs(this, now, mealAmount, mealType);
                 mealAmount = -1;

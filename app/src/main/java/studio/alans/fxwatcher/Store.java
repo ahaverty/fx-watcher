@@ -76,6 +76,7 @@ final class Store {
     static final String CALM_ON = "calm_on";                    // calm status notification (default on)
     static final String CALM_JSON = "calm_json";                // last state.json
     static final String CALM_KEY = "calm_key";                  // state|nudge, to log changes
+    static final String HYPO_AT = "hypo_at", HYPO_G = "hypo_g", HYPO_MMOL = "hypo_mmol";   // the last hypo treatment logged in CamAPS: when, grams, glucose then
     static final String CALM_YES_UNTIL = "calm_yes_until";      // "Did you bolus?" answered yes until then
     static final String TREAT_UNTIL = "treat_until";            // Treating mode end time (0 = not treating)
     static final String TREAT_AT = "treat_at";                  // when it was armed

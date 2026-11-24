@@ -322,4 +322,41 @@ public class CalmStateTest {
     public void fallingAboveFourPointFiveIsStillSteady() {
         assertEquals(CalmState.STEADY, CalmState.compute(input(series(7.0, -0.03, 20))).state);
     }
+
+    @Test
+    public void aLoggedHypoTreatmentShowsHandledNotLowSoon() {
+        CalmState.Input in = input(series(4.5, -0.03, 20));          // 3.9 and falling, as at 11:19
+        in.hypoAt = NOW - 4 * MIN;
+        in.hypoGrams = 5;
+        in.hypoMmol = 4.0;
+        CalmState.Result r = CalmState.compute(in);
+        assertEquals(CalmState.HANDLED, r.state);
+        assertTrue(r.text.startsWith("Treated 5 g"));
+    }
+
+    @Test
+    public void aTreatmentThatHasNotWorkedAfterFifteenMinutesPutsTheWarningBack() {
+        CalmState.Input in = input(series(4.5, -0.03, 20));
+        in.hypoAt = NOW - 16 * MIN;
+        in.hypoGrams = 10;
+        in.hypoMmol = 4.0;                                            // 3.9 now: not higher than then
+        assertEquals(CalmState.LOW_SOON, CalmState.compute(in).state);
+        in.hypoMmol = 3.5;                                            // it did rise: still handled
+        assertEquals(CalmState.HANDLED, CalmState.compute(in).state);
+    }
+
+    @Test
+    public void aTreatmentIsForgottenAfterTwentyMinutesAndNeverHidesARealLow() {
+        CalmState.Input in = input(series(4.5, -0.03, 20));
+        in.hypoAt = NOW - 25 * MIN;
+        in.hypoGrams = 5;
+        in.hypoMmol = 3.0;
+        assertEquals(CalmState.LOW_SOON, CalmState.compute(in).state);
+        CalmState.Input low = input(series(4.4, -0.05, 20));          // down to 3.4
+        low.hypoAt = NOW - 3 * MIN;
+        low.hypoGrams = 5;
+        low.hypoMmol = 3.6;
+        assertEquals("under 3.9 still says take 10 g", CalmState.LOW_SOON, CalmState.compute(low).state);
+        assertTrue(CalmState.compute(low).text.contains("take 10 g"));
+    }
 }
