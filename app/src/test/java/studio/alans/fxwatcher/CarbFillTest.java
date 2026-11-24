@@ -283,11 +283,46 @@ public class CarbFillTest {
 
     @Test
     public void theSheetStartsInTheRightPlace() {
-        assertEquals(15, CarbSheetActivity.start(true, -1));
-        assertEquals(10, CarbSheetActivity.start(true, 10));
-        assertEquals("a meal amount is not a low amount", 15, CarbSheetActivity.start(true, 45));
-        assertEquals(30, CarbSheetActivity.start(false, -1));
-        assertEquals(45, CarbSheetActivity.start(false, 45));
+        assertEquals(15, CarbSheetActivity.start(CarbSheetActivity.LOW, -1));
+        assertEquals(10, CarbSheetActivity.start(CarbSheetActivity.LOW, 10));
+        assertEquals("a meal amount is not a low amount", 15, CarbSheetActivity.start(CarbSheetActivity.LOW, 45));
+        assertEquals(30, CarbSheetActivity.start(CarbSheetActivity.MEAL, -1));
+        assertEquals(45, CarbSheetActivity.start(CarbSheetActivity.MEAL, 45));
+        assertEquals(60, CarbSheetActivity.start(CarbSheetActivity.SLOW, 60));
+    }
+
+    @Test
+    public void everyModeHasItsOwnRangeAndKind() {
+        assertEquals(CarbFill.Kind.MEAL, CarbSheetActivity.kind(CarbSheetActivity.MEAL));
+        assertEquals(CarbFill.Kind.SLOW, CarbSheetActivity.kind(CarbSheetActivity.SLOW));
+        assertEquals(CarbFill.Kind.LOW, CarbSheetActivity.kind(CarbSheetActivity.LOW));
+        assertEquals(5, CarbSheetActivity.min(CarbSheetActivity.LOW));
+        assertEquals(30, CarbSheetActivity.max(CarbSheetActivity.LOW));
+        assertEquals(120, CarbSheetActivity.max(CarbSheetActivity.MEAL));
+        assertEquals(120, CarbSheetActivity.max(CarbSheetActivity.SLOW));
+    }
+
+    @Test
+    public void eachKindChecksItsOwnRange() {
+        assertTrue(CarbOptions.validFor(CarbFill.Kind.MEAL, 150));
+        assertFalse(CarbOptions.validFor(CarbFill.Kind.MEAL, 151));
+        assertTrue(CarbOptions.validFor(CarbFill.Kind.SLOW, 120));
+        assertFalse(CarbOptions.validFor(CarbFill.Kind.SLOW, 121));
+        assertFalse(CarbOptions.validFor(CarbFill.Kind.SLOW, 4));
+        assertTrue(CarbOptions.validFor(CarbFill.Kind.LOW, 30));
+        assertFalse(CarbOptions.validFor(CarbFill.Kind.LOW, 31));
+    }
+
+    @Test
+    public void aSlowMealTakesTheSameAddMealRouteWithItsOwnOption() {
+        CarbFill.Kind slow = CarbFill.Kind.SLOW;
+        assertEquals(CarbFill.Step.OPEN_MENU, CarbFill.decide(CarbFill.Screen.HOME, 0, slow, false, false));
+        assertEquals(CarbFill.Step.OPEN_ADD_MEAL, CarbFill.decide(CarbFill.Screen.DRAWER, 0, slow, false, false));
+        assertEquals(CarbFill.Step.PICK_HYPO, CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0, slow, false, true));
+        assertEquals(CarbFill.Step.TYPE_LOW, CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0, slow, true, true));
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.CARBS_DIALOG, 0, slow, false, false));
+        assertEquals("Slowly absorbed meal", CarbFill.optionOf(slow));
+        assertEquals("Hypoglycaemia treatment", CarbFill.optionOf(CarbFill.Kind.LOW));
     }
 
     private static String source(String name) throws Exception {
@@ -319,7 +354,12 @@ public class CarbFillTest {
         java.util.TreeSet<String> looked = new java.util.TreeSet<>();
         java.util.regex.Matcher bm = java.util.regex.Pattern.compile("byText\\(all, \"([^\"]+)\"\\)").matcher(code);
         while (bm.find()) looked.add(bm.group(1));
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal", "Hypoglycaemia treatment", "Meal or snack")), looked);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal")), looked);
+        // the three option labels on the Add meal page are constants, and nothing else is looked up by a variable except those
+        java.util.TreeSet<String> opts = new java.util.TreeSet<>();
+        java.util.regex.Matcher om = java.util.regex.Pattern.compile("OPT_\\w+ = \"([^\"]+)\"").matcher(code);
+        while (om.find()) opts.add(om.group(1));
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("Hypoglycaemia treatment", "Meal or snack", "Slowly absorbed meal")), opts);
         assertFalse(code.contains("findAccessibilityNodeInfosByText"));
         // the field typed into is the one inside the Carbohydrates box, never "the first editable field on screen"
         assertTrue(code.contains("AccessibilityNodeInfo box = boxField;"));
@@ -342,7 +382,7 @@ public class CarbFillTest {
             if (text.contains("CarbFill.request(")) callers.add(f.getName());
         }
         // the app's own buttons, and the activity a widget tap lands on
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("CarbFillActivity.java", "CarbSheetActivity.java", "MainActivity.java")), callers);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("CarbFillActivity.java", "CarbMenuActivity.java", "CarbSheetActivity.java", "MainActivity.java")), callers);
     }
 
     private static int count(String s, String what) {

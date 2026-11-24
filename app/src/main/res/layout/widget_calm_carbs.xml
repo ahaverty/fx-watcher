@@ -6,77 +6,57 @@
     android:background="@drawable/card_teal"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="14dp">
+    android:paddingStart="12dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="8dp"
+    android:paddingBottom="6dp">
 
     <LinearLayout
         android:id="@+id/cc_status"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
+        android:layout_weight="1.15"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <ImageView
             android:id="@+id/cc_dot"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
             android:contentDescription="@null"
             android:src="@drawable/calm_dot" />
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/cc_word"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/cc_word"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Steady"
-                android:textColor="#FF1FA89A"
-                android:textSize="19sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/cc_text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="Nothing needs you"
-                android:textColor="#FF9AA3AD"
-                android:textSize="12sp" />
-        </LinearLayout>
+            android:layout_marginStart="8dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Steady"
+            android:textColor="#FF1FA89A"
+            android:textSize="16sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <TextView
-        android:id="@+id/cc_low"
-        android:layout_width="wrap_content"
-        android:layout_height="44dp"
-        android:layout_marginStart="8dp"
-        android:background="@drawable/pill_low"
-        android:gravity="center"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:text="Treat low"
-        android:textColor="#FFFFFFFF"
-        android:textSize="15sp"
-        android:textStyle="bold"
-        android:visibility="gone" />
+        android:id="@+id/cc_c1"
+        style="@style/QuickChip" />
 
     <TextView
-        android:id="@+id/cc_meal"
-        android:layout_width="wrap_content"
-        android:layout_height="44dp"
-        android:layout_marginStart="8dp"
-        android:background="@drawable/pill_meal"
-        android:gravity="center"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:text="Carbs"
-        android:textColor="#FFFFFFFF"
-        android:textSize="15sp"
-        android:textStyle="bold" />
+        android:id="@+id/cc_c2"
+        style="@style/QuickChip" />
+
+    <TextView
+        android:id="@+id/cc_c3"
+        style="@style/QuickChip" />
+
+    <TextView
+        android:id="@+id/cc_more"
+        style="@style/QuickChip"
+        android:layout_width="34dp"
+        android:layout_weight="0"
+        android:background="@drawable/chip_more"
+        android:text="\u22EF"
+        android:textSize="20sp" />
 </LinearLayout>

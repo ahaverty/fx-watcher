@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
  *
  *  MEAL: gets to the bolus calculator, opens the Carbs entry and types the grams into the box titled
  *        "Carbohydrates". Stops with the box open.
+ *  SLOW: the same Add meal route with "Slowly absorbed meal" selected instead.
  *  LOW:  a low treatment. Goes through the menu to Add meal, makes sure "Hypoglycaemia treatment" is the
  *        selected option (the page opens on "Meal or snack"), and types the grams into Amount. Stops
  *        there. It never types a low treatment into the bolus calculator, and never a meal into Add meal.
@@ -34,7 +35,7 @@ import java.util.regex.Pattern;
  *
  * The only actions in this file are tap() (one click call), type() (one text-set call) and one Back,
  * and CI counts them. What tap() may be pointed at is limited to four finders: the Carbs field, the menu
- * button, the Add meal item, the Hypoglycaemia option; the Bolus tab is {@link BolusTab#openTab}.
+ * button, the Add meal item, the Add meal option for this kind; the Bolus tab is {@link BolusTab#openTab}.
  */
 final class CarbFill {
 
@@ -43,7 +44,14 @@ final class CarbFill {
     static final long TTL_MS = 60_000L, STEP_GAP_MS = 700L, SETTLE_MS = 3_000L;
     static final int MAX_ACTIONS = 12, MAX_BACKS = 6;
 
-    enum Kind { MEAL, LOW }
+    /** MEAL: the bolus calculator. LOW and SLOW: the Add meal page, with that option selected. */
+    enum Kind { MEAL, LOW, SLOW }
+
+    static final String OPT_MEAL = "Meal or snack", OPT_LOW = "Hypoglycaemia treatment", OPT_SLOW = "Slowly absorbed meal";
+
+    static String optionOf(Kind k) {
+        return k == Kind.LOW ? OPT_LOW : k == Kind.SLOW ? OPT_SLOW : OPT_MEAL;
+    }
 
     // ---- pure: what screen is this, and what is the one next step (unit tested) ----
 
@@ -103,7 +111,7 @@ final class CarbFill {
     static Step decide(Screen s, int backs, Kind kind, boolean hypoSelected, boolean hasAmount) {
         if (s == Screen.BUSY) return Step.ABORT_BUSY;
         if (s == Screen.OTHER_DIALOG) return Step.ABORT_OTHER_DIALOG;
-        if (kind == Kind.LOW) {
+        if (kind != Kind.MEAL) {
             switch (s) {
                 case HOME:
                 case CALCULATOR: return Step.OPEN_MENU;
@@ -167,9 +175,11 @@ final class CarbFill {
     /** Why a tap can't start now, or null if it can. */
     static String refusal(Context c, int grams, Kind kind) {
         if (!enabled(c)) return "Carbs for CamAPS is off. Turn it on in FX Watcher Settings.";
-        if (kind == Kind.LOW ? !CarbOptions.validLow(grams) : !CarbOptions.valid(grams)) {
+        if (!CarbOptions.validFor(kind, grams)) {
             return kind == Kind.LOW
                     ? "A low treatment is whole grams from " + CarbOptions.LOW_MIN_G + " to " + CarbOptions.LOW_MAX_G + "."
+                    : kind == Kind.SLOW
+                    ? "A slowly absorbed meal is whole grams from " + CarbOptions.STEP_MIN + " to " + CarbOptions.STEP_MAX + "."
                     : "Only whole grams from " + CarbOptions.MIN_G + " to " + CarbOptions.MAX_G + ".";
         }
         if (!Phone.readerOn(c)) return "Turn on FX Watcher's CamAPS screen reader first.";
@@ -186,7 +196,7 @@ final class CarbFill {
         if (no != null) return no;
         long now = System.currentTimeMillis();
         req = new Req(grams, label, kind, now + TTL_MS);
-        Store.logCam(c, "Carbs for CamAPS: asked for " + grams + " g " + (kind == Kind.LOW ? "LOW TREATMENT" : "meal") + " (" + label + ")");
+        Store.logCam(c, "Carbs for CamAPS: asked for " + grams + " g " + (kind == Kind.LOW ? "LOW TREATMENT" : kind == Kind.SLOW ? "SLOW MEAL" : "meal") + " (" + label + ")");
         Intent i = Calm.camapsLaunch(c);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
@@ -223,7 +233,7 @@ final class CarbFill {
         AccessibilityNodeInfo boxField = dialogField(root);
         Screen screen = classify(texts, boxField != null);
         AccessibilityNodeInfo amountBox = screen == Screen.ADD_MEAL ? amountField(root) : null;
-        boolean hypo = screen == Screen.ADD_MEAL && hypoSelected(root);
+        boolean hypo = screen == Screen.ADD_MEAL && r.kind != Kind.MEAL && optionSelected(root, r.kind);
         if (screen == Screen.UNKNOWN && justTapped && now - r.lastAt < SETTLE_MS) return;
         Step step = decide(screen, r.backs, r.kind, hypo, amountBox != null);
         Store.logCam(c, "Carbs for CamAPS: step " + (r.actions + 1) + ": " + screen + " -> " + step);
@@ -276,9 +286,9 @@ final class CarbFill {
                 break;
             }
             case PICK_HYPO: {
-                AccessibilityNodeInfo radio = hypoOption(root);
+                AccessibilityNodeInfo radio = optionNode(root, r.kind);
                 if (radio == null) {
-                    finish(c, r, false, "I couldn't find the Hypoglycaemia treatment option", root);
+                    finish(c, r, false, "I couldn't find the " + optionOf(r.kind) + " option", root);
                     return;
                 }
                 r.actions++;
@@ -306,12 +316,12 @@ final class CarbFill {
                 r.actions++;
                 r.lastAt = now;
                 String shown = type(amountBox, r.grams);
-                boolean stillHypo = hypoSelected(root);
-                if (verified(shown, r.grams) && stillHypo) {
+                boolean stillRight = optionSelected(root, r.kind);
+                if (verified(shown, r.grams) && stillRight) {
                     finish(c, r, true, null, null);
                 } else {
-                    finish(c, r, false, "the Amount shows \"" + shown + "\" and Hypoglycaemia treatment is "
-                            + (stillHypo ? "selected" : "NOT selected") + ". Check both before you continue", root);
+                    finish(c, r, false, "the Amount shows \"" + shown + "\" and " + optionOf(r.kind) + " is "
+                            + (stillRight ? "selected" : "NOT selected") + ". Check both before you continue", root);
                 }
                 break;
             }
@@ -405,20 +415,25 @@ final class CarbFill {
         return false;
     }
 
-    /** The Hypoglycaemia treatment option is selected and "Meal or snack" is not. */
-    static boolean hypoSelected(AccessibilityNodeInfo root) {
+    /** This kind's option is selected on the Add meal page and the other two are not. */
+    static boolean optionSelected(AccessibilityNodeInfo root, Kind kind) {
         List<AccessibilityNodeInfo> all = new ArrayList<>();
         flatten(root, all, 0);
-        AccessibilityNodeInfo hypo = byText(all, "Hypoglycaemia treatment");
-        AccessibilityNodeInfo meal = byText(all, "Meal or snack");
-        return hypo != null && checked(hypo) && (meal == null || !checked(meal));
+        String want = optionOf(kind);
+        AccessibilityNodeInfo mine = null;
+        for (String opt : new String[]{OPT_MEAL, OPT_LOW, OPT_SLOW}) {
+            AccessibilityNodeInfo n = byText(all, opt);
+            if (opt.equals(want)) mine = n;
+            else if (n != null && checked(n)) return false;
+        }
+        return mine != null && checked(mine);
     }
 
-    /** The Hypoglycaemia treatment option (or its clickable parent). */
-    static AccessibilityNodeInfo hypoOption(AccessibilityNodeInfo root) {
+    /** This kind's option on the Add meal page (or its clickable parent). */
+    static AccessibilityNodeInfo optionNode(AccessibilityNodeInfo root, Kind kind) {
         List<AccessibilityNodeInfo> all = new ArrayList<>();
         flatten(root, all, 0);
-        return clickableUp(byText(all, "Hypoglycaemia treatment"));
+        return clickableUp(byText(all, optionOf(kind)));
     }
 
     /** The Add meal entry in the side menu (or its clickable parent). */
@@ -528,10 +543,10 @@ final class CarbFill {
     static void notifyResult(Context c, int grams, Kind kind, boolean ok, String problem) {
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         nm.createNotificationChannel(new NotificationChannel(CH, "Carbs for CamAPS", NotificationManager.IMPORTANCE_DEFAULT));
-        String what = kind == Kind.LOW ? "Low treatment" : "Meal carbs";
+        String what = kind == Kind.LOW ? "Low treatment" : kind == Kind.SLOW ? "Slow meal" : "Meal carbs";
         String text = ok
-                ? (kind == Kind.LOW
-                        ? "Low treatment " + grams + " g is in CamAPS's Add meal page, with Hypoglycaemia treatment selected. Check both, then tap Continue yourself."
+                ? (kind != Kind.MEAL
+                        ? what + " " + grams + " g is in CamAPS's Add meal page, with " + optionOf(kind) + " selected. Check both, then tap Continue yourself."
                         : "Meal carbs " + grams + " g are in CamAPS's Carbohydrates box. Check it, then tap Confirm yourself.")
                 : "Couldn't fill in " + grams + " g (" + what.toLowerCase(Locale.UK) + "): " + problem + ". Nothing was confirmed or delivered.";
         Notification n = new Notification.Builder(c, CH)
