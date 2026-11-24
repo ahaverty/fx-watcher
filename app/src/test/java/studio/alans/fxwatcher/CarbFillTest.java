@@ -92,7 +92,7 @@ public class CarbFillTest {
 
     @Test
     public void aBoxThatIsNotCarbohydratesIsNeverTypedInto() {
-        assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Glucose", "Confirm"), true));
+        assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(t("Glucose", "Confirm"), true));   // cancelled with Back, never typed into
         assertEquals("a Confirm box with no field", CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Carbohydrates", "Confirm"), false));
         assertEquals(CarbFill.Step.ABORT_OTHER_DIALOG, CarbFill.decide(CarbFill.Screen.OTHER_DIALOG, 0));
         assertEquals(CarbFill.Step.TYPE, CarbFill.decide(CarbFill.Screen.CARBS_DIALOG, 0));
@@ -112,8 +112,66 @@ public class CarbFillTest {
         assertEquals(CarbFill.Step.OPEN_TAB, CarbFill.decide(CarbFill.Screen.HOME, 0));
         assertEquals(CarbFill.Step.OPEN_CARBS, CarbFill.decide(CarbFill.Screen.CALCULATOR, 0));
         assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.UNKNOWN, 0));
-        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.UNKNOWN, 3));
-        assertEquals("only 4 Backs", CarbFill.Step.ABORT_LOST, CarbFill.decide(CarbFill.Screen.UNKNOWN, 4));
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.UNKNOWN, 5));
+        assertEquals("only 6 Backs", CarbFill.Step.ABORT_LOST, CarbFill.decide(CarbFill.Screen.UNKNOWN, 6));
+    }
+
+    // ---- the other screens CamAPS may have been left on (seen on Alan's phone) ----
+
+    @Test
+    public void theSideMenuIsClosedWithBack() {
+        List<String> drawer = t("CamAPS FX", "Add meal", "Alerts", "Share", "Statistics", "YpsoPump", "Active insulin", "Settings", "About");
+        assertEquals(CarbFill.Screen.DRAWER, CarbFill.classify(drawer, false));
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.DRAWER, 0));
+    }
+
+    @Test
+    public void theAddMealPagesAreLeftWithBackNotContinued() {
+        List<String> page = t("Add meal", "Amount", "g CHO", "Meal or snack", "Hypoglycaemia treatment", "Slowly absorbed meal", "Continue");
+        assertEquals(CarbFill.Screen.ADD_MEAL, CarbFill.classify(page, false));
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0));
+    }
+
+    @Test
+    public void aHalfEnteredBoostOrGlucoseBoxIsCancelledWithBack() {
+        List<String> boost = t("Boost duration", "00", "Hrs", "00", "Mins", "Cancel", "Next");
+        assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(boost, true));
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.ENTRY_DIALOG, 0));
+        assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(t("Ease-off duration", "Cancel", "Next"), true));
+        assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(t("Glucose", "Value", "mmol/L", "Cancel", "Confirm"), true));
+    }
+
+    @Test
+    public void anAlertOrWarningBoxIsNeverDismissed() {
+        assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Urgent low glucose", "Treat now", "Confirm"), false));
+        assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Confirm bolus", "Confirm", "Cancel"), false));
+        assertEquals(CarbFill.Step.ABORT_OTHER_DIALOG, CarbFill.decide(CarbFill.Screen.OTHER_DIALOG, 0));
+    }
+
+    @Test
+    public void statisticsAndInfoPagesAreLeftWithBack() {
+        for (List<String> page : Arrays.asList(
+                t("Statistics duration", "Day", "Week", "Month", "Generate PDF report"),
+                t("Statistics", "Today", "Average glucose", "GMI", "Time in target"),
+                t("Dexcom G7", "Dexcom G7 information", "Pairing code", "Connected devices"))) {
+            CarbFill.Screen sc = CarbFill.classify(page, false);
+            assertEquals(CarbFill.Screen.UNKNOWN, sc);
+            assertEquals(CarbFill.Step.BACK, CarbFill.decide(sc, 2));
+        }
+    }
+
+    @Test
+    public void theCalculatorAndHomeAreNotMistakenForOtherScreens() {
+        // the calculator also has Cancel and Next buttons
+        assertEquals(CarbFill.Screen.CALCULATOR, CarbFill.classify(t("CamAPS FX", "Meal size", "Glucose", "mmol/L", "5.9", "Carbs", "g CHO", "---", "Total Units", "Cancel", "Next"), false));
+        assertEquals(CarbFill.Screen.HOME, CarbFill.classify(t("CamAPS FX", "5.9", "mmol/L", "Boost", "Ease-off", "Auto mode", "On"), false));
+    }
+
+    @Test
+    public void theCarbohydratesBoxIsTheOnlyOneTypedInto() {
+        assertEquals(CarbFill.Screen.CARBS_DIALOG, CarbFill.classify(t("Carbohydrates", "Value", "g CHO", "Cancel", "Confirm"), true));
+        assertEquals("a Glucose box is never the Carbohydrates box", CarbFill.Screen.ENTRY_DIALOG,
+                CarbFill.classify(t("Glucose", "Value", "mmol/L", "Cancel", "Confirm"), true));
     }
 
     @Test
@@ -133,8 +191,8 @@ public class CarbFillTest {
     @Test
     public void limitsAreTightAndFixed() {
         assertEquals(60_000L, CarbFill.TTL_MS);
-        assertEquals(8, CarbFill.MAX_ACTIONS);
-        assertEquals(4, CarbFill.MAX_BACKS);
+        assertEquals(12, CarbFill.MAX_ACTIONS);
+        assertEquals(6, CarbFill.MAX_BACKS);
     }
 
     // ---- the source can only do what it says ----

@@ -26,7 +26,9 @@ import java.util.regex.Pattern;
  * What it never does: tap Confirm, Deliver, Next, Cancel or anything on a delivery; type into any
  * box that is not titled "Carbohydrates"; type anything but a whole number from 1 to 150; go on
  * for more than 60 seconds or 8 actions; act without a tap from you in the last 60 seconds; act on
- * a request twice. If it can't tell where it is it presses Back at most 4 times, else gives up and
+ * a request twice. From the side menu, the Add meal pages, a half-entered Boost, Ease-off or Glucose box or any
+ * other CamAPS page it presses Back (at most 6 times in all) to get to the home screen; any other box (an alert, a
+ * warning) or a delivery on screen it leaves alone and stops. If it can't tell where it is it gives up and
  * says so. The tab tap is {@link BolusTab#openTab}; the only other actions are in this file and CI
  * counts them: one Carbs field tap, one text set, one Back.
  */
@@ -35,26 +37,45 @@ final class CarbFill {
     private CarbFill() { }
 
     static final long TTL_MS = 60_000L, STEP_GAP_MS = 700L;
-    static final int MAX_ACTIONS = 8, MAX_BACKS = 4;
+    static final int MAX_ACTIONS = 12, MAX_BACKS = 6;
 
     // ---- pure: what screen is this, and what is the one next step (unit tested) ----
 
-    enum Screen { HOME, CALCULATOR, CARBS_DIALOG, OTHER_DIALOG, BUSY, UNKNOWN }
+    /**
+     * DRAWER: the side menu. ADD_MEAL: the Add meal pages. ENTRY_DIALOG: a half-entered Boost or Ease-off
+     * duration or Glucose box (Back cancels it). OTHER_DIALOG: any other box (an alert, a warning): not touched.
+     * UNKNOWN: any other page (Statistics, Info, Settings...), left with Back.
+     */
+    enum Screen { HOME, CALCULATOR, CARBS_DIALOG, ENTRY_DIALOG, OTHER_DIALOG, DRAWER, ADD_MEAL, BUSY, UNKNOWN }
 
     enum Step { OPEN_TAB, OPEN_CARBS, TYPE, BACK, ABORT_BUSY, ABORT_OTHER_DIALOG, ABORT_LOST }
 
     static Screen classify(List<String> texts, boolean hasEditable) {
-        boolean confirm = false, carbsTitle = false, calc = false, home = false;
+        boolean confirm = false, carbsTitle = false, glucoseTitle = false, calc = false, home = false;
+        boolean addMeal = false, alerts = false, settings = false, amount = false, cont = false, durationBox = false;
         for (String raw : texts) {
-            String t = raw.trim();
-            String l = t.toLowerCase(Locale.UK);
+            String l = raw.trim().toLowerCase(Locale.UK);
             if (l.startsWith("delivery") || l.startsWith("delivered") || l.startsWith("delivering")) return Screen.BUSY;
             if (l.equals("confirm")) confirm = true;
             if (l.equals("carbohydrates") || l.equals("carbohydrate")) carbsTitle = true;
+            if (l.equals("glucose")) glucoseTitle = true;
             if (l.equals("total units") || l.equals("g cho") || l.equals("meal size")) calc = true;
             if (l.equals("auto mode")) home = true;
+            if (l.equals("add meal")) addMeal = true;
+            if (l.equals("alerts")) alerts = true;
+            if (l.equals("settings")) settings = true;
+            if (l.equals("amount")) amount = true;
+            if (l.equals("continue")) cont = true;
+            if (l.equals("boost duration") || l.equals("ease-off duration")) durationBox = true;
         }
-        if (confirm) return carbsTitle && hasEditable ? Screen.CARBS_DIALOG : Screen.OTHER_DIALOG;
+        if (addMeal && alerts && settings) return Screen.DRAWER;
+        if (confirm) {
+            if (carbsTitle && hasEditable) return Screen.CARBS_DIALOG;
+            if (!carbsTitle && glucoseTitle) return Screen.ENTRY_DIALOG;
+            return Screen.OTHER_DIALOG;
+        }
+        if (durationBox) return Screen.ENTRY_DIALOG;
+        if (addMeal && (amount || cont)) return Screen.ADD_MEAL;
         if (calc) return Screen.CALCULATOR;
         if (home) return Screen.HOME;
         return Screen.UNKNOWN;
@@ -67,7 +88,7 @@ final class CarbFill {
             case CARBS_DIALOG: return Step.TYPE;
             case BUSY: return Step.ABORT_BUSY;
             case OTHER_DIALOG: return Step.ABORT_OTHER_DIALOG;
-            default: return backs < MAX_BACKS ? Step.BACK : Step.ABORT_LOST;
+            default: return backs < MAX_BACKS ? Step.BACK : Step.ABORT_LOST;   // DRAWER, ADD_MEAL, ENTRY_DIALOG, UNKNOWN
         }
     }
 
