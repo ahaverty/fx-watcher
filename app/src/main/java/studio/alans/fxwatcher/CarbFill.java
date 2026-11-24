@@ -54,6 +54,18 @@ final class CarbFill {
     /** After each action, look at the screen again on our own at these delays (ms): CamAPS may send no event once it settles. */
     static final long[] RECHECK_MS = {900L, 2_200L, 3_600L};
     static final int MAX_ACTIONS = 12, MAX_BACKS = 6, MAX_WAITS = 10;
+    /**
+     * CamAPS shows a spinner while it connects to the pump (5 to 7 s or more), and while it does the screen has none
+     * of the words FX Watcher knows. That is waited out, never answered with Back: Back on CamAPS's main page closes
+     * CamAPS, which threw you back to the app you came from (24 Nov 2026). Before any action there is a shorter wait,
+     * after one a longer wait, then it stops and says so.
+     */
+    static final long START_WAIT_MS = 12_000L, LOADING_WAIT_MS = 30_000L;
+
+    /** Whether an unrecognised CamAPS screen should still be waited on. acted: a step has already been taken. */
+    static boolean keepWaiting(boolean acted, long sinceMs) {
+        return sinceMs < (acted ? LOADING_WAIT_MS : START_WAIT_MS);
+    }
 
     /** MEAL: the bolus calculator. LOW and SLOW: the Add meal page. BOOST and EASE: the home card's modes. */
     enum Kind { MEAL, LOW, SLOW, BOOST, EASE }
@@ -463,6 +475,7 @@ final class CarbFill {
         final long deadline;
         final boolean correction;
         int actions, backs, waits;
+        boolean waitingLogged;
         long lastAt;
         Step lastStep;
         int sameStep;
@@ -566,6 +579,8 @@ final class CarbFill {
             plan = null;
             return "Couldn't open CamAPS.";
         }
+        progress(c, "Opening CamAPS and filling in " + sb + ". It can take 10 to 20 seconds while CamAPS connects to the pump. "
+                + "Please don't tap anything until you get a notification saying it's done.");
         return null;
     }
 
@@ -589,13 +604,6 @@ final class CarbFill {
             finish(c, r, false, "too many steps, so I stopped", root);
             return;
         }
-        // Right after a tap the next page is still animating in and looks unknown: give it a moment.
-        boolean justTapped = r.lastStep == Step.OPEN_TAB || r.lastStep == Step.OPEN_CARBS
-                || r.lastStep == Step.OPEN_MENU || r.lastStep == Step.OPEN_ADD_MEAL || r.lastStep == Step.PICK_HYPO
-                || r.lastStep == Step.DISMISS_INFO || r.lastStep == Step.CONFIRM_CARBS || r.lastStep == Step.OPEN_GLUCOSE
-                || r.lastStep == Step.CONFIRM_GLUCOSE || r.lastStep == Step.CONTINUE_ADD || r.lastStep == Step.CONFIRM_ADD
-                || r.lastStep == Step.OPEN_MODE || r.lastStep == Step.OPEN_CANCEL || r.lastStep == Step.CONFIRM_OFF
-                || r.lastStep == Step.NEXT_DURATION || r.lastStep == Step.PICK_NOW || r.lastStep == Step.CONFIRM_START;
         AccessibilityNodeInfo boxField = dialogField(root, "Carbohydrates");
         AccessibilityNodeInfo glucoseBox = dialogField(root, "Glucose");
         Screen screen = classify(texts, boxField != null, glucoseBox != null);
@@ -615,7 +623,23 @@ final class CarbFill {
         boolean durationOk = durationRead == r.grams;
         boolean running = modeRunning(texts);
         boolean bannerOk = isMode(r.kind) && bannerMatches(texts, r.kind, r.grams);
-        if (screen == Screen.UNKNOWN && justTapped && now - r.lastAt < SETTLE_MS) return;
+        if (screen == Screen.UNKNOWN) {
+            boolean acted = r.lastStep != null;
+            long since = acted ? now - r.lastAt : now - (r.deadline - TTL_MS);
+            if (keepWaiting(acted, since)) {
+                if (!r.waitingLogged) {
+                    r.waitingLogged = true;
+                    Store.logCam(c, "Carbs for CamAPS: waiting, CamAPS shows a screen I don't know (probably connecting to the pump)" + dump(root));
+                    progress(c, "Waiting for CamAPS to finish connecting to the pump. Please don't tap anything, I'll carry on by myself.");
+                }
+                return;
+            }
+            if (acted) {
+                finish(c, r, false, "CamAPS was still showing a screen I don't know after " + (LOADING_WAIT_MS / 1000) + " seconds (usually it is still connecting to the pump). "
+                        + "I stopped without pressing anything", root);
+                return;
+            }
+        }
         if (screen == Screen.HOME && isMode(r.kind) && (r.lastStep == Step.OPEN_MODE || r.lastStep == Step.OPEN_CANCEL)
                 && now - r.lastAt < SETTLE_MS) return;       // the box is still opening: don't tap the button twice
         Step step = r.kind == Kind.MEAL
@@ -1379,7 +1403,31 @@ final class CarbFill {
     static final String CH = "carbfill";
     static final int ID = 7;
 
+    static final String PROGRESS_CH = "carbfill_progress";
+    static final int PROGRESS_ID = 8;
+
+    /** A quiet ongoing note while a run is in progress, so you can see FX Watcher is working and what it is waiting for. */
+    static void progress(Context c, String text) {
+        NotificationManager nm = c.getSystemService(NotificationManager.class);
+        nm.createNotificationChannel(new NotificationChannel(PROGRESS_CH, "Carbs for CamAPS, in progress", NotificationManager.IMPORTANCE_LOW));
+        Notification n = new Notification.Builder(c, PROGRESS_CH)
+                .setSmallIcon(R.drawable.ic_stat)
+                .setContentTitle("Filling in CamAPS")
+                .setContentText(text)
+                .setStyle(new Notification.BigTextStyle().bigText(text))
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setTimeoutAfter(2 * 60_000L)
+                .build();
+        nm.notify(PROGRESS_ID, n);
+    }
+
+    static void clearProgress(Context c) {
+        c.getSystemService(NotificationManager.class).cancel(PROGRESS_ID);
+    }
+
     static void notifyResult(Context c, Plan p, Req last, boolean ok, String problem) {
+        clearProgress(c);
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         nm.createNotificationChannel(new NotificationChannel(CH, "Carbs for CamAPS", NotificationManager.IMPORTANCE_DEFAULT));
         String lastDesc = describe(new Item(last.kind, last.grams, last.label));
@@ -1397,7 +1445,7 @@ final class CarbFill {
             title = "Not finished in CamAPS";
             text = "Couldn't finish " + lastDesc + ": " + problem + ". "
                     + (done.length() > 0 ? "Done before that: " + done + ". " : "")
-                    + "Nothing was delivered. Check CamAPS before you go on.";
+                    + "Nothing was delivered. Open CamAPS and check what is on screen, then run it again from the plan.";
         }
         Notification n = new Notification.Builder(c, CH)
                 .setSmallIcon(R.drawable.ic_stat)

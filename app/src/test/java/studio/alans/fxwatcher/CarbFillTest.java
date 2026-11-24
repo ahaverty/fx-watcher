@@ -658,6 +658,27 @@ public class CarbFillTest {
         assertTrue(src.contains("setPositiveButton(\"Run\""));
     }
 
+    // ---- CamAPS connecting to the pump: wait, never Back (24 Nov) ----
+
+    @Test
+    public void anUnknownScreenIsWaitedOutNotBackedOutOf() {
+        // before any action: 12 s; after one: 30 s
+        assertTrue(CarbFill.keepWaiting(false, 3_000L));
+        assertTrue(CarbFill.keepWaiting(false, 11_000L));
+        assertFalse(CarbFill.keepWaiting(false, 12_000L));
+        assertTrue("the 24 Nov case: 3.6 s after tapping the Bolus tab", CarbFill.keepWaiting(true, 3_600L));
+        assertTrue("a pump connection can take 5 to 7 s or more", CarbFill.keepWaiting(true, 20_000L));
+        assertFalse(CarbFill.keepWaiting(true, 30_000L));
+    }
+
+    @Test
+    public void backIsNeverPressedForAnUnknownScreenOnceActing() throws Exception {
+        String code = source("CarbFill.java");
+        // the unknown-screen branch waits, or finishes once a step was taken; only before any action may it fall through to a Back
+        assertTrue(code.contains("keepWaiting(acted, since)"));
+        assertTrue(code.contains("I stopped without pressing anything"));
+    }
+
     @Test
     public void onlyAPersonsTapStartsARequest() throws Exception {
         java.util.TreeSet<String> callers = new java.util.TreeSet<>();
