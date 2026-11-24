@@ -60,6 +60,25 @@ final class Store {
     static final int DEF_DELIVERY_FAST_SEC = 60;
     // Nudges (Nudges.java), each off until turned on
     static final String NUDGE_DUPLICATE = "nudge_duplicate";  // possible duplicate bolus
+    static final String LOWWARN_MODE = "lowwarn_mode";          // off / calm / balanced / early
+    static final String LOWWARN_TRACKER = "lowwarn_tracker";    // LowWarning.Tracker state
+    static final String LOWWARN_JOURNAL = "lowwarn_journal";    // every warning and what came of it
+    static final String GARMIN_PUSH = "garmin_push";            // push the calm state to the watch face (default on)
+    static final String NIGHT_WATCH = "lowwarn_night";          // at night also watch slow falls (default off)
+    static final String SERVER_ON = "server_on";                // 127.0.0.1 state.json for the watch (default on)
+    static final String SERVER_PORT = "server_port";
+    static final String CALM_ON = "calm_on";                    // calm status notification (default on)
+    static final String CALM_JSON = "calm_json";                // last state.json
+    static final String CALM_KEY = "calm_key";                  // state|nudge, to log changes
+    static final String CALM_YES_UNTIL = "calm_yes_until";      // "Did you bolus?" answered yes until then
+    static final String TREAT_UNTIL = "treat_until";            // Treating mode end time (0 = not treating)
+    static final String TREAT_AT = "treat_at";                  // when it was armed
+    static final String TREAT_BASE = "treat_base";              // glucose when armed (NaN until the first reading)
+    static final String TREAT_MEDIA_PREV = "treat_media_prev";  // media volume before, to put back
+    static final String TREAT_MEDIA_SET = "treat_media_set";    // what we set it to (-1 = we did not change it)
+    static final String TREAT_ESCALATE_AT = "treat_escalate";   // ended early: FX Watcher rings until glucose is back up
+    static final String TREAT_MIN = "treat_min";                // length, 10 to 30
+    static final String CAM_ALERT_AT = "cam_alert_at";          // when CamAPS last posted a one-off alert
     static final String NUDGE_BOOST = "nudge_boost";          // Boost after a slow meal
     static final String NUDGE_BEDTIME = "nudge_bedtime";      // Ease-off at bedtime with insulin on board
     static final String SHARE_BOLUS = "share_bolus";          // BolusBroadcast to other apps, off until turned on
@@ -181,6 +200,8 @@ final class Store {
      */
     /** What FX Watcher saw CamAPS do (notifications, bolus calculator, countdown, deliveries), newest first. */
     static final String CAMLOG = "cam_log";
+    /** How CamAPS alerts sound (AlertAudio): player usage, volumes, notification actions. */
+    static final String AUDIOLOG = "audio_log";
 
     /** Writes to the CamAPS log only; a line identical to the newest one is skipped. */
     static synchronized void camLog(Context c, String msg) {

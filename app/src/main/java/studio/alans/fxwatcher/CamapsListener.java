@@ -101,6 +101,9 @@ public class CamapsListener extends NotificationListenerService {
             screenRegistered = true;
         }
         scanActive();
+        Treating.tick(this);
+        CalmServer.sync(this);
+        GarminPush.sync(this);
         SensorWatch.checkBonds(this);
         SleepReceiver.sync(this);
         onInterruptionFilterChanged(getCurrentInterruptionFilter());
@@ -130,7 +133,23 @@ public class CamapsListener extends NotificationListenerService {
     public void onNotificationPosted(StatusBarNotification sbn) {
         if (isCamaps(sbn) && !handle(sbn, false)) logIgnored(sbn);
         else if (sbn != null && sbn.getPackageName() != null
-                && sbn.getPackageName().startsWith("com.camdiab.") && !sbn.isOngoing()) info(sbn);
+                && sbn.getPackageName().startsWith("com.camdiab.") && !sbn.isOngoing()) {
+            Store.p(this).edit().putLong(Store.CAM_ALERT_AT, System.currentTimeMillis()).apply();
+            audio(sbn);
+            info(sbn);
+        }
+    }
+
+    /** Debug record of how this alert sounds (AlertAudio). Never throws, changes nothing. */
+    private void audio(StatusBarNotification sbn) {
+        try {
+            android.service.notification.NotificationListenerService.Ranking r =
+                    new android.service.notification.NotificationListenerService.Ranking();
+            android.app.NotificationChannel ch = getCurrentRanking().getRanking(sbn.getKey(), r) ? r.getChannel() : null;
+            AlertAudio.onNotification(this, sbn, ch);
+        } catch (Exception e) {
+            Log.w(TAG, "alert audio record", e);
+        }
     }
 
     private static final java.util.regex.Pattern DELIVERED =
@@ -162,6 +181,7 @@ public class CamapsListener extends NotificationListenerService {
         // Any fresh "Delivered" notification answers the missed bolus check, Nightscout or not.
         double u = BolusTracker.units(text);
         if (u >= 0) BolusWatch.delivered(this, u, System.currentTimeMillis());
+        LowWarnings.camaps(this, title + " " + text, System.currentTimeMillis());
         sensorExpiry(this, text, at);
         SensorWatch.texts(this, java.util.Collections.singletonList(text), at);
         CamapsAlert a = CamapsAlert.parse(title, text);
@@ -335,6 +355,14 @@ public class CamapsListener extends NotificationListenerService {
         }
         if (status == null && glucose == null && !force) return false;
         if (status == null) status = "Unknown";
+        for (String s : texts) {
+            if (LowWarning.camapsFalling(s)) LowWarnings.camaps(this, s, System.currentTimeMillis());
+        }
+        if (glucose != null) {
+            try {
+                AlertAudio.onLowGlucose(this, Double.parseDouble(glucose.replace(',', '.')));
+            } catch (NumberFormatException ignored) { }
+        }
         String pkg = sbn.getPackageName();
         Store.camLog(this, "Status notification: auto mode " + status + (glucose == null ? "" : ", glucose " + glucose));
         Monitor.onCamaps(this, true, status, glucose, texts, pkg, false);

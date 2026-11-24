@@ -216,6 +216,82 @@ In the night hours (Settings > Night and battery) the duplicate and Boost nudges
 bedtime one is meant for that time and does. Home Assistant can add its own nudges, shown and
 logged the same way: see [docs/home-assistant.md](docs/home-assistant.md#8-nudges-from-home-assistant).
 
+### Early low warning
+
+A buzz and a notification, with no sound, when glucose is on course to go under 3.9: "Low coming. Take
+10 g of fast carbs now." It fits a line through the last 15 to 20 minutes of CamAPS readings and projects
+20 to 25 minutes ahead. It also warns when glucose is under 5.5 and falling 0.1 mmol/L per minute or
+faster. It ignores Ease-off, Boost and suspension on purpose: the low can still come. One re-buzz after
+10 minutes, only if the projection got worse. The watch buzzes because it mirrors the phone
+notification (leave the watch's own Do Not Disturb off). Quiet event does not mute it, because it never
+plays a sound. Treating mode does, because you are already handling it.
+
+Three levels, chosen from your own Nightscout history (`docs/early-low-backtest.md`): **Calm** (about 2 in
+3 lows caught 15+ minutes ahead), **Balanced** (3 in 4, the default) and **Early** (4 in 5). The price of
+catching more is more warnings that turn out not to be needed, about 1.7, 2 and 3 a day. The 80% caught
+with at most 2 false a day target is not reachable from CGM readings alone on this history. Every warning
+and whether glucose then went under 3.9 within 45 minutes is kept in the app (Early low warning section)
+and in the CamAPS log, so the level can be retuned from real use.
+
+### Treating mode
+
+For when you are already handling a low and CamAPS keeps nagging. **You** arm it: the app button, the
+"I'm treating" button on the Low coming notification (it shows on the watch), or a Home Assistant
+broadcast (`studio.alans.fxwatcher.HA_TREAT`, same key as the snooze one). Nothing in the app starts it
+by itself, and a test checks that.
+
+What it does: media volume to 0 (CamAPS plays its alerts on the media stream), then sets it back to 0 if
+CamAPS lifts it for an Urgent low while glucose is under 3.5 or a CamAPS alert has just posted. FX Watcher's
+own urgent low buzzes instead of ringing. It counts down in the status notification.
+
+* 20 minutes by default, 10 to 30 in the settings.
+* **Ends early and rings FX Watcher's alarm at full volume** if glucose goes under 2.5, or if it is not
+  higher than when you armed it 15 minutes in (or there is no reading by then).
+* The volume is put back at the end. The end is an exact alarm, the watchdog and the boot receiver, and
+  the state is stored, so it also comes back if the app is killed or the phone restarts.
+* **What still rings:** pump alarms (blockage, empty cartridge or battery, no delivery, they come from the
+  pump), Dexcom G7 app alarms, clock alarms, calls.
+* **CamAPS Urgent low is not guaranteed silent.** CamAPS lifts the media volume to half and plays a clip;
+  FX Watcher sets it back to 0 right after, which is a race. A short sound may get through and it may not
+  work at all. The findings are in `camaps-re/findings.md`, "Urgent low audio".
+* It changes the media volume and nothing else: not the ringer, Do Not Disturb, CamAPS or the pump.
+
+### How CamAPS alerts sound (debug log)
+
+A log of how each CamAPS alert makes its sound: the notification's channel and actions, the audio players
+playing at 0, 0.4, 1.2, 3 and 7 seconds, and every volume change in the first 15 seconds. It changes
+nothing. It exists to settle, on the next real Urgent low, whether CamAPS lifts the media volume and how
+fast. Copy it from the bottom of the app.
+
+### Calm view
+
+One word for how things are, with no glucose number: **steady** (teal), **handled** (amber), **check** (coral),
+**low soon** and **treating** (purple). *Handled* means above 10 but Boost is on, or a bolus or correction was
+delivered in the last 2 hours and glucose is flat or falling: no alerts, and the text says so ("Handled: Boost
+and correction working, back in range by about 22:00"). *Check* is one of three nudges that say what to do:
+"Did you bolus?" (rising like a meal with no bolus seen; buttons Yes done and Open CamAPS), "Check the site?"
+(above 12 for 90+ minutes after a correction) and "CamAPS isn't looping" (auto mode not On for 15+ minutes).
+
+The status notification is silent and low importance, never shows a number, and is not shown at all while
+steady. The home-screen widget (long press, Widgets, FX Watcher) is a state dot and one word; tap opens CamAPS.
+Setup notes, including which xDrip+ display and alert settings to switch off without touching collection or
+the Nightscout upload: `docs/calm-setup.md`.
+
+### Night watch, and the buzz on a silent phone
+
+Settings, Early low warning: **At night also warn on slow falls** (off by default, Fast lows level only) adds a gentle
+slow-fall projection during your night hours, without the insulin gate. More warnings, which is why it is off.
+If the phone's ringer is set to silent, Android also mutes a notification's buzz, so "Low coming" adds its own
+alarm-type buzz in that case.
+
+### Watch face (Garmin Forerunner 165)
+
+FX Watcher serves `http://127.0.0.1:17590/state.json` (state, word, colour, glucose, trend, age_min, updated),
+read only and on the phone itself, so the Garmin Connect app can fetch it for a watch face. Turn it off in
+Settings (Calm view) if you do not want any app on the phone to be able to read it. The watch face (ring
+and one word, no number) and a glance for when you want the number are in `watchface/`. They are not built
+yet: see `watchface/README.md`.
+
 ## Bolus broadcast
 
 Optional, for people who build their own apps. With **Settings > Connections > Share boluses with

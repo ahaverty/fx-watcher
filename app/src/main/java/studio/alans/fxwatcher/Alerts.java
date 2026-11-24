@@ -164,12 +164,14 @@ final class Alerts {
 
     /** Full alarm: notification, full-screen alert, sound and vibration. */
     static void alarm(Context c, Monitor.Problem pr, boolean fresh) {
-        if (Quiet.active(c) && Quiet.mutes(pr.code)) {
+        boolean treating = Treating.mutes(Treating.active(c), pr.code);
+        if (treating || (Quiet.active(c) && Quiet.mutes(pr.code))) {
             // Quiet event: buzz the phone and watch (again every 10 min) instead of ringing.
             stopSound(c);
             SharedPreferences p = Store.p(c);
             long now = System.currentTimeMillis();
-            boolean buzz = fresh || now - p.getLong(Store.QUIET_BUZZ, 0) >= 10 * 60_000L;
+            long gap = treating ? 5 * 60_000L : 10 * 60_000L;   // treating: the urgent low buzzes more often
+            boolean buzz = fresh || now - p.getLong(Store.QUIET_BUZZ, 0) >= gap;
             if (buzz) p.edit().putLong(Store.QUIET_BUZZ, now).apply();
             problem(c, pr, Monitor.ALARM, buzz, true);
             return;
@@ -242,7 +244,13 @@ final class Alerts {
         long batt = p.getLong(Store.BATT_SNOOZE_UNTIL, 0);
         if (pr != null && "BATTERY".equals(pr.code) && batt > now) text = "Battery alert snoozed until " + Store.hm(batt);
         if (quiet > now) text = "Quiet until " + Store.hm(quiet) + " · " + text;
-        String key = title + "|" + text;
+        long treat = Treating.until(c);
+        if (treat > now) {
+            // The countdown is the notification's own chronometer, so the text never changes (watches re-announce changes).
+            title = "Treating";
+            text = "Alerts quiet, alarm still buzzes";
+        }
+        String key = title + "|" + text + "|" + (treat > now ? treat : 0);
         if (key.equals(lastStatus) && isShowing(nm, ID_STATUS)) return;
         lastStatus = key;
         Notification.Builder b = new Notification.Builder(c, CH_STATUS)
@@ -253,6 +261,13 @@ final class Alerts {
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false);
+        if (treat > now) {
+            b.setUsesChronometer(true).setChronometerCountDown(true).setShowWhen(true).setWhen(treat);
+            b.addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
+                    "End treating", PendingIntent.getBroadcast(c, 34, new Intent(c, ActionReceiver.class)
+                            .setAction(ActionReceiver.TREAT_END),
+                            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT)).build());
+        }
         if (quiet > now) {
             b.addAction(new Notification.Action.Builder(Icon.createWithResource(c, R.drawable.ic_stat),
                     "End quiet", PendingIntent.getBroadcast(c, 33, new Intent(c, ActionReceiver.class)

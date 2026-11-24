@@ -185,6 +185,9 @@ final class Monitor {
             return s;
         }
 
+        Problem treat = treatingEnded(p, now);
+        if (treat != null) return treat;
+
         Problem cam = present ? camapsProblem(c, p, now) : null;
         if (cam != null) return cam;
 
@@ -224,6 +227,29 @@ final class Monitor {
             return b;
         }
         return pump;
+    }
+
+    /**
+     * Treating mode ended early (glucose under 2.5, not rising, or no reading): FX Watcher's alarm
+     * rings at full volume until a reading is back at 3.9 or higher (or 30 min pass, or it is silenced).
+     */
+    private static Problem treatingEnded(SharedPreferences p, long now) {
+        long at = p.getLong(Store.TREAT_ESCALATE_AT, 0);
+        if (at == 0) return null;
+        float mmol = p.getFloat(Store.MMOL, -1f);
+        boolean fresh = now - p.getLong(Store.LAST_SEEN, 0) <= 12 * 60_000L;
+        if (now - at > 30 * 60_000L || (fresh && mmol >= 3.9f && p.getLong(Store.LAST_SEEN, 0) > at)) {
+            p.edit().putLong(Store.TREAT_ESCALATE_AT, 0).apply();
+            return null;
+        }
+        Problem t = new Problem();
+        t.code = "TREAT";
+        t.title = "Still low: treating isn't enough";
+        t.detail = "Treating mode ended at " + Store.hm(at) + " because glucose was very low or not rising. "
+                + "Take more fast carbs and check CamAPS.";
+        t.since = t.warnAt = t.alarmAt = at;
+        t.snoozable = false;
+        return t;
     }
 
     /** Problems read from the CamAPS notification itself: urgent low, auto mode off, no glucose. */
@@ -268,6 +294,7 @@ final class Monitor {
         if (p.getLong(Store.SIM_UNTIL, 0) <= now) Phone.refreshPump(c, Phone.UNKNOWN);
         refreshBattery(c, now);
         Problem pr = problem(c, now);
+        Calm.refresh(c);
         int prevLevel = p.getInt(Store.LEVEL, NONE);
         String prevCode = p.getString(Store.PROBLEM, "");
         String prevTitle = p.getString(Store.PROBLEM_TITLE, "");
@@ -406,6 +433,8 @@ final class Monitor {
         if (lastSeen > 0 && staleAt > now) next = Math.min(next, staleAt + 1000);
         long test = p.getLong(Store.TEST_UNTIL, 0);
         if (test > now) next = Math.min(next, test);
+        long treat = Treating.nextCheck(c);
+        if (treat > now) next = Math.min(next, treat);
         long nudge = nextNudge(c);
         if (nudge > now) next = Math.min(next, nudge);
         long pumpDown = p.getLong(Store.PUMP_DOWN_SINCE, 0);
@@ -430,6 +459,7 @@ final class Monitor {
     /** Called by the watchdog timer: confirm CamAPS is still there, then re-evaluate. */
     static void check(Context c) {
         Quiet.tick(c);
+        Treating.tick(c);
         SensorWatch.checkBonds(c);
         if (!CamapsListener.poll(c)) {
             Store.log(c, "Watchdog: notification listener not bound");

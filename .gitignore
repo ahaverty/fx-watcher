@@ -2,3 +2,7 @@ build/
 .gradle/
 *.iml
 local.properties
+# Connect IQ: build output and the developer key
+watchface/**/bin/
+*.der
+developer_key*

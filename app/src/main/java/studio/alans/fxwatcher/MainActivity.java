@@ -24,6 +24,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -190,6 +192,20 @@ public class MainActivity extends Activity {
         } else {
             root.addView(button("Quiet event (cinema, ceremony…)", this::pickQuietEnd));
         }
+        long treat = Treating.until(this);
+        if (treat > now) {
+            root.addView(text("Treating until " + Store.hm(treat) + ": media volume 0, FX urgent low buzzes. "
+                    + "Pump alarms still ring. It ends early and rings if glucose goes under 2.5 or is not "
+                    + "higher after 15 min.", 16));
+            LinearLayout tr = new LinearLayout(this);
+            tr.addView(button("End treating", () -> Treating.end(this, "ended by you")),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            tr.addView(button("What still rings?", this::treatingGuide),
+                    new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            root.addView(tr);
+        } else {
+            root.addView(button("I'm treating a low (" + Treating.minutes(this) + " min)", this::treatingGuide));
+        }
         if (Alerts.sounding() || p.getInt(Store.LEVEL, 0) >= Monitor.ACKED) {
             root.addView(button("Silence alarm", () -> Monitor.silence(this)));
         }
@@ -265,6 +281,54 @@ public class MainActivity extends Activity {
         EditText deliveryFast = number("Deliver tapped but not delivered: alert after (sec)",
                 "Plus 10 s for each unit. Starts when the delivery countdown shows. 0 turns it off.",
                 p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
+
+        section("Calm view", "calm", false);
+        cur.addView(text("One word for how things are: steady, handled, check, low soon or treating. The "
+                + "status notification has no glucose number and is not shown at all while things are steady. "
+                + "Add the FX Watcher widget to the home screen for a dot and one word. Tap opens CamAPS.", 14));
+        CheckBox calmOn = box("Calm status notification (only when something is not steady)",
+                p.getBoolean(Store.CALM_ON, true));
+
+        CheckBox garminPush = box("Push the state to the Garmin watch face as it changes (needs Garmin Connect)",
+                p.getBoolean(Store.GARMIN_PUSH, true));
+        CheckBox serverOn = box("Serve the calm state to the Garmin watch on this phone only (127.0.0.1)",
+                p.getBoolean(Store.SERVER_ON, true));
+        EditText serverPort = number("Watch server port", "Read-only http://127.0.0.1:<port>/state.json. Not reachable "
+                + "from the network. Any app on this phone can read it, glucose number included.",
+                p.getInt(Store.SERVER_PORT, CalmServer.DEF_PORT), false);
+
+        section("Early low warning", "lowwarn", false);
+        cur.addView(text("A buzz and a notification, no sound, when glucose is on course to go under "
+                + "3.9 in the next 20 to 25 minutes: take 10 g. It looks at the last 15 to 20 minutes of "
+                + "readings and ignores Ease-off, Boost and suspension. Numbers are from your own history "
+                + "(docs/early-low-backtest.md): the more lows it catches early, the more warnings that "
+                + "turn out not to be needed.", 14));
+        final String[] lowModes = {LowWarning.OFF, LowWarning.CALM, LowWarning.BALANCED, LowWarning.EARLY, LowWarning.FAST};
+        final String[] lowLabels = {"Off",
+                "Calm: catches about 2 in 3 lows 15+ min ahead, about 1.7 needless warnings a day",
+                "Balanced: about 3 in 4, about 2 needless a day (recommended)",
+                "Early: about 4 in 5, about 3 needless a day",
+                "Fast lows only (recommended): fast falls with insulin on board, plus CamAPS's own falling alerts. "
+                        + "About 10 min notice, about 0.4 needless a day"};
+        final RadioGroup lowMode = new RadioGroup(this);
+        String lowNow = LowWarnings.mode(p);
+        for (int i = 0; i < lowModes.length; i++) {
+            RadioButton rb = new RadioButton(this);
+            rb.setText(lowLabels[i]);
+            rb.setId(1000 + i);
+            lowMode.addView(rb);
+            if (lowModes[i].equals(lowNow)) rb.setChecked(true);
+            if (lowModes[i].equals(LowWarning.FAST) && !p.contains(Store.LOWWARN_MODE)) rb.setChecked(true);
+        }
+        if (lowMode.getCheckedRadioButtonId() < 0) lowMode.check(1004);   // unknown value: fast lows only
+        cur.addView(lowMode);
+        CheckBox nightWatch = box("At night also warn on slow falls (Fast lows level only; more warnings)",
+                p.getBoolean(Store.NIGHT_WATCH, false));
+        cur.addView(button("Show a test warning", () -> LowWarnings.test(this)));
+        EditText treatMin = number("Treating mode length (min, 10 to 30)",
+                "How long the alerts stay quiet after you tap I'm treating. It ends early if glucose is under 2.5 "
+                        + "or not higher after 15 min.", Treating.minutes(this), false);
+        cur.addView(text(LowWarnings.recent(this), 12));
 
         section("Nudges", "nudges", false);
         cur.addView(text("A reminder at the moment Ease-off or Boost might help, or a bolus is worth "
@@ -369,6 +433,13 @@ public class MainActivity extends Activity {
                     .putInt(Store.PUMP_NUDGE, intOf(pumpNudge, Store.DEF_PUMP_NUDGE))
                     .putInt(Store.MISSED_BOLUS_MIN, intOf(missedBolus, Store.DEF_MISSED_BOLUS_MIN))
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
+                    .putBoolean(Store.CALM_ON, calmOn.isChecked())
+                    .putBoolean(Store.SERVER_ON, serverOn.isChecked())
+                    .putBoolean(Store.GARMIN_PUSH, garminPush.isChecked())
+                    .putBoolean(Store.NIGHT_WATCH, nightWatch.isChecked())
+                    .putInt(Store.SERVER_PORT, Math.max(1024, Math.min(65535, intOf(serverPort, CalmServer.DEF_PORT))))
+                    .putInt(Store.TREAT_MIN, Treating.clampMinutes(intOf(treatMin, Treating.DEF_MIN)))
+                    .putString(Store.LOWWARN_MODE, lowModes[Math.max(0, lowMode.getCheckedRadioButtonId() - 1000)])
                     .putBoolean(Store.NUDGE_DUPLICATE, nudgeDuplicate.isChecked())
                     .putBoolean(Store.NUDGE_BOOST, nudgeBoost.isChecked())
                     .putBoolean(Store.NUDGE_BEDTIME, nudgeBedtime.isChecked())
@@ -407,6 +478,8 @@ public class MainActivity extends Activity {
             SleepReceiver.sync(this);
             Bedtime.tick(this);
             Store.log(this, "Settings saved");
+            CalmServer.sync(this);
+            GarminPush.sync(this);
             Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         }));
 
@@ -423,6 +496,7 @@ public class MainActivity extends Activity {
         // ---- Logs: copy buttons always visible, the text itself folded away until opened
         logSection("FX Watcher log", "log", Store.LOG, "FX Watcher log", 1);
         logSection("What FX Watcher saw in CamAPS", "camlog", Store.CAMLOG, "CamAPS log (as seen by FX Watcher)", 3);
+        logSection("How CamAPS alerts sound (debug)", "audiolog", Store.AUDIOLOG, "Alert audio log", 3);
 
         setContentView(sv);
     }
@@ -448,6 +522,24 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /** Treating mode: say exactly what it does and what still rings, then start on a tap. */
+    private void treatingGuide() {
+        boolean on = Treating.active(this);
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this)
+                .setTitle("Treating mode")
+                .setMessage(Treating.guide(this, Treating.minutes(this)));
+        if (on) {
+            b.setPositiveButton("OK", null);
+        } else {
+            b.setPositiveButton("Start", (d, w) -> {
+                Treating.start(this, "the app button");
+                Toast.makeText(this, "Treating until " + Store.hm(Treating.until(this)), Toast.LENGTH_SHORT).show();
+                build();
+            }).setNegativeButton("Cancel", null);
+        }
+        b.show();
     }
 
     private void quietGuide(long until, boolean offerStart) {

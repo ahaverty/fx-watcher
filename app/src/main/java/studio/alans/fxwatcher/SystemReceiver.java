@@ -16,6 +16,7 @@ public class SystemReceiver extends BroadcastReceiver {
             Bedtime.tick(c);
             BolusWatch.resume(c);
             Quiet.tick(c);
+            Treating.tick(c);
         }
     }
 }
