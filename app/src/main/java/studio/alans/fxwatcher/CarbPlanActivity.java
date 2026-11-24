@@ -30,7 +30,7 @@ public class CarbPlanActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         List<CarbFill.Item> items = CarbFill.parseSteps(getIntent().getStringExtra(EXTRA_STEPS), "plan");
-        boolean correction = getIntent().getBooleanExtra(EXTRA_CORRECTION, false);
+        boolean correction = getIntent().getBooleanExtra(EXTRA_CORRECTION, Store.p(this).getBoolean(Store.CARB_CORRECTION, false));
         String key = getIntent().getStringExtra(EXTRA_KEY);
         if (key != null && !PlanRuns.validKey(key)) key = null;
         String bad = items == null ? "That plan couldn't be read." : CarbFill.validatePlan(items);
