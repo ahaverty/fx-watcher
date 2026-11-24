@@ -35,7 +35,8 @@ import java.util.regex.Pattern;
  *
  * The only actions in this file are tap() (one click call), type() (one text-set call) and one Back,
  * and CI counts them. What tap() may be pointed at is limited to four finders: the Carbs field, the menu
- * button, the Add meal item, the Add meal option for this kind; the Bolus tab is {@link BolusTab#openTab}.
+ * button, the Add meal item, the Add meal option for this kind, and the X of the delivered-an-hour-ago
+ * information popup; the Bolus tab is {@link BolusTab#openTab}.
  */
 final class CarbFill {
 
@@ -60,20 +61,30 @@ final class CarbFill {
      * duration or Glucose box (Back cancels it). OTHER_DIALOG: any other box (an alert, a warning): not touched.
      * UNKNOWN: any other page (Statistics, Info, Settings...), left with Back.
      */
-    enum Screen { HOME, CALCULATOR, CARBS_DIALOG, ENTRY_DIALOG, OTHER_DIALOG, DRAWER, ADD_MEAL, BUSY, UNKNOWN }
+    enum Screen { HOME, CALCULATOR, CARBS_DIALOG, ENTRY_DIALOG, OTHER_DIALOG, DRAWER, ADD_MEAL, INFO_POPUP, BUSY, UNKNOWN }
+
+    /**
+     * INFO_POPUP: CamAPS's "Information" popup that says how long ago insulin was delivered ("1.9 U delivered 8 min
+     * ago."). It shows over the calculator, Back does not close it, and it is only a note, so its X is tapped.
+     * Any other Information popup (a pump problem, say) is OTHER_DIALOG and left alone.
+     */
+    private static final Pattern DELIVERED_AGO = Pattern.compile("^\\d+([.,]\\d+)?\\s*u\\s+delivered\\b.*\\bago\\.?$", Pattern.CASE_INSENSITIVE);
 
     enum Step {
         OPEN_TAB, OPEN_CARBS, TYPE,
-        OPEN_MENU, OPEN_ADD_MEAL, PICK_HYPO, TYPE_LOW,
+        OPEN_MENU, OPEN_ADD_MEAL, PICK_HYPO, TYPE_LOW, DISMISS_INFO,
         BACK, ABORT_BUSY, ABORT_OTHER_DIALOG, ABORT_LOST, ABORT_NO_FIELD
     }
 
     static Screen classify(List<String> texts, boolean hasEditable) {
         boolean confirm = false, carbsTitle = false, glucoseTitle = false, calc = false, home = false;
         boolean addMeal = false, alerts = false, settings = false, amount = false, cont = false, durationBox = false;
+        boolean infoTitle = false, deliveredAgo = false;
         for (String raw : texts) {
             String l = raw.trim().toLowerCase(Locale.UK);
             if (l.startsWith("delivery") || l.startsWith("delivered") || l.startsWith("delivering")) return Screen.BUSY;
+            if (l.equals("information")) infoTitle = true;
+            if (DELIVERED_AGO.matcher(raw.trim()).matches()) deliveredAgo = true;
             if (l.equals("confirm")) confirm = true;
             if (l.equals("carbohydrates") || l.equals("carbohydrate")) carbsTitle = true;
             if (l.equals("glucose")) glucoseTitle = true;
@@ -86,6 +97,8 @@ final class CarbFill {
             if (l.equals("continue")) cont = true;
             if (l.equals("boost duration") || l.equals("ease-off duration")) durationBox = true;
         }
+        if (infoTitle && deliveredAgo) return Screen.INFO_POPUP;
+        if (infoTitle) return Screen.OTHER_DIALOG;
         if (addMeal && alerts && settings) return Screen.DRAWER;
         if (confirm) {
             if (carbsTitle && hasEditable) return Screen.CARBS_DIALOG;
@@ -111,6 +124,7 @@ final class CarbFill {
     static Step decide(Screen s, int backs, Kind kind, boolean hypoSelected, boolean hasAmount) {
         if (s == Screen.BUSY) return Step.ABORT_BUSY;
         if (s == Screen.OTHER_DIALOG) return Step.ABORT_OTHER_DIALOG;
+        if (s == Screen.INFO_POPUP) return Step.DISMISS_INFO;
         if (kind != Kind.MEAL) {
             switch (s) {
                 case HOME:
@@ -229,7 +243,8 @@ final class CarbFill {
         }
         // Right after a tap the next page is still animating in and looks unknown: give it a moment.
         boolean justTapped = r.lastStep == Step.OPEN_TAB || r.lastStep == Step.OPEN_CARBS
-                || r.lastStep == Step.OPEN_MENU || r.lastStep == Step.OPEN_ADD_MEAL || r.lastStep == Step.PICK_HYPO;
+                || r.lastStep == Step.OPEN_MENU || r.lastStep == Step.OPEN_ADD_MEAL || r.lastStep == Step.PICK_HYPO
+                || r.lastStep == Step.DISMISS_INFO;
         AccessibilityNodeInfo boxField = dialogField(root);
         Screen screen = classify(texts, boxField != null);
         AccessibilityNodeInfo amountBox = screen == Screen.ADD_MEAL ? amountField(root) : null;
@@ -261,6 +276,17 @@ final class CarbFill {
                 r.actions++;
                 r.lastAt = now;
                 tap(field);
+                break;
+            }
+            case DISMISS_INFO: {
+                AccessibilityNodeInfo close = closeButton(root);
+                if (close == null) {
+                    finish(c, r, false, "I couldn't find the close button on CamAPS's information popup", root);
+                    return;
+                }
+                r.actions++;
+                r.lastAt = now;
+                tap(close);
                 break;
             }
             case OPEN_MENU: {
@@ -455,6 +481,27 @@ final class CarbFill {
             if (!n.isVisibleToUser() || !n.isClickable()) continue;
             n.getBoundsInScreen(b);
             if (b.centerX() < r.left + r.width() * 0.22 && b.centerY() < r.top + r.height() * 0.14 && b.centerX() < bestX) {
+                best = n;
+                bestX = b.centerX();
+            }
+        }
+        return best;
+    }
+
+    /** The X of the "Information" popup: the rightmost clickable node on the title's row. */
+    static AccessibilityNodeInfo closeButton(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> all = new ArrayList<>();
+        flatten(root, all, 0);
+        AccessibilityNodeInfo title = byText(all, "Information");
+        if (title == null) return null;
+        Rect tb = new Rect(), b = new Rect();
+        title.getBoundsInScreen(tb);
+        AccessibilityNodeInfo best = null;
+        int bestX = Integer.MIN_VALUE;
+        for (AccessibilityNodeInfo n : all) {
+            if (!n.isVisibleToUser() || !n.isClickable()) continue;
+            n.getBoundsInScreen(b);
+            if (Math.abs(b.centerY() - tb.centerY()) <= tb.height() && b.centerX() > tb.centerX() && b.centerX() > bestX) {
                 best = n;
                 bestX = b.centerX();
             }

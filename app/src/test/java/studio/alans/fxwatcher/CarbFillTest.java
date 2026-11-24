@@ -139,6 +139,30 @@ public class CarbFillTest {
         assertEquals("only 6 Backs", CarbFill.Step.ABORT_LOST, CarbFill.decide(CarbFill.Screen.UNKNOWN, 6));
     }
 
+    // ---- the "delivered a while ago" information popup that blocked the first run ----
+
+    @Test
+    public void theDeliveredAgoPopupIsClosedWithItsXAndNothingElse() {
+        List<String> pop = t("Information", "1.9 U delivered 8 min ago.");
+        assertEquals(CarbFill.Screen.INFO_POPUP, CarbFill.classify(pop, false));
+        assertEquals(CarbFill.Step.DISMISS_INFO, CarbFill.decide(CarbFill.Screen.INFO_POPUP, 0));
+        assertEquals(CarbFill.Step.DISMISS_INFO, CarbFill.decide(CarbFill.Screen.INFO_POPUP, 0, CarbFill.Kind.LOW, false, false));
+        assertEquals(CarbFill.Screen.INFO_POPUP, CarbFill.classify(t("Information", "0.5 U delivered 1 h 12 min ago"), false));
+    }
+
+    @Test
+    public void anyOtherInformationPopupIsLeftAlone() {
+        assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Information", "Unable to connect to your pump."), false));
+        assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Information", "Very low level of insulin in reservoir."), false));
+        assertEquals(CarbFill.Screen.OTHER_DIALOG, CarbFill.classify(t("Information", "Sensor expired."), false));
+    }
+
+    @Test
+    public void aJustDeliveredPopupStillStopsEverything() {
+        assertEquals(CarbFill.Screen.BUSY, CarbFill.classify(t("Information", "Delivered 1.9 U of insulin."), false));
+        assertEquals(CarbFill.Screen.BUSY, CarbFill.classify(t("Delivery will start in 5 seconds"), false));
+    }
+
     // ---- the other screens CamAPS may have been left on (seen on Alan's phone) ----
 
     @Test
@@ -349,12 +373,12 @@ public class CarbFillTest {
         java.util.TreeSet<String> targets = new java.util.TreeSet<>();
         java.util.regex.Matcher tm = java.util.regex.Pattern.compile("\\btap\\((\\w+)\\)").matcher(code);
         while (tm.find()) if (!tm.group(1).equals("AccessibilityNodeInfo")) targets.add(tm.group(1));
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("field", "item", "menu", "radio")), targets);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("close", "field", "item", "menu", "radio")), targets);
         // the words looked up to find something to press or read: never Confirm, Continue, Deliver, Next or Cancel
         java.util.TreeSet<String> looked = new java.util.TreeSet<>();
         java.util.regex.Matcher bm = java.util.regex.Pattern.compile("byText\\(all, \"([^\"]+)\"\\)").matcher(code);
         while (bm.find()) looked.add(bm.group(1));
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal")), looked);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal", "Information")), looked);
         // the three option labels on the Add meal page are constants, and nothing else is looked up by a variable except those
         java.util.TreeSet<String> opts = new java.util.TreeSet<>();
         java.util.regex.Matcher om = java.util.regex.Pattern.compile("OPT_\\w+ = \"([^\"]+)\"").matcher(code);
