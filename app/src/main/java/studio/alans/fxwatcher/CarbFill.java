@@ -471,6 +471,7 @@ final class CarbFill {
     private static final class Plan {
         final List<Item> items;
         final boolean correction;
+        String key;
         int idx;
         final List<String> done = new ArrayList<>();
 
@@ -523,6 +524,11 @@ final class CarbFill {
      * one a meal if there is one, and stop at the first that fails. Returns a reason it did not start, or null.
      */
     static String runPlan(Context c, List<Item> items, boolean correction) {
+        return runPlan(c, items, correction, null);
+    }
+
+    /** key: the sender's idempotency key. A fresh run of it is recorded, and each finished step is added to that record. */
+    static String runPlan(Context c, List<Item> items, boolean correction, String key) {
         String bad = validatePlan(items);
         if (bad != null) return bad;
         for (Item it : items) {
@@ -531,6 +537,10 @@ final class CarbFill {
         }
         long now = System.currentTimeMillis();
         plan = new Plan(new ArrayList<>(items), correction);
+        if (PlanRuns.validKey(key)) {
+            plan.key = key;
+            Store.p(c).edit().putString(Store.CARB_RUNS, PlanRuns.start(Store.p(c).getString(Store.CARB_RUNS, ""), key, now)).apply();
+        }
         Item first = items.get(0);
         req = new Req(first.amount, first.label, first.kind, correction, now + TTL_MS);
         StringBuilder sb = new StringBuilder();
@@ -978,6 +988,10 @@ final class CarbFill {
         if (!ok && root != null) Store.logCam(c, "Carbs for CamAPS: the screen was:" + dump(root));
         Store.logCam(c, ok ? "Carbs for CamAPS: " + describe(new Item(r.kind, r.grams, r.label)) + " done" + (r.correction ? ", with glucose" : "")
                 : "Carbs for CamAPS: stopped, " + problem);
+        if (ok && p != null && p.key != null) {
+            Store.p(c).edit().putString(Store.CARB_RUNS, PlanRuns.stepDone(Store.p(c).getString(Store.CARB_RUNS, ""), p.key,
+                    System.currentTimeMillis(), r.kind.name(), p.idx + 1 >= p.items.size())).apply();
+        }
         if (ok && p != null && p.idx + 1 < p.items.size()) {
             // the next step of the plan carries on in the same CamAPS window
             p.done.add(describe(new Item(r.kind, r.grams, r.label)));
