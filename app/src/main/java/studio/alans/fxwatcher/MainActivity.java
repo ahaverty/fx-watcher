@@ -282,6 +282,23 @@ public class MainActivity extends Activity {
                 "Plus 10 s for each unit. Starts when the delivery countdown shows. 0 turns it off.",
                 p.getInt(Store.DELIVERY_FAST_SEC, Store.DEF_DELIVERY_FAST_SEC), false);
 
+        section("Carbs for CamAPS", "carbs", false);
+        cur.addView(text("Tap an amount (here or on the home-screen widget) and FX Watcher opens CamAPS, goes to the "
+                + "bolus calculator and types the carbs into its Carbohydrates box. Then it stops and tells you. "
+                + "YOU check the number, tap Confirm and deliver. It never taps Confirm or Deliver, only types "
+                + "whole grams from 1 to 150, and gives up after 60 seconds, 8 steps or anything it does not "
+                + "recognise. Needs the CamAPS screen reader on. Off by default.", 14));
+        CheckBox carbFill = box("Let FX Watcher fill the carbs into CamAPS when I tap an amount",
+                p.getBoolean(Store.CARB_FILL, false));
+        EditText carbPresets = field("Quick amounts (grams, separated by commas)", "Up to 6 show on the widget after any plan "
+                + "from Meal Log. Whole grams from 1 to 150.", p.getString(Store.CARB_PRESETS, CarbOptions.DEFAULT_PRESETS));
+        for (CarbOptions.Option o : CarbWidget.options(this)) {
+            cur.addView(button((o.plan ? "Plan: " : "") + o.label, () -> {
+                String no = CarbFill.request(this, o.grams, o.label);
+                if (no != null) Toast.makeText(this, no, Toast.LENGTH_LONG).show();
+            }));
+        }
+
         section("Calm view", "calm", false);
         cur.addView(text("One word for how things are: steady, handled, check, low soon or treating. The "
                 + "status notification has no glucose number and is not shown at all while things are steady. "
@@ -434,6 +451,8 @@ public class MainActivity extends Activity {
                     .putInt(Store.MISSED_BOLUS_MIN, intOf(missedBolus, Store.DEF_MISSED_BOLUS_MIN))
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
                     .putBoolean(Store.CALM_ON, calmOn.isChecked())
+                    .putBoolean(Store.CARB_FILL, carbFill.isChecked())
+                    .putString(Store.CARB_PRESETS, CarbOptions.joinPresets(CarbOptions.parsePresets(carbPresets.getText().toString())))
                     .putBoolean(Store.SERVER_ON, serverOn.isChecked())
                     .putBoolean(Store.GARMIN_PUSH, garminPush.isChecked())
                     .putBoolean(Store.NIGHT_WATCH, nightWatch.isChecked())
@@ -480,6 +499,7 @@ public class MainActivity extends Activity {
             Store.log(this, "Settings saved");
             CalmServer.sync(this);
             GarminPush.sync(this);
+            CarbWidget.update(this);
             Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         }));
 

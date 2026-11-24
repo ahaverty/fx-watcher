@@ -63,6 +63,9 @@ final class Store {
     static final String LOWWARN_MODE = "lowwarn_mode";          // off / calm / balanced / early
     static final String LOWWARN_TRACKER = "lowwarn_tracker";    // LowWarning.Tracker state
     static final String LOWWARN_JOURNAL = "lowwarn_journal";    // every warning and what came of it
+    static final String CARB_FILL = "carbfill_on";              // fill carbs into CamAPS's calculator when tapped (default OFF)
+    static final String CARB_PRESETS = "carb_presets";          // "10,15,20,30,45,60"
+    static final String CARB_PLAN = "carb_plan";                // plan amounts an app sent (CarbOptions.Plan)
     static final String GARMIN_PUSH = "garmin_push";            // push the calm state to the watch face (default on)
     static final String NIGHT_WATCH = "lowwarn_night";          // at night also watch slow falls (default off)
     static final String SERVER_ON = "server_on";                // 127.0.0.1 state.json for the watch (default on)

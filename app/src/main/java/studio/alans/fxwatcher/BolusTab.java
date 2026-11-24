@@ -78,9 +78,21 @@ public final class BolusTab extends BroadcastReceiver {
             Store.log(c, "Couldn't find CamAPS's Bolus tab. Tabs: " + tabLabels(root));
             return;
         }
-        boolean ok = target.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        boolean ok = click(target);
         Store.log(c, (ok ? "Opened CamAPS's Bolus tab" : "Couldn't open CamAPS's Bolus tab")
                 + " (asked by an app, found by " + how + "). Tabs: " + tabLabels(root));
+    }
+
+    /** The one tap this file makes. */
+    private static boolean click(AccessibilityNodeInfo target) {
+        return target.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+    }
+
+    /** For CarbFill, on a request you just made: tap the Bolus tab once if CamAPS's home is showing. */
+    static boolean openTab(AccessibilityNodeInfo root) {
+        AccessibilityNodeInfo t = byLabel(root);
+        if (t == null) t = middleTab(root);
+        return t != null && click(t);
     }
 
     /** A visible, unselected tab described as the bolus / meal tab, or its clickable parent. */

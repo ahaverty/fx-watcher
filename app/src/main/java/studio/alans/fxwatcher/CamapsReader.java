@@ -87,6 +87,7 @@ public class CamapsReader extends AccessibilityService {
             List<String> texts = new ArrayList<>();
             for (Item it : items) texts.add(it.text);
             BolusTab.maybeTap(this, root, texts);   // only acts if turned on and an app just asked
+            CarbFill.maybeAct(this, this, root, texts);   // only acts for a request you made in the last minute
             onScreen(items);
         } catch (Exception ex) {
             Log.w(TAG, "event", ex);

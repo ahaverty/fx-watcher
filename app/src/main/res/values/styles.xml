@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="CarbButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_margin">3dp</item>
+        <item name="android:background">@drawable/carb_btn_bg</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+</resources>

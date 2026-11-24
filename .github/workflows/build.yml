@@ -22,19 +22,32 @@ jobs:
         with:
           gradle-version: '8.7'
       - name: CamAPS stays read-only
-        # FX Watcher must never act on CamAPS (it runs an insulin pump): no accessibility
-        # actions, gestures or text input anywhere in the app.
+        # FX Watcher must never act on CamAPS (it runs an insulin pump): no accessibility actions,
+        # gestures or text input anywhere in the app, except the two opt-in files below.
         run: |
-          if grep -rnE "performAction|dispatchGesture|performGlobalAction|ACTION_SET_TEXT|ACTION_CLICK|canPerformGestures=\"true\"|flagRequestFilterKeyEvents|flagRequestTouchExploration" app/src/main --exclude=BolusTab.java; then
+          if grep -rnE "performAction|dispatchGesture|performGlobalAction|ACTION_SET_TEXT|ACTION_CLICK|canPerformGestures=\"true\"|flagRequestFilterKeyEvents|flagRequestTouchExploration" app/src/main --exclude=BolusTab.java --exclude=CarbFill.java; then
             echo "::error::An acting accessibility API appeared in the source. FX Watcher must stay read-only."
             exit 1
           fi
-          # The one opt-in exception: BolusTab taps the Bolus tab, once, and does nothing else.
+          # Opt-in 1: BolusTab taps the Bolus tab, once, and does nothing else.
           f=app/src/main/java/studio/alans/fxwatcher/BolusTab.java
           if grep -nE "dispatchGesture|performGlobalAction|ACTION_SET_TEXT|ACTION_SCROLL|ACTION_PASTE" "$f" \
               || [ "$(grep -c 'performAction(' "$f")" != 1 ] \
               || [ "$(grep -c 'performAction(AccessibilityNodeInfo.ACTION_CLICK)' "$f")" != 1 ]; then
             echo "::error::BolusTab may only make its one ACTION_CLICK on the Bolus tab."
+            exit 1
+          fi
+          # Opt-in 2: CarbFill (after your tap on an amount) may click the Carbs field once, set the text of
+          # the Carbohydrates box once, and press Back once. Nothing else: no gestures, no scroll, no paste,
+          # no other global action, and it must not name Confirm or Deliver as something to press.
+          g=app/src/main/java/studio/alans/fxwatcher/CarbFill.java
+          if grep -nE "dispatchGesture|ACTION_SCROLL|ACTION_PASTE|ACTION_LONG_CLICK|GLOBAL_ACTION_(HOME|RECENTS|NOTIFICATIONS|QUICK|POWER|LOCK|TAKE)" "$g" \
+              || [ "$(grep -c 'performAction(' "$g")" != 2 ] \
+              || [ "$(grep -c 'performAction(AccessibilityNodeInfo.ACTION_CLICK)' "$g")" != 1 ] \
+              || [ "$(grep -c 'performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)' "$g")" != 1 ] \
+              || [ "$(grep -c 'performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)' "$g")" != 1 ] \
+              || [ "$(grep -c 'performGlobalAction(' "$g")" != 1 ]; then
+            echo "::error::CarbFill may only click the Carbs field, type into the Carbohydrates box, and press Back."
             exit 1
           fi
       - name: Signing key
