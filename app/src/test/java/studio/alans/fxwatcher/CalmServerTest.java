@@ -116,4 +116,14 @@ public class CalmServerTest {
             server.stop();
         }
     }
+
+    @Test
+    public void historyIsServedOnlyWhenGivenAndStaysReadOnly() {
+        assertTrue(text(CalmServer.respond("GET /history.json HTTP/1.1", () -> JSON)).startsWith("HTTP/1.1 404"));
+        String r = text(CalmServer.respond("GET /history.json HTTP/1.1", () -> JSON, () -> "{\"h\":[]}"));
+        assertTrue(r.startsWith("HTTP/1.1 200"));
+        assertTrue(r.endsWith("{\"h\":[]}"));
+        assertTrue(text(CalmServer.respond("POST /history.json HTTP/1.1", () -> JSON, () -> "{}")).startsWith("HTTP/1.1 405"));
+        assertTrue(text(CalmServer.respond("GET /history HTTP/1.1", () -> JSON, () -> "{}")).startsWith("HTTP/1.1 404"));
+    }
 }

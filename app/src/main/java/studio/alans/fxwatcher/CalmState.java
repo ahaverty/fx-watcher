@@ -256,6 +256,44 @@ final class CalmState {
                 glucose < 0 ? "null" : String.format(Locale.US, "%.1f", glucose), trend, ageMin, updated / 1000);
     }
 
+    /** Slots in the history: 6 hours at 5 minutes. */
+    static final int HIST_SLOTS = 72;
+
+    /**
+     * What the watch's chart reads (GET /history.json): "end" the newest reading's time in seconds, "h" the last
+     * 6 hours in 5 minute slots oldest first as tenths of mmol/L (-1 where there was no reading), "slope" mmol/L
+     * per minute times 1000 from the same 20 min fit as the trend word (0 when unknown), and "lowin" the minutes
+     * until 3.9 if it keeps going at that rate (-1 when not falling, already low, or more than 10 hours off).
+     */
+    static String historyJson(List<double[]> readings, long now) {
+        if (readings == null || readings.isEmpty()) return "{\"end\":0,\"h\":[],\"slope\":0,\"lowin\":-1}";
+        double[] newest = readings.get(readings.size() - 1);
+        long end = (long) newest[0];
+        StringBuilder sb = new StringBuilder("{\"end\":").append(end / 1000).append(",\"h\":[");
+        for (int i = 0; i < HIST_SLOTS; i++) {
+            long slot = end - (long) (HIST_SLOTS - 1 - i) * 5 * MIN;
+            int v = -1;
+            long best = 150_000L;                                   // within 2.5 minutes of the slot
+            for (double[] r : readings) {
+                long d = Math.abs((long) r[0] - slot);
+                if (d <= best) {
+                    best = d;
+                    v = (int) Math.round(r[1] * 10);
+                }
+            }
+            if (i > 0) sb.append(',');
+            sb.append(v);
+        }
+        double s = slope(readings, now);
+        long slopeMilli = Double.isNaN(s) ? 0 : Math.round(s * 1000);
+        int lowIn = -1;
+        if (!Double.isNaN(s) && s <= -0.005 && newest[1] > LOW) {
+            long m = Math.round((newest[1] - LOW) / -s);
+            if (m <= 600) lowIn = (int) m;
+        }
+        return sb.append("],\"slope\":").append(slopeMilli).append(",\"lowin\":").append(lowIn).append('}').toString();
+    }
+
     /** The same fields as the json, as a map for the Garmin push. */
     static java.util.Map<String, Object> message(Result r, double glucose, String trend, long glucoseAt, long now) {
         java.util.Map<String, Object> m = new java.util.HashMap<>();

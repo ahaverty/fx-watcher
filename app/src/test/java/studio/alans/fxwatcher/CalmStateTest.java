@@ -359,4 +359,28 @@ public class CalmStateTest {
         assertEquals("under 3.9 still says take 10 g", CalmState.LOW_SOON, CalmState.compute(low).state);
         assertTrue(CalmState.compute(low).text.contains("take 10 g"));
     }
+
+    @Test
+    public void historyJsonHasSlotsSlopeAndMinutesToLow() {
+        List<double[]> r = series(10.0, -0.04, 120);                   // 10.0 down to 5.2 over 2 h
+        String j = CalmState.historyJson(r, NOW);
+        assertTrue(j.startsWith("{\"end\":" + (NOW / 1000) + ",\"h\":["));
+        String h = j.substring(j.indexOf('[') + 1, j.indexOf(']'));
+        String[] v = h.split(",");
+        assertEquals(CalmState.HIST_SLOTS, v.length);
+        assertEquals("the newest slot is the newest reading", String.valueOf(Math.round(r.get(r.size() - 1)[1] * 10)), v[v.length - 1]);
+        assertEquals("before the first reading there is nothing", "-1", v[0]);
+        int sl = Integer.parseInt(j.substring(j.indexOf("\"slope\":") + 8, j.indexOf(",\"lowin\"")));
+        assertTrue("slope " + sl, sl <= -35 && sl >= -45);
+        int lowin = Integer.parseInt(j.substring(j.indexOf("\"lowin\":") + 8, j.length() - 1));
+        double g = r.get(r.size() - 1)[1];
+        assertEquals((g - 3.9) / 0.04, lowin, 5.0);
+    }
+
+    @Test
+    public void historyJsonSaysNoLowWhenFlatOrRisingOrEmpty() {
+        assertTrue(CalmState.historyJson(series(6.0, 0.0, 60), NOW).endsWith("\"lowin\":-1}"));
+        assertTrue(CalmState.historyJson(series(5.0, 0.04, 60), NOW).endsWith("\"lowin\":-1}"));
+        assertEquals("{\"end\":0,\"h\":[],\"slope\":0,\"lowin\":-1}", CalmState.historyJson(new ArrayList<double[]>(), NOW));
+    }
 }

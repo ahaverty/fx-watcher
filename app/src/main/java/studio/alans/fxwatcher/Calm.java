@@ -167,6 +167,12 @@ final class Calm {
         refresh(c);
     }
 
+    /** What the watch's chart reads: the last 6 hours and the rate. */
+    static String history(Context c) {
+        long now = System.currentTimeMillis();
+        return CalmState.historyJson(input(c, now).readings, now);
+    }
+
     /** What the watch and widget read, worked out now (so age_min is right when it is asked for). */
     static String json(Context c) {
         long now = System.currentTimeMillis();
