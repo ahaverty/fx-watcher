@@ -99,22 +99,37 @@ class NumberSeries {
         return TEAL;
     }
 
-    // The one sentence and its colour: [text, colour, showsRate].
+    // The one sentence, its colour, and a shorter form for the glance: [text, colour, short].
     static function message(g, trend, ageMin) {
         if (g < LOW) {
-            return ["Low now", PURPLE];
+            return ["Low now", PURPLE, "Low now"];
         }
         var m = lowIn(ageMin);
         if (m != null && m <= 90) {
             if (m < 3) {
-                return ["Low very soon", PURPLE];
+                return ["Low very soon", PURPLE, "Low soon"];
             }
-            return ["Low in about " + (((m + 2) / 5) * 5).format("%d") + " min", PURPLE];
+            var n = (((m + 2) / 5) * 5).format("%d");
+            return ["Low in about " + n + " min", PURPLE, "Low in " + n + " min"];
         }
-        if (trend != null && trend.equals("rising")) {
-            return ["Heading up", TEAL];
+        var s = slope();
+        if (g > 10.0) {
+            if (s != null && s <= -0.02) { return ["High, coming down", AMBER, "High, easing"]; }
+            if (s != null && s >= 0.02) { return ["High and rising", AMBER, "High, rising"]; }
+            return ["High", AMBER, "High"];
         }
-        return ["No low expected", TEAL];
+        if (s != null && s >= 0.02) {
+            var up = (10.0 - g) / s;
+            if (up <= 90) {
+                var k = (((up.toNumber() + 2) / 5) * 5).format("%d");
+                return ["High in about " + k + " min", AMBER, "High in " + k + " min"];
+            }
+            return ["Heading up", TEAL, "Rising"];
+        }
+        if (s != null && s <= -0.02) {
+            return ["Easing down", TEAL, "Easing down"];
+        }
+        return ["Steady in range", TEAL, "In range"];
     }
 
     static function rateText() {
@@ -150,34 +165,10 @@ class NumberGlance extends WatchUi.GlanceView {
         try {
             var m = NumberSeries.message(d[:glucose], d[:trend], d[:minutes]);
             dc.setColor(m[1], Graphics.COLOR_TRANSPARENT);
-            dc.drawText(0, h * 0.74, Graphics.FONT_GLANCE, m[0],
+            dc.drawText(0, h * 0.74, Graphics.FONT_GLANCE, m[2],
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            spark(dc, w, h);
         } catch (ex) {
             // the number above is enough if the history is odd
-        }
-    }
-
-    // The last hour as small dots on the right.
-    function spark(dc, w, h) {
-        var pts = NumberSeries.points();
-        if (pts == null || pts.size() < 2) { return; }
-        var x0 = w * 0.62;
-        var x1 = w - 4;
-        var y0 = h * 0.12;
-        var y1 = h * 0.88;
-        dc.setColor(NumberSeries.BAND, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(x0, y0 + (y1 - y0) * (12.0 - 10.0) / 10.0, x1 - x0, (y1 - y0) * (10.0 - 3.9) / 10.0);
-        for (var i = 0; i < pts.size(); i++) {
-            var t = pts[i][0];
-            if (t < -60) { continue; }
-            var v = pts[i][1];
-            if (v < 2.0) { v = 2.0; }
-            if (v > 12.0) { v = 12.0; }
-            var x = x0 + (t + 60) / 60.0 * (x1 - x0);
-            var y = y1 - (v - 2.0) / 10.0 * (y1 - y0);
-            dc.setColor(NumberSeries.colour(pts[i][1]), Graphics.COLOR_TRANSPARENT);
-            dc.fillCircle(x, y, 2);
         }
     }
 }
@@ -267,8 +258,8 @@ class WidgetNumberView extends WatchUi.View {
         var future = 30;
         var left = w * 0.12;
         var right = w * 0.88;
-        var top = h * 0.32;
-        var bottom = h * 0.64;
+        var top = h * 0.31;
+        var bottom = h * 0.56;
         var pts = NumberSeries.points();
         if (pts != null && pts.size() > 1) {
             // the target band and the low line
@@ -322,8 +313,15 @@ class WidgetNumberView extends WatchUi.View {
 
         var m = NumberSeries.message(g, d[:trend], d[:minutes]);
         dc.setColor(m[1], Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, h * 0.77, Graphics.FONT_SMALL, m[0], Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        legend(dc, w, h * 0.90);
+        dc.drawText(w / 2, h * 0.725, fitFont(dc, m[0], w * 0.82), m[0], Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        legend(dc, w, h * 0.865);
+    }
+
+    // The biggest of three sizes the text fits in.
+    function fitFont(dc, text, maxW) {
+        if (dc.getTextWidthInPixels(text, Graphics.FONT_SMALL) <= maxW) { return Graphics.FONT_SMALL; }
+        if (dc.getTextWidthInPixels(text, Graphics.FONT_TINY) <= maxW) { return Graphics.FONT_TINY; }
+        return Graphics.FONT_XTINY;
     }
 
     function yOf(v, top, bottom) {
@@ -350,25 +348,21 @@ class WidgetNumberView extends WatchUi.View {
         }
     }
 
-    // low, in range, high, and the dashed trend line, centred.
+    // low, in range, high, centred.
     function legend(dc, w, y) {
-        var labels = ["low", "in range", "high", "trend"];
-        var colours = [NumberSeries.PURPLE, NumberSeries.TEAL, NumberSeries.AMBER, 0xBBBBBB];
+        var labels = ["low", "in range", "high"];
+        var colours = [NumberSeries.PURPLE, NumberSeries.TEAL, NumberSeries.AMBER];
         var total = 0;
         var widths = [];
-        for (var i = 0; i < 4; i++) {
+        for (var i = 0; i < 3; i++) {
             var tw = dc.getTextWidthInPixels(labels[i], Graphics.FONT_XTINY);
             widths.add(tw);
             total += 10 + tw + 12;
         }
         var x = (w - total) / 2 + 4;
-        for (var i = 0; i < 4; i++) {
+        for (var i = 0; i < 3; i++) {
             dc.setColor(colours[i], Graphics.COLOR_TRANSPARENT);
-            if (i == 3) {
-                dc.drawLine(x, y, x + 8, y);
-            } else {
-                dc.fillCircle(x + 3, y, 3);
-            }
+            dc.fillCircle(x + 3, y, 3);
             dc.setColor(0xAAAAAA, Graphics.COLOR_TRANSPARENT);
             dc.drawText(x + 10, y, Graphics.FONT_XTINY, labels[i], Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             x += 10 + widths[i] + 12;

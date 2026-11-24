@@ -419,14 +419,25 @@ final class CarbFill {
         return out;
     }
 
+    /**
+     * The step in CamAPS's own words, so it can't be mistaken for something else: the meal kind is the BOLUS
+     * CALCULATOR's carbs (only filled in, nothing is recorded or delivered until you tap Next and Deliver), never
+     * Add meal. The Add meal entries and Boost / Ease-off are recorded by CamAPS as soon as they are confirmed.
+     */
     static String describe(Item it) {
         switch (it.kind) {
-            case LOW: return "low treatment " + it.amount + " g";
-            case SLOW: return "slow meal " + it.amount + " g";
-            case BOOST: return "Boost " + minutesText(it.amount);
-            case EASE: return "Ease-off " + minutesText(it.amount);
-            default: return "meal " + it.amount + " g";
+            case LOW: return "Add meal \u203a Hypoglycaemia treatment, " + it.amount + " g";
+            case SLOW: return "Add meal \u203a Slowly absorbed meal, " + it.amount + " g";
+            case BOOST: return "Boost, " + minutesText(it.amount) + ", starting now";
+            case EASE: return "Ease-off, " + minutesText(it.amount) + ", starting now";
+            default: return "Bolus calculator, carbs " + it.amount + " g";
         }
+    }
+
+    /** What CamAPS does with the step once it is confirmed. */
+    static String effect(Item it) {
+        return it.kind == Kind.MEAL ? "only filled in, nothing is recorded"
+                : isMode(it.kind) ? "starts as soon as it is confirmed" : "recorded by CamAPS as soon as it is confirmed";
     }
 
     static String minutesText(int m) {
@@ -1377,9 +1388,11 @@ final class CarbFill {
         String title, text;
         if (ok) {
             boolean meal = last.kind == Kind.MEAL;
-            title = meal ? "Meal ready in CamAPS" : "Done in CamAPS";
-            text = (done.length() > 0 ? "Done: " + done + ", " + lastDesc + ". " : lastDesc.substring(0, 1).toUpperCase(Locale.UK) + lastDesc.substring(1) + " is in. ")
-                    + (meal ? (last.correction ? "The glucose is confirmed too. " : "") + "Review the bolus screen, then tap Next and Deliver yourself." : "");
+            title = meal ? "Bolus calculator ready in CamAPS" : "Done in CamAPS";
+            text = (done.length() > 0 ? "Done: " + done + ". Then " : "")
+                    + (done.length() > 0 ? lastDesc : lastDesc.substring(0, 1).toUpperCase(Locale.UK) + lastDesc.substring(1)) + ". "
+                    + (meal ? (last.correction ? "Glucose is confirmed too, so CamAPS adds a correction. " : "")
+                    + "Review it, then tap Next and Deliver yourself." : "");
         } else {
             title = "Not finished in CamAPS";
             text = "Couldn't finish " + lastDesc + ": " + problem + ". "

@@ -45,19 +45,19 @@ public class CarbPlanActivity extends Activity {
         final String k = key;
         AlertDialog.Builder d = new AlertDialog.Builder(this).setOnCancelListener(dlg -> finish());
         if (earlier == null) {
-            d.setTitle("Run in CamAPS?").setMessage(steps(items))
+            d.setTitle("Run in CamAPS?").setMessage(steps(items, correction))
                     .setPositiveButton("Run", (dlg, w) -> start(items, correction, k))
                     .setNegativeButton("Cancel", (dlg, w) -> finish());
         } else {
             String when = new SimpleDateFormat("HH:mm", Locale.UK).format(new Date(earlier.at));
             List<CarbFill.Item> left = PlanRuns.remaining(items, earlier);
             if (earlier.complete || left.isEmpty()) {
-                d.setTitle("Already run at " + when).setMessage("This plan was already run in CamAPS.\n\n" + steps(items)
+                d.setTitle("Already run at " + when).setMessage("This plan was already run in CamAPS.\n\n" + steps(items, correction)
                                 + "\nRunning it again would repeat every step.")
                         .setPositiveButton("Cancel", (dlg, w) -> finish())
                         .setNegativeButton("Run it all again", (dlg, w) -> start(items, correction, k));
             } else {
-                d.setTitle("Started at " + when + ", not finished").setMessage("Done: " + doneText(items, earlier) + "\n\nLeft to do:\n" + steps(left))
+                d.setTitle("Started at " + when + ", not finished").setMessage("Done: " + doneText(items, earlier) + "\n\nLeft to do:\n" + steps(left, correction))
                         .setPositiveButton("Run the rest", (dlg, w) -> start(left, correction, k))
                         .setNeutralButton("Cancel", (dlg, w) -> finish())
                         .setNegativeButton("Run it all again", (dlg, w) -> start(items, correction, k));
@@ -78,15 +78,18 @@ public class CarbPlanActivity extends Activity {
         return sb.length() == 0 ? "nothing" : sb.toString();
     }
 
-    private static String steps(List<CarbFill.Item> items) {
+    private static String steps(List<CarbFill.Item> items, boolean correction) {
         StringBuilder sb = new StringBuilder();
         int n = 1;
+        boolean records = false;
         for (CarbFill.Item it : items) {
-            String d = CarbFill.describe(it);
-            sb.append(n++).append(". ").append(d.substring(0, 1).toUpperCase(Locale.UK)).append(d.substring(1)).append('\n');
+            sb.append(n++).append(". ").append(CarbFill.describe(it)).append('\n').append("    ").append(CarbFill.effect(it)).append('\n');
+            if (it.kind != CarbFill.Kind.MEAL) records = true;
         }
         boolean meal = items.get(items.size() - 1).kind == CarbFill.Kind.MEAL;
-        sb.append(meal ? "\nIt stops on the bolus screen. You tap Next and Deliver." : "\nNothing else is delivered.");
+        if (meal && correction) sb.append("\nGlucose is confirmed too, so CamAPS adds a correction.\n");
+        if (records) sb.append("\nAdd meal and Boost entries can't be undone once confirmed.");
+        sb.append(meal ? "\nThe bolus calculator is only filled in: you tap Next and Deliver." : "");
         return sb.toString();
     }
 }
