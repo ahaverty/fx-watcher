@@ -77,6 +77,18 @@ public class CarbFillTest {
         assertFalse(stale.get(0).plan);
     }
 
+    @Test
+    public void amountsAreColouredBySize() {
+        assertEquals(0, CarbOptions.band(10));
+        assertEquals(0, CarbOptions.band(15));
+        assertEquals(1, CarbOptions.band(16));
+        assertEquals(1, CarbOptions.band(30));
+        assertEquals(2, CarbOptions.band(31));
+        assertEquals(2, CarbOptions.band(50));
+        assertEquals(3, CarbOptions.band(51));
+        assertEquals(3, CarbOptions.band(150));
+    }
+
     // ---- which CamAPS screen is it ----
 
     private static List<String> t(String... s) {

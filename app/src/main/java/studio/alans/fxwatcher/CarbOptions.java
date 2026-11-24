@@ -145,6 +145,17 @@ final class CarbOptions {
         return out.size() > SLOTS ? out.subList(0, SLOTS) : out;
     }
 
+    /**
+     * The size band of an amount, for the widget's colour: 0 small (up to 15 g, the hypo-treatment sizes),
+     * 1 snack (16 to 30), 2 meal (31 to 50), 3 big (over 50). Pure, so it is tested.
+     */
+    static int band(int grams) {
+        if (grams <= 15) return 0;
+        if (grams <= 30) return 1;
+        if (grams <= 50) return 2;
+        return 3;
+    }
+
     static String describe(int grams) {
         return String.format(Locale.UK, "%d g", grams);
     }

@@ -19,6 +19,28 @@ public class CarbWidget extends AppWidgetProvider {
 
     private static final int[] SLOTS = {R.id.carb_1, R.id.carb_2, R.id.carb_3, R.id.carb_4, R.id.carb_5, R.id.carb_6};
 
+    private static final int[] BANDS = {R.drawable.carb_btn_small, R.drawable.carb_btn_snack, R.drawable.carb_btn_meal, R.drawable.carb_btn_big};
+
+    /** The number big, "g" small under it; the plan's button says PLAN first. */
+    static CharSequence face(CarbOptions.Option o) {
+        String num = String.valueOf(o.grams);
+        String top = o.plan ? o.label.substring(0, o.label.lastIndexOf(' ', o.label.length() - 3)).toUpperCase(java.util.Locale.UK) + "\n" : "";
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+        if (!top.isEmpty()) {
+            int a = sb.length();
+            sb.append(top);
+            sb.setSpan(new android.text.style.RelativeSizeSpan(0.55f), a, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        int n0 = sb.length();
+        sb.append(num);
+        sb.setSpan(new android.text.style.RelativeSizeSpan(1.7f), n0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), n0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        int g0 = sb.length();
+        sb.append("\ng");
+        sb.setSpan(new android.text.style.RelativeSizeSpan(0.6f), g0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return sb;
+    }
+
     @Override
     public void onUpdate(Context c, AppWidgetManager mgr, int[] ids) {
         push(c, mgr, ids);
@@ -59,7 +81,9 @@ public class CarbWidget extends AppWidgetProvider {
             if (s < opts.size()) {
                 CarbOptions.Option o = opts.get(s);
                 v.setViewVisibility(SLOTS[s], android.view.View.VISIBLE);
-                v.setTextViewText(SLOTS[s], o.label);
+                v.setTextViewText(SLOTS[s], face(o));
+                v.setInt(SLOTS[s], "setBackgroundResource", o.plan ? R.drawable.carb_btn_plan : BANDS[CarbOptions.band(o.grams)]);
+                v.setTextColor(SLOTS[s], o.plan || CarbOptions.band(o.grams) >= 2 ? 0xFFFFFFFF : 0xFF1B1B1B);
                 v.setOnClickPendingIntent(SLOTS[s], tap(c, o, s));
             } else {
                 v.setViewVisibility(SLOTS[s], android.view.View.GONE);
