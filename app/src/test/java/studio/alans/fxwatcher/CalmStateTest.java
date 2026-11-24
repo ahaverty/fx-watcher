@@ -304,4 +304,22 @@ public class CalmStateTest {
             assertFalse(t, t.contains("—") || t.contains("–"));
         }
     }
+
+    @Test
+    public void fallingUnderFourPointFiveIsLowSoonEvenWithoutAWarning() {
+        // 4.5 down to 3.9 over 20 min is 0.03/min: the glance says falling, the buzz rule (0.05) does not fire
+        CalmState.Result r = CalmState.compute(input(series(4.5, -0.03, 20)));
+        assertEquals(CalmState.LOW_SOON, r.state);
+    }
+
+    @Test
+    public void steadyOrRisingNearALowStaysSteady() {
+        assertEquals(CalmState.STEADY, CalmState.compute(input(series(4.2, 0.0, 20))).state);
+        assertEquals(CalmState.STEADY, CalmState.compute(input(series(3.9, 0.05, 20))).state);
+    }
+
+    @Test
+    public void fallingAboveFourPointFiveIsStillSteady() {
+        assertEquals(CalmState.STEADY, CalmState.compute(input(series(7.0, -0.03, 20))).state);
+    }
 }

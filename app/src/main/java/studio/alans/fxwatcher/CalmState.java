@@ -162,6 +162,12 @@ final class CalmState {
         boolean low = !r.stale && in.glucose < LOW;
         if (low) return set(r, LOW_SOON, "Low: take 10 g of fast carbs");
         if (in.lowSoon) return set(r, LOW_SOON, "Low coming: take 10 g");
+        // Near a low and falling by the glance's own definition: never "Steady", whatever the buzz rule decided
+        // (24 Nov 2026: 3.9 and "falling" on the watch glance, "Steady" on the face).
+        if (!r.stale && in.glucose < LowWarning.FLOOR_BELOW) {
+            double fall = slope(in.readings, in.now);
+            if (!Double.isNaN(fall) && fall <= -NudgeRules.TREND_DELTA / 15.0 + 1e-9) return set(r, LOW_SOON, "Falling near low: take 10 g");
+        }
         if (loopOff(in)) {
             r.nudge = NUDGE_LOOP;
             r.showOpenCamaps = true;
