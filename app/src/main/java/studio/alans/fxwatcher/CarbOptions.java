@@ -22,6 +22,8 @@ final class CarbOptions {
     static final int LOW_MIN_G = 5, LOW_MAX_G = 30, LOW_DEFAULT_G = 15;
     static final int[] LOW_CHIPS = {10, 15, 20};
     static final long PLAN_TTL_MS = 2 * 3_600_000L;
+    /** Boost and Ease-off run from 15 minutes to 6 hours, in steps of 5 minutes. */
+    static final int MODE_MIN = 15, MODE_MAX = 360;
     static final int SLOTS = 6, MAX_PLAN_ITEMS = 2, MAX_PRESETS = 12;
 
     /** A whole number of grams from 1 to 150: the only thing that is ever typed into CamAPS. */
@@ -33,6 +35,7 @@ final class CarbOptions {
     static boolean validFor(CarbFill.Kind kind, int grams) {
         if (kind == CarbFill.Kind.LOW) return validLow(grams);
         if (kind == CarbFill.Kind.SLOW) return grams >= STEP_MIN && grams <= STEP_MAX;
+        if (CarbFill.isMode(kind)) return grams >= MODE_MIN && grams <= MODE_MAX && grams % 5 == 0;
         return valid(grams);
     }
 

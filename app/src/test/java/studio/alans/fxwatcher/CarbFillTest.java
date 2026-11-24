@@ -2,6 +2,7 @@ package studio.alans.fxwatcher;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -182,9 +183,12 @@ public class CarbFillTest {
     @Test
     public void aHalfEnteredBoostOrGlucoseBoxIsCancelledWithBack() {
         List<String> boost = t("Boost duration", "00", "Hrs", "00", "Mins", "Cancel", "Next");
-        assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(boost, true));
+        assertEquals(CarbFill.Screen.MODE_DURATION, CarbFill.classify(boost, true));
+        // a meal or Add meal request that meets a half-entered Boost box backs out of it
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.MODE_DURATION, 0));
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.MODE_DURATION, 0, CarbFill.Kind.SLOW, false, false));
+        assertEquals(CarbFill.Screen.MODE_DURATION, CarbFill.classify(t("Ease-off duration", "Cancel", "Next"), true));
         assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.ENTRY_DIALOG, 0));
-        assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(t("Ease-off duration", "Cancel", "Next"), true));
         assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(t("Glucose", "Value", "mmol/L", "Cancel", "Confirm"), true));
     }
 
@@ -381,18 +385,24 @@ public class CarbFillTest {
         java.util.TreeSet<String> targets = new java.util.TreeSet<>();
         java.util.regex.Matcher tm = java.util.regex.Pattern.compile("\\btap\\((\\w+)\\)").matcher(code);
         while (tm.find()) if (!tm.group(1).equals("AccessibilityNodeInfo")) targets.add(tm.group(1));
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("close", "field", "glucose", "item", "menu", "ok", "radio")), targets);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("cancelBtn", "close", "cont", "field", "glucose", "item", "menu", "modeBtn", "next", "now_", "ok", "radio")), targets);
         // the words looked up to find something to press or read: never Confirm, Continue, Deliver, Next or Cancel
         java.util.TreeSet<String> looked = new java.util.TreeSet<>();
         java.util.regex.Matcher bm = java.util.regex.Pattern.compile("byText\\(all, \"([^\"]+)\"\\)").matcher(code);
         while (bm.find()) looked.add(bm.group(1));
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal", "Confirm", "Information")), looked);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal", "Confirm", "Continue", "Information", "Next", "Now")), looked);
         // Confirm is looked up in one place only, and only the two steps that follow a verified read-back call it
         assertEquals(1, count(code, "byText(all, \"Confirm\")"));
-        assertEquals(2, count(code, "confirmButton(root)"));
+        // five Confirm taps: carbs box, glucose box, the Add meal final box, the Off box, the Start box
+        assertEquals(5, count(code, "confirmButton(root)"));
         assertTrue(code.contains("verified(held, r.grams) ? null : confirmButton(root)"));
         assertTrue(code.contains("glucoseMatches(held, r.calcGlucose) ? null : confirmButton(root)"));
-        for (String never : new String[]{"\"Next\"", "\"Deliver\"", "\"Cancel\"", "\"Continue\""}) {
+        assertTrue(code.contains("addConfirmOk ? confirmButton(root) : null"));
+        // Next only on the Duration box after Hrs and Mins read back; Continue only on Add meal after the amount did
+        assertTrue(code.contains("durationOk ? nextButton(root) : null"));
+        assertEquals(1, count(code, "nextButton(root)") - 0);
+        assertEquals(1, count(code, "continueButton(root)"));
+        for (String never : new String[]{"\"Deliver\"", "\"Cancel\""}) {
             assertFalse("never looked up to press: " + never, code.contains("byText(all, " + never + ")"));
         }
         // the three option labels on the Add meal page are constants, and nothing else is looked up by a variable except those
@@ -473,6 +483,169 @@ public class CarbFillTest {
         List<String> g = t("Glucose", "mmol/L", "Confirm");
         assertEquals(CarbFill.Screen.GLUCOSE_DIALOG, CarbFill.classify(g, false, true));
         assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(g, false, false));
+    }
+
+    // ---- Boost and Ease-off ----
+
+    private static CarbFill.Step mode(CarbFill.Screen s, CarbFill.Phase ph, boolean running, boolean matches, boolean durOk, boolean banner) {
+        return CarbFill.decideMode(s, 0, ph, running, matches, durOk, banner);
+    }
+
+    @Test
+    public void modeScreensAreRecognisedFromCamapsOwnWords() {
+        assertEquals(CarbFill.Screen.MODE_DURATION, CarbFill.classify(t("Boost duration", "Hrs", "Mins", "Cancel", "Next"), true));
+        assertEquals(CarbFill.Screen.MODE_START, CarbFill.classify(t("Boost start", "Now", "Later", "Cancel", "Confirm"), false));
+        assertEquals(CarbFill.Screen.MODE_START, CarbFill.classify(t("Ease-off start", "Now", "08", "36", "Cancel", "Confirm"), false));
+        assertEquals(CarbFill.Screen.MODE_OFF, CarbFill.classify(t("Boost", "Off", "Cancel", "Confirm", "Auto mode", "02:00:00"), false));
+        // the bolus calculator's own Next and Confirm boxes are not mode screens
+        assertEquals(CarbFill.Screen.CARBS_DIALOG, CarbFill.classify(t("Carbohydrates", "Cancel", "Confirm"), true));
+        assertEquals(CarbFill.Screen.HOME, CarbFill.classify(t("Auto mode", "On", "Boost", "Ease-off"), false));
+    }
+
+    @Test
+    public void aBoostGoesThroughDurationNowAndConfirm() {
+        assertEquals(CarbFill.Step.OPEN_MODE, mode(CarbFill.Screen.HOME, CarbFill.Phase.START, false, true, false, false));
+        assertEquals(CarbFill.Step.TYPE_DURATION, mode(CarbFill.Screen.MODE_DURATION, CarbFill.Phase.START, false, true, false, false));
+        assertEquals(CarbFill.Step.NEXT_DURATION, mode(CarbFill.Screen.MODE_DURATION, CarbFill.Phase.DURATION_TYPED, false, true, true, false));
+        assertEquals(CarbFill.Step.ABORT_MISMATCH, mode(CarbFill.Screen.MODE_DURATION, CarbFill.Phase.DURATION_TYPED, false, true, false, false));
+        assertEquals(CarbFill.Step.PICK_NOW, mode(CarbFill.Screen.MODE_START, CarbFill.Phase.DURATION_NEXT, false, true, false, false));
+        assertEquals(CarbFill.Step.CONFIRM_START, mode(CarbFill.Screen.MODE_START, CarbFill.Phase.NOW_PICKED, false, true, false, false));
+        assertEquals(CarbFill.Step.WAIT, mode(CarbFill.Screen.HOME, CarbFill.Phase.START_CONFIRMED, true, true, false, false));
+        assertEquals(CarbFill.Step.FINISH, mode(CarbFill.Screen.HOME, CarbFill.Phase.START_CONFIRMED, true, true, false, true));
+    }
+
+    @Test
+    public void theOtherModesBoxStopsEverything() {
+        assertEquals(CarbFill.Step.ABORT_MISMATCH, mode(CarbFill.Screen.MODE_DURATION, CarbFill.Phase.START, false, false, false, false));
+        assertEquals(CarbFill.Step.ABORT_MISMATCH, mode(CarbFill.Screen.MODE_START, CarbFill.Phase.DURATION_NEXT, false, false, false, false));
+    }
+
+    @Test
+    public void aRunningModeIsCancelledFirstAndTheOffBoxConfirmedOnlyAfterOurOwnTap() {
+        assertEquals(CarbFill.Step.OPEN_CANCEL, mode(CarbFill.Screen.HOME, CarbFill.Phase.START, true, true, false, false));
+        assertEquals(CarbFill.Step.CONFIRM_OFF, mode(CarbFill.Screen.MODE_OFF, CarbFill.Phase.CANCELLING, true, true, false, false));
+        // an Off box nobody asked us to open is closed, not confirmed
+        assertEquals(CarbFill.Step.BACK, mode(CarbFill.Screen.MODE_OFF, CarbFill.Phase.START, true, true, false, false));
+        assertEquals(CarbFill.Step.WAIT, mode(CarbFill.Screen.HOME, CarbFill.Phase.OFF_CONFIRMED, true, true, false, false));
+        assertEquals(CarbFill.Step.OPEN_MODE, mode(CarbFill.Screen.HOME, CarbFill.Phase.OFF_CONFIRMED, false, true, false, false));
+        assertEquals(CarbFill.Step.TYPE_DURATION, mode(CarbFill.Screen.MODE_DURATION, CarbFill.Phase.OFF_CONFIRMED, false, true, false, false));
+    }
+
+    @Test
+    public void modeAlertsAndDeliveriesStillStopEverything() {
+        for (CarbFill.Phase ph : CarbFill.Phase.values()) {
+            assertEquals(CarbFill.Step.ABORT_BUSY, mode(CarbFill.Screen.BUSY, ph, false, true, true, true));
+            assertEquals(CarbFill.Step.ABORT_OTHER_DIALOG, mode(CarbFill.Screen.OTHER_DIALOG, ph, false, true, true, true));
+        }
+    }
+
+    @Test
+    public void durationAndBannerChecks() {
+        assertEquals(120, CarbFill.durationMinutes("2", "00"));
+        assertEquals(90, CarbFill.durationMinutes("01", "30"));
+        assertEquals(-1, CarbFill.durationMinutes("", "30"));
+        assertEquals(-1, CarbFill.durationMinutes("2", "75"));
+        assertEquals(120, CarbFill.timerMinutes("02:00:00"));
+        assertEquals(119, CarbFill.timerMinutes("01:59:56"));
+        assertEquals(-1, CarbFill.timerMinutes("5.5"));
+        assertTrue(CarbFill.bannerMatches(t("02:00:00", "Boost"), CarbFill.Kind.BOOST, 120));
+        assertTrue(CarbFill.bannerMatches(t("01:59:56", "Boost"), CarbFill.Kind.BOOST, 120));
+        assertFalse("a longer boost than asked is wrong", CarbFill.bannerMatches(t("03:00:00", "Boost"), CarbFill.Kind.BOOST, 120));
+        assertFalse(CarbFill.bannerMatches(t("02:00:00", "Ease-off"), CarbFill.Kind.BOOST, 120));
+        assertFalse(CarbFill.bannerMatches(t("Boost"), CarbFill.Kind.BOOST, 120));
+        assertTrue(CarbFill.dialogMatches(t("Boost duration", "Boost", "Ease-off"), CarbFill.Kind.BOOST));
+        assertFalse(CarbFill.dialogMatches(t("Ease-off duration", "Boost"), CarbFill.Kind.BOOST));
+        assertTrue(CarbFill.modeRunning(t("02:00:00", "Boost")));
+        assertFalse(CarbFill.modeRunning(t("Boost", "Ease-off")));
+    }
+
+    @Test
+    public void modeAmountsAreMinutesInSteps() {
+        assertTrue(CarbOptions.validFor(CarbFill.Kind.BOOST, 120));
+        assertTrue(CarbOptions.validFor(CarbFill.Kind.EASE, 45));
+        assertFalse(CarbOptions.validFor(CarbFill.Kind.BOOST, 10));
+        assertFalse(CarbOptions.validFor(CarbFill.Kind.BOOST, 361));
+        assertFalse(CarbOptions.validFor(CarbFill.Kind.EASE, 47));
+    }
+
+    // ---- Add meal through to its final box ----
+
+    private static CarbFill.Step add(CarbFill.Screen s, CarbFill.Phase ph, boolean sel, boolean amountOk, boolean confirmOk, boolean settled) {
+        return CarbFill.decideAdd(s, 0, ph, sel, true, amountOk, confirmOk, settled);
+    }
+
+    @Test
+    public void aSlowMealIsContinuedAndConfirmedOnlyAfterItReadsBack() {
+        assertEquals(CarbFill.Step.CONTINUE_ADD, add(CarbFill.Screen.ADD_MEAL, CarbFill.Phase.TYPED, true, true, false, false));
+        assertEquals(CarbFill.Step.ABORT_MISMATCH, add(CarbFill.Screen.ADD_MEAL, CarbFill.Phase.TYPED, false, true, false, false));
+        assertEquals(CarbFill.Step.ABORT_MISMATCH, add(CarbFill.Screen.ADD_MEAL, CarbFill.Phase.TYPED, true, false, false, false));
+        assertEquals(CarbFill.Step.CONFIRM_ADD, add(CarbFill.Screen.ADD_CONFIRM, CarbFill.Phase.CONTINUED, true, true, true, false));
+        assertEquals(CarbFill.Step.ABORT_MISMATCH, add(CarbFill.Screen.ADD_CONFIRM, CarbFill.Phase.CONTINUED, true, true, false, false));
+        assertEquals(CarbFill.Step.WAIT, add(CarbFill.Screen.ADD_MEAL, CarbFill.Phase.CONTINUED, true, true, false, false));
+        assertEquals(CarbFill.Step.WAIT, add(CarbFill.Screen.ADD_CONFIRM, CarbFill.Phase.ADD_CONFIRMED, true, true, true, true));
+        assertEquals(CarbFill.Step.WAIT, add(CarbFill.Screen.HOME, CarbFill.Phase.ADD_CONFIRMED, true, true, true, false));
+        assertEquals(CarbFill.Step.FINISH, add(CarbFill.Screen.HOME, CarbFill.Phase.ADD_CONFIRMED, true, true, true, true));
+    }
+
+    @Test
+    public void theFinalBoxIsRecognisedAndAPlainMealBoxIsNotAcceptedForSlowOrLow() {
+        List<String> box = t("Meal", "1", "g CHO", "Cancel", "Confirm", "Add meal");
+        assertEquals(CarbFill.Screen.ADD_CONFIRM, CarbFill.classify(box, false));
+        // behind-the-box editable fields (the dimmed Add meal page) don't stop it being recognised
+        assertEquals(CarbFill.Screen.ADD_CONFIRM, CarbFill.classify(box, true));
+        assertEquals(CarbFill.Screen.CARBS_DIALOG, CarbFill.classify(t("Carbohydrates", "g CHO", "Cancel", "Confirm"), true));
+    }
+
+    // ---- plans ----
+
+    private static CarbFill.Item item(CarbFill.Kind k, int a) {
+        return new CarbFill.Item(k, a, "t");
+    }
+
+    @Test
+    public void aPlanRunsInTheFixedOrderAndEndsOnTheMeal() {
+        assertNull(CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.SLOW, 15), item(CarbFill.Kind.BOOST, 120), item(CarbFill.Kind.MEAL, 45))));
+        assertNull(CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.EASE, 60), item(CarbFill.Kind.MEAL, 45))));
+        assertNull(CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.MEAL, 45))));
+        assertNotNull("the meal must be last", CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.MEAL, 45), item(CarbFill.Kind.BOOST, 120))));
+        assertNotNull(CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.BOOST, 120), item(CarbFill.Kind.SLOW, 15))));
+        assertNotNull("both modes", CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.BOOST, 120), item(CarbFill.Kind.EASE, 60))));
+        assertNotNull("twice", CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.MEAL, 45), item(CarbFill.Kind.MEAL, 30))));
+        assertNotNull("low alone", CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.LOW, 15), item(CarbFill.Kind.MEAL, 45))));
+        assertNull(CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.LOW, 15))));
+        assertNotNull("out of range", CarbFill.validatePlan(Arrays.asList(item(CarbFill.Kind.BOOST, 7))));
+        assertNotNull(CarbFill.validatePlan(new java.util.ArrayList<CarbFill.Item>()));
+    }
+
+    @Test
+    public void stepsAreParsedFromTheirOneStringAndNothingElse() {
+        List<CarbFill.Item> p = CarbFill.parseSteps("SLOW:15;BOOST:120;MEAL:45", "x");
+        assertEquals(3, p.size());
+        assertEquals(CarbFill.Kind.BOOST, p.get(1).kind);
+        assertEquals(120, p.get(1).amount);
+        assertNull(CarbFill.parseSteps("DELIVER:3", "x"));
+        assertNull(CarbFill.parseSteps("MEAL:abc", "x"));
+        assertNull(CarbFill.parseSteps("MEAL", "x"));
+        assertNull(CarbFill.parseSteps("", "x"));
+        assertNull(CarbFill.parseSteps("MEAL:1000", "x"));
+    }
+
+    @Test
+    public void onlyThePlanScreenAndTheSheetsStartAPlan() throws Exception {
+        java.util.TreeSet<String> callers = new java.util.TreeSet<>();
+        File dir = null;
+        for (String q : new String[]{"src/main/java/studio/alans/fxwatcher", "app/src/main/java/studio/alans/fxwatcher"}) {
+            if (new File(q).isDirectory()) dir = new File(q);
+        }
+        for (File f : dir.listFiles((d, n) -> n.endsWith(".java"))) {
+            if (f.getName().equals("CarbFill.java")) continue;
+            String text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+            if (text.contains("CarbFill.runPlan(")) callers.add(f.getName());
+        }
+        // the plan screen starts it, and only from its own Run button
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("CarbPlanActivity.java")), callers);
+        String src = new String(Files.readAllBytes(new File(dir, "CarbPlanActivity.java").toPath()), StandardCharsets.UTF_8);
+        assertTrue(src.contains("setPositiveButton(\"Run\""));
     }
 
     @Test

@@ -296,6 +296,15 @@ public class MainActivity extends Activity {
                 p.getBoolean(Store.CARB_CORRECTION, false));
         EditText carbPresets = field("Quick amounts (grams, separated by commas)", "Up to 6 show on the widget after any plan "
                 + "from Meal Log. Whole grams from 1 to 150.", p.getString(Store.CARB_PRESETS, CarbOptions.DEFAULT_PRESETS));
+        cur.addView(text("Try the new steps (each asks CamAPS for one thing and stops at the end):", 13));
+        cur.addView(button("Start a 30 minute Boost", () -> {
+            String no = CarbFill.request(this, 30, "test", CarbFill.Kind.BOOST);
+            if (no != null) Toast.makeText(this, no, Toast.LENGTH_LONG).show();
+        }));
+        cur.addView(button("Start a 30 minute Ease-off", () -> {
+            String no = CarbFill.request(this, 30, "test", CarbFill.Kind.EASE);
+            if (no != null) Toast.makeText(this, no, Toast.LENGTH_LONG).show();
+        }));
         for (CarbOptions.Option o : CarbWidget.options(this)) {
             cur.addView(button((o.plan ? "Plan: " : "") + o.label, () -> {
                 String no = CarbFill.request(this, o.grams, o.label, CarbFill.Kind.MEAL);

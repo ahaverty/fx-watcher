@@ -183,6 +183,18 @@
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
         <activity
+            android:name=".CarbPlanActivity"
+            android:exported="true"
+            android:permission="studio.alans.fxwatcher.permission.RECEIVE_BOLUS"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.DeviceDefault.Dialog.NoActionBar">
+            <intent-filter>
+                <action android:name="studio.alans.fxwatcher.action.RUN_PLAN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".CarbFillActivity"
             android:exported="false"
             android:excludeFromRecents="true"
