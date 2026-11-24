@@ -19,25 +19,29 @@ public class CarbWidget extends AppWidgetProvider {
 
     private static final int[] SLOTS = {R.id.carb_1, R.id.carb_2, R.id.carb_3, R.id.carb_4, R.id.carb_5, R.id.carb_6};
 
-    private static final int[] BANDS = {R.drawable.carb_btn_small, R.drawable.carb_btn_snack, R.drawable.carb_btn_meal, R.drawable.carb_btn_big};
+    private static final int[] BANDS = {R.drawable.carb_chip_small, R.drawable.carb_chip_snack, R.drawable.carb_chip_meal, R.drawable.carb_chip_big};
 
-    /** The number big, "g" small under it; the plan's button says PLAN first. */
+    /** Background for an amount: teal for the plan, otherwise an outline by size. */
+    static int chip(CarbOptions.Option o) {
+        return o.plan ? R.drawable.carb_chip_plan : BANDS[CarbOptions.band(o.grams)];
+    }
+
+    /** "30 g" on one line, the number big; the plan's chip has a small PLAN above it. */
     static CharSequence face(CarbOptions.Option o) {
-        String num = String.valueOf(o.grams);
-        String top = o.plan ? o.label.substring(0, o.label.lastIndexOf(' ', o.label.length() - 3)).toUpperCase(java.util.Locale.UK) + "\n" : "";
         android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
-        if (!top.isEmpty()) {
-            int a = sb.length();
-            sb.append(top);
-            sb.setSpan(new android.text.style.RelativeSizeSpan(0.55f), a, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (o.plan) {
+            sb.append("PLAN\n");
+            sb.setSpan(new android.text.style.RelativeSizeSpan(0.6f), 0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(0xFF7FE0D4), 0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         int n0 = sb.length();
-        sb.append(num);
-        sb.setSpan(new android.text.style.RelativeSizeSpan(1.7f), n0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.append(String.valueOf(o.grams));
+        sb.setSpan(new android.text.style.RelativeSizeSpan(1.35f), n0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), n0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         int g0 = sb.length();
-        sb.append("\ng");
-        sb.setSpan(new android.text.style.RelativeSizeSpan(0.6f), g0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.append(" g");
+        sb.setSpan(new android.text.style.RelativeSizeSpan(0.8f), g0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.setSpan(new android.text.style.ForegroundColorSpan(0xFFB8BEC6), g0, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return sb;
     }
 
@@ -82,8 +86,8 @@ public class CarbWidget extends AppWidgetProvider {
                 CarbOptions.Option o = opts.get(s);
                 v.setViewVisibility(SLOTS[s], android.view.View.VISIBLE);
                 v.setTextViewText(SLOTS[s], face(o));
-                v.setInt(SLOTS[s], "setBackgroundResource", o.plan ? R.drawable.carb_btn_plan : BANDS[CarbOptions.band(o.grams)]);
-                v.setTextColor(SLOTS[s], o.plan || CarbOptions.band(o.grams) >= 2 ? 0xFFFFFFFF : 0xFF1B1B1B);
+                v.setInt(SLOTS[s], "setBackgroundResource", chip(o));
+                v.setTextColor(SLOTS[s], 0xFFFFFFFF);
                 v.setOnClickPendingIntent(SLOTS[s], tap(c, o, s));
             } else {
                 v.setViewVisibility(SLOTS[s], android.view.View.GONE);

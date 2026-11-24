@@ -22,7 +22,6 @@ public class CalmCarbWidget extends AppWidgetProvider {
 
     static final String STEP = "studio.alans.fxwatcher.action.CARB_STEP";
     private static final int[] QUICK = {R.id.cc_q1, R.id.cc_q2, R.id.cc_q3, R.id.cc_q4};
-    private static final int[] BANDS = {R.drawable.carb_btn_small, R.drawable.carb_btn_snack, R.drawable.carb_btn_meal, R.drawable.carb_btn_big};
     private static final int[] CARDS = {0, 0, 0, 0, 0};
 
     @Override
@@ -69,8 +68,8 @@ public class CalmCarbWidget extends AppWidgetProvider {
                 CarbOptions.Option o = opts.get(s);
                 v.setViewVisibility(QUICK[s], View.VISIBLE);
                 v.setTextViewText(QUICK[s], CarbWidget.face(o));
-                v.setInt(QUICK[s], "setBackgroundResource", o.plan ? R.drawable.carb_btn_plan : BANDS[CarbOptions.band(o.grams)]);
-                v.setTextColor(QUICK[s], o.plan || CarbOptions.band(o.grams) >= 2 ? 0xFFFFFFFF : 0xFF1B1B1B);
+                v.setInt(QUICK[s], "setBackgroundResource", CarbWidget.chip(o));
+                v.setTextColor(QUICK[s], 0xFFFFFFFF);
                 v.setOnClickPendingIntent(QUICK[s], CarbWidget.tap(c, o, 10 + s));
             } else {
                 v.setViewVisibility(QUICK[s], View.GONE);
@@ -83,7 +82,7 @@ public class CalmCarbWidget extends AppWidgetProvider {
         v.setOnClickPendingIntent(R.id.cc_down, step(c, -CarbOptions.STEP, 0));
         v.setOnClickPendingIntent(R.id.cc_up, step(c, CarbOptions.STEP, 1));
         v.setTextViewText(R.id.cc_set, on ? "Set " + amount + " g in CamAPS" : "Turn on carbs in Settings");
-        v.setInt(R.id.cc_set, "setBackgroundResource", on ? R.drawable.carb_btn_plan : R.drawable.carb_btn_off);
+        v.setInt(R.id.cc_set, "setBackgroundResource", on ? R.drawable.carb_set : R.drawable.carb_btn_off);
         v.setOnClickPendingIntent(R.id.cc_set, CarbWidget.tap(c, new CarbOptions.Option(amount + " g", amount, false), 20));
         mgr.updateAppWidget(ids, v);
     }

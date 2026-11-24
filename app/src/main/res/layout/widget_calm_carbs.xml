@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/card_teal"
     android:orientation="vertical"
-    android:padding="14dp">
+    android:padding="16dp">
 
     <LinearLayout
         android:id="@+id/cc_status"
@@ -16,8 +16,8 @@
 
         <ImageView
             android:id="@+id/cc_dot"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:contentDescription="@null"
             android:src="@drawable/calm_dot" />
 
@@ -34,7 +34,7 @@
                 android:layout_height="wrap_content"
                 android:text="Steady"
                 android:textColor="#FF1FA89A"
-                android:textSize="22sp"
+                android:textSize="19sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -44,16 +44,15 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="Nothing needs you"
-                android:textColor="#FFB8BEC6"
+                android:textColor="#FF9AA3AD"
                 android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="10dp"
-        android:layout_weight="1.2"
+        android:layout_height="52dp"
+        android:layout_marginTop="14dp"
         android:orientation="horizontal">
 
         <TextView
@@ -75,41 +74,56 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="4dp"
-        android:layout_weight="0.8"
+        android:layout_height="44dp"
+        android:layout_marginStart="3dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="3dp"
+        android:background="@drawable/carb_stepper"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <TextView
             android:id="@+id/cc_down"
-            style="@style/StepButton"
-            android:text="\u2212 5" />
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="\u2212"
+            android:textColor="#FF1FA89A"
+            android:textSize="24sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/cc_amount"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1.4"
+            android:layout_weight="1.6"
             android:gravity="center"
             android:text="20 g"
             android:textColor="#FFFFFFFF"
-            android:textSize="22sp"
+            android:textSize="19sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/cc_up"
-            style="@style/StepButton"
-            android:text="+ 5" />
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="+"
+            android:textColor="#FF1FA89A"
+            android:textSize="24sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/cc_set"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="46dp"
         android:layout_marginStart="3dp"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="10dp"
         android:layout_marginEnd="3dp"
-        android:background="@drawable/carb_btn_plan"
+        android:background="@drawable/carb_set"
         android:gravity="center"
         android:text="Set 20 g in CamAPS"
         android:textColor="#FFFFFFFF"
