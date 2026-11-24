@@ -149,6 +149,14 @@ final class CarbOptions {
      * The size band of an amount, for the widget's colour: 0 small (up to 15 g, the hypo-treatment sizes),
      * 1 snack (16 to 30), 2 meal (31 to 50), 3 big (over 50). Pure, so it is tested.
      */
+    static final int STEP = 5, STEP_MIN = 5, STEP_MAX = 120, STEP_DEFAULT = 20;
+
+    /** The stepper: move by `delta` grams, keep it a multiple of 5 between 5 and 120. */
+    static int stepped(int current, int delta) {
+        int v = Math.round((current + delta) / (float) STEP) * STEP;
+        return Math.max(STEP_MIN, Math.min(STEP_MAX, v));
+    }
+
     static int band(int grams) {
         if (grams <= 15) return 0;
         if (grams <= 30) return 1;

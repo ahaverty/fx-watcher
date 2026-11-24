@@ -63,6 +63,7 @@ final class Store {
     static final String LOWWARN_MODE = "lowwarn_mode";          // off / calm / balanced / early
     static final String LOWWARN_TRACKER = "lowwarn_tracker";    // LowWarning.Tracker state
     static final String LOWWARN_JOURNAL = "lowwarn_journal";    // every warning and what came of it
+    static final String CARB_STEP = "carb_step";                // the combined widget's stepper amount
     static final String CARB_FILL = "carbfill_on";              // fill carbs into CamAPS's calculator when tapped (default OFF)
     static final String CARB_PRESETS = "carb_presets";          // "10,15,20,30,45,60"
     static final String CARB_PLAN = "carb_plan";                // plan amounts an app sent (CarbOptions.Plan)

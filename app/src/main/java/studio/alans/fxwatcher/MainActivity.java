@@ -500,6 +500,7 @@ public class MainActivity extends Activity {
             CalmServer.sync(this);
             GarminPush.sync(this);
             CarbWidget.update(this);
+            CalmCarbWidget.update(this);
             Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
         }));
 

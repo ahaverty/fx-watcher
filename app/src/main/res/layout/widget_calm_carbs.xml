@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cc_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/card_teal"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <LinearLayout
+        android:id="@+id/cc_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/cc_dot"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:contentDescription="@null"
+            android:src="@drawable/calm_dot" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/cc_word"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Steady"
+                android:textColor="#FF1FA89A"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/cc_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Nothing needs you"
+                android:textColor="#FFB8BEC6"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="10dp"
+        android:layout_weight="1.2"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/cc_q1"
+            style="@style/CarbButton" />
+
+        <TextView
+            android:id="@+id/cc_q2"
+            style="@style/CarbButton" />
+
+        <TextView
+            android:id="@+id/cc_q3"
+            style="@style/CarbButton" />
+
+        <TextView
+            android:id="@+id/cc_q4"
+            style="@style/CarbButton" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="4dp"
+        android:layout_weight="0.8"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/cc_down"
+            style="@style/StepButton"
+            android:text="\u2212 5" />
+
+        <TextView
+            android:id="@+id/cc_amount"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.4"
+            android:gravity="center"
+            android:text="20 g"
+            android:textColor="#FFFFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/cc_up"
+            style="@style/StepButton"
+            android:text="+ 5" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/cc_set"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginStart="3dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="3dp"
+        android:background="@drawable/carb_btn_plan"
+        android:gravity="center"
+        android:text="Set 20 g in CamAPS"
+        android:textColor="#FFFFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+</LinearLayout>

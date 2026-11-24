@@ -89,6 +89,17 @@ public class CarbFillTest {
         assertEquals(3, CarbOptions.band(150));
     }
 
+    @Test
+    public void theStepperMovesInFivesAndStaysInRange() {
+        assertEquals(25, CarbOptions.stepped(20, 5));
+        assertEquals(15, CarbOptions.stepped(20, -5));
+        assertEquals(5, CarbOptions.stepped(5, -5));
+        assertEquals(120, CarbOptions.stepped(120, 5));
+        assertEquals(20, CarbOptions.stepped(22, 0));
+        assertEquals(5, CarbOptions.stepped(0, 0));
+        assertTrue(CarbOptions.valid(CarbOptions.stepped(999, 0)));
+    }
+
     // ---- which CamAPS screen is it ----
 
     private static List<String> t(String... s) {

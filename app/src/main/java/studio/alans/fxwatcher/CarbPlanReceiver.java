@@ -37,5 +37,6 @@ public final class CarbPlanReceiver extends BroadcastReceiver {
             return;
         }
         CarbWidget.update(c);
+        CalmCarbWidget.update(c);
     }
 }
