@@ -17,6 +17,14 @@ class CalmView extends WatchUi.WatchFace {
         WatchFace.initialize();
     }
 
+    function onShow() {
+        try {
+            (Application.getApp() as CalmApp).register();
+        } catch (ex) {
+            // tried again at the next update
+        }
+    }
+
     function onEnterSleep() {
         asleep = true;
         WatchUi.requestUpdate();
@@ -27,8 +35,16 @@ class CalmView extends WatchUi.WatchFace {
         WatchUi.requestUpdate();
     }
 
-    // The ring colour and the word. Never a number.
+    // The ring colour and the word. Never a number. Any surprise in the stored state is "no data".
     function look() {
+        try {
+            return lookAt();
+        } catch (ex) {
+            return [GREY, "no data"];
+        }
+    }
+
+    function lookAt() {
         var s = Application.Storage.getValue("state") as Dictionary?;
         var fetched = Application.Storage.getValue("fetched");
         if (s == null || fetched == null) {
@@ -75,6 +91,11 @@ class CalmView extends WatchUi.WatchFace {
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
 
+        try {
+            (Application.getApp() as CalmApp).register();
+        } catch (ex) {
+            // not registered yet; the next update tries again
+        }
         var l = look();
         var colour = l[0];
         var word = l[1];

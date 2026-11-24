@@ -24,24 +24,52 @@ class CalmApp extends Application.AppBase {
         Background.registerForTemporalEvent(new Time.Duration(5 * 60));
     }
 
+    var registered = false;
+
     function getInitialView() {
-        // FX Watcher on the phone pushes the state the moment CamAPS has a reading.
-        Communications.registerForPhoneAppMessages(method(:onPhone));
         return [new CalmView()];
     }
 
+    // FX Watcher on the phone pushes the state the moment CamAPS has a reading. Registered from the
+    // view once it is showing (and tried again each time), never while the face is still starting:
+    // a message queued while the face was away is delivered the moment we register, and a failure
+    // here used to take the whole face down ("IQ!" and a different face).
+    function register() as Void {
+        if (registered) {
+            return;
+        }
+        try {
+            Communications.registerForPhoneAppMessages(method(:onPhone));
+            registered = true;
+        } catch (ex) {
+            registered = false;
+        }
+    }
+
     function onPhone(msg as Communications.PhoneAppMessage) as Void {
-        var d = msg.data;
-        if (d instanceof Lang.Dictionary && d.hasKey("state")) {
-            remember(d);
+        try {
+            var d = msg.data;
+            if (d instanceof Lang.Dictionary && d.hasKey("state")) {
+                remember(d);
+            }
+        } catch (ex) {
+            // a bad message is dropped; the face keeps the last state
         }
     }
 
     // Keep a state, and when it arrived. The face computes the age from this.
     function remember(d as Dictionary) as Void {
-        Application.Storage.setValue("state", d);
-        Application.Storage.setValue("fetched", Time.now().value());
-        WatchUi.requestUpdate();
+        try {
+            Application.Storage.setValue("state", d);
+            Application.Storage.setValue("fetched", Time.now().value());
+        } catch (ex) {
+            return;
+        }
+        try {
+            WatchUi.requestUpdate();
+        } catch (ex) {
+            // no view yet
+        }
     }
 
     function getServiceDelegate() {
@@ -50,11 +78,15 @@ class CalmApp extends Application.AppBase {
 
     // The background service finished: keep what it fetched, and when.
     function onBackgroundData(data) {
-        if (data instanceof Lang.Dictionary && data.hasKey("state")) {
-            remember(data);
-        } else if (data instanceof Lang.Dictionary && data.hasKey("error")) {
-            Application.Storage.setValue("error", data["error"]);
+        try {
+            if (data instanceof Lang.Dictionary && data.hasKey("state")) {
+                remember(data);
+            } else if (data instanceof Lang.Dictionary && data.hasKey("error")) {
+                Application.Storage.setValue("error", data["error"]);
+            }
+            WatchUi.requestUpdate();
+        } catch (ex) {
+            // keep the last state
         }
-        WatchUi.requestUpdate();
     }
 }
