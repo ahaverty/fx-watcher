@@ -103,6 +103,11 @@ public class GarminPushTest {
         for (int m = 0; m <= 20; m += 5) r.add(new double[]{NOW + m * 60_000L, 5.4 - 0.05 * m});   // 5.4 -> 4.4
         LowWarning.Projection pr = LowWarning.project(r, NOW + 20 * 60_000L, night);
         assertTrue(LowWarning.fires(4.4, pr, night, 0.0));
-        assertFalse(LowWarning.fires(4.4, LowWarning.project(r, NOW + 20 * 60_000L, fast), fast, 0.0));
+        // by day the near-low floor now covers this: under 4.5 and falling 0.05/min warns whatever the insulin
+        assertTrue(LowWarning.fires(4.4, LowWarning.project(r, NOW + 20 * 60_000L, fast), fast, 0.0));
+        // but the same slow fall higher up (4.9) still waits for the insulin gate by day
+        List<double[]> hi = new ArrayList<>();
+        for (int m = 0; m <= 20; m += 5) hi.add(new double[]{NOW + m * 60_000L, 5.9 - 0.05 * m});      // 5.9 -> 4.9
+        assertFalse(LowWarning.fires(4.9, LowWarning.project(hi, NOW + 20 * 60_000L, fast), fast, 0.0));
     }
 }

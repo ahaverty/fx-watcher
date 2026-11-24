@@ -76,6 +76,8 @@ Fast low: a fall of 2.0 or more in the 20 minutes before the first reading under
 
 The "Fast lows only" level warns when glucose falls 0.10 mmol/L per minute or more over 15 minutes, is under 6.0, and there is at least 0.5 U on board (unknown insulin does not block it). It also warns when CamAPS itself says "Urgent Low Soon", "Glucose falling fast / very fast" or posts a falling glucose alert. Same debounce, same Treating suppression.
 
+**Near-low floor (24 Nov, every level except off):** under 4.5 and falling 0.05 mmol/L per minute or more over the fit also warns, whatever the insulin on board. It was added after a drop from 8.5 to 4.2 with no warning, because the insulin gate held it back. Not backtested for false alerts: a flat or drifting line under 4.5 does not reach 0.05 per minute, and it needs the same debounce.
+
 Insulin on board, tested on the 46 days with logged boluses (`tools/backtest/IobBacktest.java`, 61 lows, only 7 of them fast, so this is a direction and not a proof):
 
 since 6 Oct: 46 days, 61 lows, 7 fast, of which 5 had >= 1.0 U on board
