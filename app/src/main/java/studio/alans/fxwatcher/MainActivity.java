@@ -285,12 +285,15 @@ public class MainActivity extends Activity {
         section("Carbs for CamAPS", "carbs", false);
         cur.addView(text("Tap an amount (here, on the widget or in the carbs sheet) and FX Watcher opens CamAPS, goes to the "
                 + "bolus calculator and types the carbs into its Carbohydrates box. A low treatment is separate: it goes to "
-                + "Add meal, selects Hypoglycaemia treatment and types the amount, and is only offered when you are low or heading low. Then it stops and tells you. "
-                + "YOU check the number, tap Confirm and deliver. It never taps Confirm or Deliver, only types "
-                + "whole grams from 1 to 150, and gives up after 60 seconds, 8 steps or anything it does not "
+                + "Add meal, selects Hypoglycaemia treatment and types the amount, and is only offered when you are low or heading low. "
+                + "For a meal it also taps Confirm on the Carbohydrates box and checks the calculator shows the number. "
+                + "YOU review it, tap Next and deliver. It never taps Next, Deliver, Cancel or Continue, only types "
+                + "whole grams from 1 to 150, and gives up after 60 seconds, 12 steps or anything it does not "
                 + "recognise. Needs the CamAPS screen reader on. Off by default.", 14));
         CheckBox carbFill = box("Let FX Watcher fill the carbs into CamAPS when I tap an amount",
                 p.getBoolean(Store.CARB_FILL, false));
+        CheckBox carbCorrection = box("Meals: also confirm the glucose so CamAPS adds a correction",
+                p.getBoolean(Store.CARB_CORRECTION, false));
         EditText carbPresets = field("Quick amounts (grams, separated by commas)", "Up to 6 show on the widget after any plan "
                 + "from Meal Log. Whole grams from 1 to 150.", p.getString(Store.CARB_PRESETS, CarbOptions.DEFAULT_PRESETS));
         for (CarbOptions.Option o : CarbWidget.options(this)) {
@@ -453,6 +456,7 @@ public class MainActivity extends Activity {
                     .putInt(Store.DELIVERY_FAST_SEC, intOf(deliveryFast, Store.DEF_DELIVERY_FAST_SEC))
                     .putBoolean(Store.CALM_ON, calmOn.isChecked())
                     .putBoolean(Store.CARB_FILL, carbFill.isChecked())
+                    .putBoolean(Store.CARB_CORRECTION, carbCorrection.isChecked())
                     .putString(Store.CARB_PRESETS, CarbOptions.joinPresets(CarbOptions.parsePresets(carbPresets.getText().toString())))
                     .putBoolean(Store.SERVER_ON, serverOn.isChecked())
                     .putBoolean(Store.GARMIN_PUSH, garminPush.isChecked())

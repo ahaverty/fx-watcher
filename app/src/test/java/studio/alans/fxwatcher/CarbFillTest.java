@@ -381,12 +381,20 @@ public class CarbFillTest {
         java.util.TreeSet<String> targets = new java.util.TreeSet<>();
         java.util.regex.Matcher tm = java.util.regex.Pattern.compile("\\btap\\((\\w+)\\)").matcher(code);
         while (tm.find()) if (!tm.group(1).equals("AccessibilityNodeInfo")) targets.add(tm.group(1));
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("close", "field", "item", "menu", "radio")), targets);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("close", "field", "glucose", "item", "menu", "ok", "radio")), targets);
         // the words looked up to find something to press or read: never Confirm, Continue, Deliver, Next or Cancel
         java.util.TreeSet<String> looked = new java.util.TreeSet<>();
         java.util.regex.Matcher bm = java.util.regex.Pattern.compile("byText\\(all, \"([^\"]+)\"\\)").matcher(code);
         while (bm.find()) looked.add(bm.group(1));
-        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal", "Information")), looked);
+        assertEquals(new java.util.TreeSet<>(Arrays.asList("Add meal", "Confirm", "Information")), looked);
+        // Confirm is looked up in one place only, and only the two steps that follow a verified read-back call it
+        assertEquals(1, count(code, "byText(all, \"Confirm\")"));
+        assertEquals(2, count(code, "confirmButton(root)"));
+        assertTrue(code.contains("verified(held, r.grams) ? null : confirmButton(root)"));
+        assertTrue(code.contains("glucoseMatches(held, r.calcGlucose) ? null : confirmButton(root)"));
+        for (String never : new String[]{"\"Next\"", "\"Deliver\"", "\"Cancel\"", "\"Continue\""}) {
+            assertFalse("never looked up to press: " + never, code.contains("byText(all, " + never + ")"));
+        }
         // the three option labels on the Add meal page are constants, and nothing else is looked up by a variable except those
         java.util.TreeSet<String> opts = new java.util.TreeSet<>();
         java.util.regex.Matcher om = java.util.regex.Pattern.compile("OPT_\\w+ = \"([^\"]+)\"").matcher(code);
@@ -399,6 +407,72 @@ public class CarbFillTest {
         assertFalse(code.contains("firstEditable"));
         // typing happens only in the TYPE step, which decide() returns only for CARBS_DIALOG
         assertTrue(code.contains("case CARBS_DIALOG: return Step.TYPE;"));
+    }
+
+    // ---- confirming the carbs box and the optional glucose correction ----
+
+    private static CarbFill.Step meal(CarbFill.Screen s, CarbFill.Phase ph, boolean corr, CarbFill.GlucoseBox gb, boolean carbsOk) {
+        return CarbFill.decideMeal(s, 0, ph, corr, gb, carbsOk);
+    }
+
+    @Test
+    public void typedCarbsAreConfirmedOnlyInTheCarbohydratesBox() {
+        assertEquals(CarbFill.Step.CONFIRM_CARBS, meal(CarbFill.Screen.CARBS_DIALOG, CarbFill.Phase.TYPED, false, CarbFill.GlucoseBox.EMPTY, false));
+        // anywhere else after typing it backs out and never confirms
+        assertEquals(CarbFill.Step.BACK, meal(CarbFill.Screen.HOME, CarbFill.Phase.TYPED, false, CarbFill.GlucoseBox.EMPTY, false));
+        assertEquals(CarbFill.Step.ABORT_LOST, meal(CarbFill.Screen.CALCULATOR, CarbFill.Phase.TYPED, false, CarbFill.GlucoseBox.EMPTY, true));
+    }
+
+    @Test
+    public void withoutACorrectionItStopsOnTheCalculatorOnceTheCarbsReadBack() {
+        assertEquals(CarbFill.Step.FINISH, meal(CarbFill.Screen.CALCULATOR, CarbFill.Phase.CARBS_CONFIRMED, false, CarbFill.GlucoseBox.EMPTY, true));
+        assertEquals(CarbFill.Step.ABORT_MISMATCH, meal(CarbFill.Screen.CALCULATOR, CarbFill.Phase.CARBS_CONFIRMED, false, CarbFill.GlucoseBox.EMPTY, false));
+    }
+
+    @Test
+    public void aCorrectionOpensTheGlucoseBoxThenFillsOrChecksItThenConfirms() {
+        assertEquals(CarbFill.Step.OPEN_GLUCOSE, meal(CarbFill.Screen.CALCULATOR, CarbFill.Phase.CARBS_CONFIRMED, true, CarbFill.GlucoseBox.EMPTY, true));
+        assertEquals(CarbFill.Step.TYPE_GLUCOSE, meal(CarbFill.Screen.GLUCOSE_DIALOG, CarbFill.Phase.GLUCOSE_OPENED, true, CarbFill.GlucoseBox.EMPTY, true));
+        assertEquals(CarbFill.Step.CONFIRM_GLUCOSE, meal(CarbFill.Screen.GLUCOSE_DIALOG, CarbFill.Phase.GLUCOSE_OPENED, true, CarbFill.GlucoseBox.MATCH, true));
+        assertEquals(CarbFill.Step.CONFIRM_GLUCOSE, meal(CarbFill.Screen.GLUCOSE_DIALOG, CarbFill.Phase.GLUCOSE_TYPED, true, CarbFill.GlucoseBox.MATCH, true));
+        assertEquals(CarbFill.Step.FINISH, meal(CarbFill.Screen.CALCULATOR, CarbFill.Phase.GLUCOSE_CONFIRMED, true, CarbFill.GlucoseBox.EMPTY, true));
+    }
+
+    @Test
+    public void aGlucoseBoxHoldingAnythingElseStopsEverything() {
+        assertEquals(CarbFill.Step.ABORT_MISMATCH, meal(CarbFill.Screen.GLUCOSE_DIALOG, CarbFill.Phase.GLUCOSE_OPENED, true, CarbFill.GlucoseBox.WRONG, true));
+        // and it is never confirmed unless the box matched
+        assertEquals(CarbFill.Step.ABORT_LOST, meal(CarbFill.Screen.CALCULATOR, CarbFill.Phase.GLUCOSE_TYPED, true, CarbFill.GlucoseBox.MATCH, true));
+    }
+
+    @Test
+    public void blockingPopupsStopOrClearAtEveryPhase() {
+        for (CarbFill.Phase ph : CarbFill.Phase.values()) {
+            assertEquals(CarbFill.Step.ABORT_BUSY, meal(CarbFill.Screen.BUSY, ph, true, CarbFill.GlucoseBox.EMPTY, true));
+            assertEquals(CarbFill.Step.ABORT_OTHER_DIALOG, meal(CarbFill.Screen.OTHER_DIALOG, ph, true, CarbFill.GlucoseBox.EMPTY, true));
+            assertEquals(CarbFill.Step.DISMISS_INFO, meal(CarbFill.Screen.INFO_POPUP, ph, true, CarbFill.GlucoseBox.EMPTY, true));
+        }
+    }
+
+    @Test
+    public void glucoseChecks() {
+        assertTrue(CarbFill.glucoseMatches("5.9", 5.9));
+        assertTrue(CarbFill.glucoseMatches(" 5,9 ", 5.9));
+        assertFalse(CarbFill.glucoseMatches("5.8", 5.9));
+        assertFalse(CarbFill.glucoseMatches("", 5.9));
+        assertFalse(CarbFill.glucoseMatches("59", 5.9));
+        assertFalse(CarbFill.glucoseMatches("5.9", Double.NaN));
+        assertTrue(CarbFill.glucoseSane(5.9, 6.1));
+        assertFalse(CarbFill.glucoseSane(5.9, 7.0));
+        assertFalse(CarbFill.glucoseSane(0, 6.0));
+        assertFalse(CarbFill.glucoseSane(5.9, -1));
+    }
+
+    @Test
+    public void glucoseDialogIsOnlyRecognisedWithItsOwnField() {
+        List<String> g = t("Glucose", "mmol/L", "Confirm");
+        assertEquals(CarbFill.Screen.GLUCOSE_DIALOG, CarbFill.classify(g, false, true));
+        assertEquals(CarbFill.Screen.ENTRY_DIALOG, CarbFill.classify(g, false, false));
     }
 
     @Test

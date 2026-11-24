@@ -37,17 +37,20 @@ jobs:
             echo "::error::BolusTab may only make its one ACTION_CLICK on the Bolus tab."
             exit 1
           fi
-          # Opt-in 2: CarbFill (after your tap on an amount) may click the Carbs field once, set the text of
-          # the Carbohydrates box once, and press Back once. Nothing else: no gestures, no scroll, no paste,
-          # no other global action, and it must not name Confirm or Deliver as something to press.
+          # Opt-in 2: CarbFill (after your tap on an amount) goes through one tap() and one text entry, and
+          # presses Back once. It may tap Confirm only inside the Carbohydrates and Glucose boxes it is filling
+          # in. Nothing else: no gestures, no scroll, no paste, no other global action, and it must never look
+          # up Next, Deliver, Cancel or Continue to press.
           g=app/src/main/java/studio/alans/fxwatcher/CarbFill.java
           if grep -nE "dispatchGesture|ACTION_SCROLL|ACTION_PASTE|ACTION_LONG_CLICK|GLOBAL_ACTION_(HOME|RECENTS|NOTIFICATIONS|QUICK|POWER|LOCK|TAKE)" "$g" \
+              || grep -nE 'byText\(all, "(Next|Deliver|Cancel|Continue)"\)' "$g" \
+              || [ "$(grep -c 'confirmButton(root)' "$g")" != 2 ] \
               || [ "$(grep -c 'performAction(' "$g")" != 2 ] \
               || [ "$(grep -c 'performAction(AccessibilityNodeInfo.ACTION_CLICK)' "$g")" != 1 ] \
               || [ "$(grep -c 'performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)' "$g")" != 1 ] \
               || [ "$(grep -c 'performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)' "$g")" != 1 ] \
               || [ "$(grep -c 'performGlobalAction(' "$g")" != 1 ]; then
-            echo "::error::CarbFill may only click the Carbs field, type into the Carbohydrates box, and press Back."
+            echo "::error::CarbFill may only click fields, type into the Carbohydrates and Glucose boxes, tap their Confirm, and press Back."
             exit 1
           fi
       - name: Signing key
