@@ -105,7 +105,9 @@ class NumberSeries {
             return ["Low now", PURPLE, "Low now"];
         }
         var m = lowIn(ageMin);
-        if (m != null && m <= 90) {
+        // Only claim a low when the straight-line estimate is close: over a longer time CamAPS adjusts and the
+        // line is a poor guess (24 Nov 2026: "Low in about 75 min" at 8.9 after a meal peak). 30 min, like the early-low rule.
+        if (m != null && m <= 30) {
             if (m < 3) {
                 return ["Low very soon", PURPLE, "Low soon"];
             }
