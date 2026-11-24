@@ -80,6 +80,11 @@ public class CamapsReader extends AccessibilityService {
                 return;
             }
             AccessibilityNodeInfo root = getRootInActiveWindow();
+            // With a CamAPS entry box open the keyboard is the active window; the event's own source still
+            // belongs to CamAPS, so read CamAPS's window from that.
+            if (root == null || root.getPackageName() == null || !root.getPackageName().toString().startsWith("com.camdiab.")) {
+                root = windowOf(e.getSource());
+            }
             if (root == null) return;
             if (root.getPackageName() == null || !root.getPackageName().toString().startsWith("com.camdiab.")) return;
             List<Item> items = new ArrayList<>();
@@ -92,6 +97,16 @@ public class CamapsReader extends AccessibilityService {
         } catch (Exception ex) {
             Log.w(TAG, "event", ex);
         }
+    }
+
+    /** The root of the window a node is in (up the parents), or null. */
+    private static AccessibilityNodeInfo windowOf(AccessibilityNodeInfo n) {
+        for (int i = 0; n != null && i < 60; i++) {
+            AccessibilityNodeInfo p = n.getParent();
+            if (p == null) return n;
+            n = p;
+        }
+        return null;
     }
 
     private static void collect(AccessibilityNodeInfo n, List<Item> out, int depth) {

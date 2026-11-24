@@ -36,7 +36,7 @@ final class CarbFill {
 
     private CarbFill() { }
 
-    static final long TTL_MS = 60_000L, STEP_GAP_MS = 700L;
+    static final long TTL_MS = 60_000L, STEP_GAP_MS = 700L, SETTLE_MS = 3_000L;
     static final int MAX_ACTIONS = 12, MAX_BACKS = 6;
 
     // ---- pure: what screen is this, and what is the one next step (unit tested) ----
@@ -179,12 +179,16 @@ final class CarbFill {
             return;
         }
         if (now - r.lastAt < STEP_GAP_MS) return;
+        // Right after a tap on the tab or the Carbs field the next page is still animating in and looks unknown:
+        // give it a moment instead of pressing Back.
+        boolean justTapped = r.lastStep == Step.OPEN_TAB || r.lastStep == Step.OPEN_CARBS;
         if (r.actions >= MAX_ACTIONS) {
             finish(c, r, false, "too many steps, so I stopped", root);
             return;
         }
         AccessibilityNodeInfo boxField = dialogField(root);
         Screen screen = classify(texts, boxField != null);
+        if (screen == Screen.UNKNOWN && justTapped && now - r.lastAt < SETTLE_MS) return;
         Step step = decide(screen, r.backs);
         Store.logCam(c, "Carbs for CamAPS: step " + (r.actions + 1) + ": " + screen + " -> " + step);
         if (step == r.lastStep) {
