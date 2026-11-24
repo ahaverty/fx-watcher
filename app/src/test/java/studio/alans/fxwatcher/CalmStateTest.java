@@ -383,4 +383,26 @@ public class CalmStateTest {
         assertTrue(CalmState.historyJson(series(5.0, 0.04, 60), NOW).endsWith("\"lowin\":-1}"));
         assertEquals("{\"end\":0,\"h\":[],\"slope\":0,\"lowin\":-1}", CalmState.historyJson(new ArrayList<double[]>(), NOW));
     }
+
+    @Test
+    public void aRiseOutOfALowIsNotADidYouBolus() {
+        // 3.8 up to 8.6 over 40 min: the shape of a meal, but it started from a low
+        List<double[]> r = series(3.8, 0.12, 40);
+        CalmState.Input in = input(r);
+        assertTrue(in.glucose >= 8.0);
+        assertTrue(CalmState.compute(in).state != CalmState.CHECK);
+        // the same rise from 5.5 is still a Did you bolus
+        CalmState.Input meal = input(series(5.5, 0.08, 40));
+        assertTrue(meal.glucose >= 8.0);
+        assertEquals(CalmState.CHECK, CalmState.compute(meal).state);
+    }
+
+    @Test
+    public void aLoggedHypoTreatmentAlsoSilencesDidYouBolus() {
+        CalmState.Input in = input(series(5.5, 0.08, 40));
+        in.hypoAt = NOW - 100 * MIN;
+        in.hypoGrams = 10;
+        in.hypoMmol = 3.8;
+        assertTrue(CalmState.compute(in).state != CalmState.CHECK);
+    }
 }

@@ -128,12 +128,18 @@ final class CalmState {
 
     /**
      * A rise that looks like a meal with no bolus: up at least 2.0 over the last 45 min to 8.0 or more,
-     * still rising, and nothing delivered in the last 2 hours. There is no "I ate" signal, so this is
+     * still rising, nothing delivered in the last 2 hours, and not a recovery from a low. There is no "I ate" signal, so this is
      * the shape of a meal, not proof of one.
      */
     static boolean riseWithoutBolus(Input in) {
         if (in.glucose < 8.0 || in.now < in.bolusYesUntil) return false;
         if (recentBolus(in.boluses, in.now) != null) return false;
+        // A rise out of a low is the treatment working, not a missed meal bolus (24 Nov 2026: "Did you bolus?" after
+        // treating a 3.9): a hypo treatment logged in the last 3 h, or a reading under 4.5 in the last 90 min.
+        if (in.hypoAt > 0 && in.now >= in.hypoAt && in.now - in.hypoAt <= 3 * 60 * MIN) return false;
+        for (double[] r : in.readings) {
+            if (r[0] <= in.now && in.now - r[0] <= 90 * MIN && r[1] < LowWarning.FLOOR_BELOW) return false;
+        }
         double min = Double.MAX_VALUE;
         for (double[] r : in.readings) {
             if (in.now - r[0] <= 45 * MIN && r[0] <= in.now) min = Math.min(min, r[1]);
