@@ -8,6 +8,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import java.util.ArrayList;
@@ -43,6 +46,8 @@ final class CarbFill {
     private CarbFill() { }
 
     static final long TTL_MS = 60_000L, STEP_GAP_MS = 700L, SETTLE_MS = 3_000L;
+    /** After each action, look at the screen again on our own at these delays (ms): CamAPS may send no event once it settles. */
+    static final long[] RECHECK_MS = {900L, 2_200L, 3_600L};
     static final int MAX_ACTIONS = 12, MAX_BACKS = 6;
 
     /** MEAL: the bolus calculator. LOW and SLOW: the Add meal page, with that option selected. */
@@ -261,6 +266,7 @@ final class CarbFill {
             r.lastStep = step;
             r.sameStep = 1;
         }
+        long actionsBefore = r.actions;
         switch (step) {
             case OPEN_TAB:
                 r.actions++;
@@ -360,6 +366,55 @@ final class CarbFill {
             default:
                 finish(c, r, false, why(step), root);
         }
+        if (r.actions > actionsBefore && !r.finished) recheck(c, svc);
+    }
+
+    // ---- looking again without waiting for an event ----
+
+    private static Handler mainHandler;
+
+    private static synchronized Handler main() {
+        if (mainHandler == null) mainHandler = new Handler(Looper.getMainLooper());
+        return mainHandler;
+    }
+
+    /** Three more looks at CamAPS's screen after an action, in case no further event comes. Does nothing once the request is over. */
+    private static void recheck(Context c, AccessibilityService svc) {
+        for (long delay : RECHECK_MS) {
+            main().postDelayed(() -> {
+                if (!active()) return;
+                try {
+                    AccessibilityNodeInfo root = camapsRoot(svc);
+                    if (root != null) maybeAct(c, svc, root, visibleTexts(root));
+                } catch (RuntimeException ignored) { }
+            }, delay);
+        }
+    }
+
+    /** CamAPS's window: the active one, or (the keyboard may be active) the CamAPS window in the list. */
+    private static AccessibilityNodeInfo camapsRoot(AccessibilityService svc) {
+        AccessibilityNodeInfo root = svc.getRootInActiveWindow();
+        if (root != null && root.getPackageName() != null && root.getPackageName().toString().startsWith("com.camdiab.")) return root;
+        List<AccessibilityWindowInfo> windows = svc.getWindows();
+        if (windows == null) return null;
+        for (AccessibilityWindowInfo w : windows) {
+            AccessibilityNodeInfo r = w.getRoot();
+            if (r != null && r.getPackageName() != null && r.getPackageName().toString().startsWith("com.camdiab.")) return r;
+        }
+        return null;
+    }
+
+    /** The text or description of everything visible, in tree order (what the reader hands maybeAct). */
+    static List<String> visibleTexts(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> all = new ArrayList<>();
+        flatten(root, all, 0);
+        List<String> out = new ArrayList<>();
+        for (AccessibilityNodeInfo n : all) {
+            if (!n.isVisibleToUser()) continue;
+            CharSequence t = n.getText() != null && n.getText().length() > 0 ? n.getText() : n.getContentDescription();
+            if (t != null && t.length() > 0) out.add(t.toString().trim());
+        }
+        return out;
     }
 
     /** The only click in this file. */

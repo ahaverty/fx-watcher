@@ -236,6 +236,14 @@ public class CarbFillTest {
     }
 
     @Test
+    public void theScreenIsReLookedAtThriceAfterEachAction() {
+        assertEquals(3, CarbFill.RECHECK_MS.length);
+        assertTrue(CarbFill.RECHECK_MS[0] > CarbFill.STEP_GAP_MS);
+        assertTrue(CarbFill.RECHECK_MS[1] > CarbFill.RECHECK_MS[0]);
+        assertTrue("the last look is after the settle time, so a page still loading is seen again", CarbFill.RECHECK_MS[2] > CarbFill.SETTLE_MS);
+    }
+
+    @Test
     public void limitsAreTightAndFixed() {
         assertEquals(60_000L, CarbFill.TTL_MS);
         assertEquals(12, CarbFill.MAX_ACTIONS);

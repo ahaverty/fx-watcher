@@ -13,7 +13,7 @@
     android:packageNames="com.camdiab.fx_alert.mmoll,com.camdiab.fx_alert.mgdl,com.camdiab.fx_alert.hx.mmoll,com.camdiab.fx_alert.hx.mgdl"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked|typeViewTextChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagReportViewIds"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="false"
     android:canTakeScreenshot="true"
