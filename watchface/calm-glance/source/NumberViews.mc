@@ -177,6 +177,9 @@ class WidgetNumberView extends WatchUi.View {
 
     const SPANS = [60, 180, 360];
     var spanIndex = 1;
+    // The vertical range: 2 to 12 normally, taller when the readings go outside it, so nothing is clipped.
+    var yMin = 2.0;
+    var yMax = 12.0;
 
     function initialize() {
         View.initialize();
@@ -261,6 +264,16 @@ class WidgetNumberView extends WatchUi.View {
         var top = h * 0.31;
         var bottom = h * 0.56;
         var pts = NumberSeries.points();
+        yMin = 2.0;
+        yMax = 12.0;
+        if (pts != null) {
+            for (var k = 0; k < pts.size(); k++) {
+                if (pts[k][0] < -span) { continue; }
+                var pv = pts[k][1];
+                if (pv + 0.3 > yMax) { yMax = Math.ceil(pv + 0.3); }
+                if (pv - 0.3 < yMin) { yMin = Math.floor(pv - 0.3); }
+            }
+        }
         if (pts != null && pts.size() > 1) {
             // the target band and the low line
             dc.setColor(NumberSeries.BAND, Graphics.COLOR_TRANSPARENT);
@@ -326,9 +339,9 @@ class WidgetNumberView extends WatchUi.View {
 
     function yOf(v, top, bottom) {
         var c = v;
-        if (c < 2.0) { c = 2.0; }
-        if (c > 12.0) { c = 12.0; }
-        return bottom - (c - 2.0) / 10.0 * (bottom - top);
+        if (c < yMin) { c = yMin; }
+        if (c > yMax) { c = yMax; }
+        return bottom - (c - yMin) / (yMax - yMin) * (bottom - top);
     }
 
     // A dashed line from (x1, y1) to (x2, y2): dash pixels on, gap pixels off.
