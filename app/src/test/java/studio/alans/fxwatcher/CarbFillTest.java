@@ -386,6 +386,24 @@ public class CarbFillTest {
         assertEquals("Hypoglycaemia treatment", CarbFill.optionOf(CarbFill.Kind.LOW));
     }
 
+    @Test
+    public void aMealOrSnackGoesThroughAddMealAndNeverTheCalculator() {
+        CarbFill.Kind add = CarbFill.Kind.ADD;
+        assertEquals(add, CarbSheetActivity.kind(CarbSheetActivity.ADD));
+        assertEquals(CarbFill.Kind.MEAL, CarbSheetActivity.kind(CarbSheetActivity.MEAL));
+        assertEquals("Meal or snack", CarbFill.optionOf(add));
+        assertEquals(CarbFill.Step.OPEN_MENU, CarbFill.decide(CarbFill.Screen.CALCULATOR, 0, add, false, false));
+        assertEquals(CarbFill.Step.PICK_HYPO, CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0, add, false, true));
+        assertEquals(CarbFill.Step.TYPE_LOW, CarbFill.decide(CarbFill.Screen.ADD_MEAL, 0, add, true, true));
+        assertEquals(CarbFill.Step.BACK, CarbFill.decide(CarbFill.Screen.CARBS_DIALOG, 0, add, false, false));
+        assertTrue(CarbOptions.validFor(add, 120));
+        assertFalse(CarbOptions.validFor(add, 121));
+        assertFalse(CarbOptions.validFor(add, 4));
+        CarbFill.Item item = new CarbFill.Item(add, 20, "t");
+        assertEquals("Add meal \u203a Meal or snack, 20 g", CarbFill.describe(item));
+        assertEquals("recorded by CamAPS as soon as it is confirmed", CarbFill.effect(item));
+    }
+
     private static String source(String name) throws Exception {
         for (String p : new String[]{"src/main/java/studio/alans/fxwatcher/", "app/src/main/java/studio/alans/fxwatcher/"}) {
             File f = new File(p + name);

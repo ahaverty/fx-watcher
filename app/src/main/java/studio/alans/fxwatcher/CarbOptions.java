@@ -34,10 +34,10 @@ final class CarbOptions {
         return grams >= MIN_G && grams <= MAX_G;
     }
 
-    /** The range for each kind: a meal 1 to 150, a slowly absorbed meal 5 to 120, a low treatment 5 to 30. */
+    /** The range for each kind: a bolus 1 to 150, a slow or added meal 5 to 120, a low treatment 5 to 30. */
     static boolean validFor(CarbFill.Kind kind, int grams) {
         if (kind == CarbFill.Kind.LOW) return validLow(grams);
-        if (kind == CarbFill.Kind.SLOW) return grams >= STEP_MIN && grams <= STEP_MAX;
+        if (kind == CarbFill.Kind.SLOW || kind == CarbFill.Kind.ADD) return grams >= STEP_MIN && grams <= STEP_MAX;
         if (CarbFill.isMode(kind)) return grams >= MODE_MIN && grams <= MODE_MAX && grams % 5 == 0;
         return valid(grams);
     }

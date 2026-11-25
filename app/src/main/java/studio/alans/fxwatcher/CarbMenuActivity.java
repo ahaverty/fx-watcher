@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * The widget's three-dots menu: your snack amounts for the bolus calculator and low treatment amounts in
- * one tap, then the slow meal and the slider. Snack amounts under 20 g are hidden while low or heading
+ * one tap, then the slow meal, the slider and, last, a meal or snack added without a bolus. Snack amounts under 20 g are hidden while low or heading
  * low. An app widget can't take a long press, so this is the other way in. Each row asks CarbFill (which
  * never delivers) or opens the carbs sheet.
  */
@@ -51,7 +51,8 @@ public class CarbMenuActivity extends Activity {
         card.addView(chips(lows, R.drawable.pill_low, CarbFill.Kind.LOW));
 
         card.addView(item("Slowly absorbed meal\u2026", CarbSheetActivity.SLOW));
-        card.addView(item("Carbs slider\u2026", CarbSheetActivity.MEAL));
+        card.addView(item("Bolus slider\u2026", CarbSheetActivity.MEAL));
+        card.addView(item("Meal or snack, no bolus\u2026", CarbSheetActivity.ADD));
         setContentView(root);
     }
 

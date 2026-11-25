@@ -27,7 +27,8 @@ import java.util.regex.Pattern;
  *        correction was asked for, it then opens the Glucose box, types CamAPS's own displayed glucose if
  *        the box is empty (or checks it if filled), and taps that box's Confirm. It stops on the
  *        calculator: Next and Deliver are yours.
- *  SLOW / LOW: the Add meal route. Selects "Slowly absorbed meal" or "Hypoglycaemia treatment", types the
+ *  SLOW / LOW / ADD: the Add meal route, no bolus. Selects "Slowly absorbed meal", "Hypoglycaemia
+ *        treatment" or "Meal or snack", types the
  *        grams into Amount, reads both back, taps Continue, and on the final box (which must show the same
  *        grams) taps Confirm.
  *  BOOST / EASE: taps Boost or Ease-off on the home card (first cancelling one that is already running, by
@@ -67,8 +68,11 @@ final class CarbFill {
         return sinceMs < (acted ? LOADING_WAIT_MS : START_WAIT_MS);
     }
 
-    /** MEAL: the bolus calculator. LOW and SLOW: the Add meal page. BOOST and EASE: the home card's modes. */
-    enum Kind { MEAL, LOW, SLOW, BOOST, EASE }
+    /**
+     * MEAL: the bolus calculator. LOW, SLOW and ADD (Meal or snack): the Add meal page. BOOST and EASE: the home
+     * card's modes.
+     */
+    enum Kind { MEAL, LOW, SLOW, ADD, BOOST, EASE }
 
     static boolean isMode(Kind k) {
         return k == Kind.BOOST || k == Kind.EASE;
@@ -235,7 +239,7 @@ final class CarbFill {
     }
 
     /**
-     * Slow meal or low treatment through Add meal. selected: this kind's option is on (and the others off).
+     * Slow meal, low treatment or a meal or snack through Add meal. selected: this kind's option is on (and the others off).
      * hasAmount: the Amount field exists. amountOk: it reads back as the grams. confirmOk: the final box shows the
      * same grams. settled: the final box has been gone for a moment.
      */
@@ -386,7 +390,7 @@ final class CarbFill {
     }
 
     static int rank(Kind k) {
-        return k == Kind.LOW ? 0 : k == Kind.SLOW ? 1 : isMode(k) ? 2 : 3;
+        return k == Kind.LOW ? 0 : k == Kind.SLOW || k == Kind.ADD ? 1 : isMode(k) ? 2 : 3;
     }
 
     /** Why this list of steps can't run as a plan, or null. At most one of each; low only alone; the meal last. */
@@ -440,6 +444,7 @@ final class CarbFill {
         switch (it.kind) {
             case LOW: return "Add meal \u203a Hypoglycaemia treatment, " + it.amount + " g";
             case SLOW: return "Add meal \u203a Slowly absorbed meal, " + it.amount + " g";
+            case ADD: return "Add meal \u203a Meal or snack, " + it.amount + " g";
             case BOOST: return "Boost, " + minutesText(it.amount) + ", starting now";
             case EASE: return "Ease-off, " + minutesText(it.amount) + ", starting now";
             default: return "Bolus calculator, carbs " + it.amount + " g";
@@ -521,6 +526,8 @@ final class CarbFill {
                     ? "A low treatment is whole grams from " + CarbOptions.LOW_MIN_G + " to " + CarbOptions.LOW_MAX_G + "."
                     : kind == Kind.SLOW
                     ? "A slowly absorbed meal is whole grams from " + CarbOptions.STEP_MIN + " to " + CarbOptions.STEP_MAX + "."
+                    : kind == Kind.ADD
+                    ? "An added meal is whole grams from " + CarbOptions.STEP_MIN + " to " + CarbOptions.STEP_MAX + "."
                     : isMode(kind)
                     ? "Boost and Ease-off run from " + CarbOptions.MODE_MIN + " minutes to " + CarbOptions.MODE_MAX / 60 + " hours."
                     : "Only whole grams from " + CarbOptions.MIN_G + " to " + CarbOptions.MAX_G + ".";
@@ -952,7 +959,7 @@ final class CarbFill {
     }
 
     private static boolean optionKind(Kind k) {
-        return k == Kind.LOW || k == Kind.SLOW;
+        return k == Kind.LOW || k == Kind.SLOW || k == Kind.ADD;
     }
 
     // ---- looking again without waiting for an event ----

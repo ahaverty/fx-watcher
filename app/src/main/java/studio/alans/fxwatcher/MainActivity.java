@@ -286,6 +286,7 @@ public class MainActivity extends Activity {
         cur.addView(text("Tap an amount (here, on the widget or in the carbs sheet) and FX Watcher opens CamAPS, goes to the "
                 + "bolus calculator and types the carbs into its Carbohydrates box. A low treatment is separate: it goes to "
                 + "Add meal, selects Hypoglycaemia treatment and types the amount, and is only offered when you are low or heading low. "
+                + "A slow meal, or a meal or snack with no bolus, goes through Add meal too and is recorded once FX Watcher confirms it. "
                 + "For a meal it also taps Confirm on the Carbohydrates box and checks the calculator shows the number. "
                 + "YOU review it, tap Next and deliver. It never taps Next, Deliver, Cancel or Continue, only types "
                 + "whole grams from 1 to 150, and gives up after 60 seconds, 12 steps or anything it does not "

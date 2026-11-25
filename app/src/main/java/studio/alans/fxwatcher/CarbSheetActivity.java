@@ -19,14 +19,15 @@ import java.util.List;
 
 /**
  * The carbs sheet, for when the widget's quick amounts are not the amount. A segmented switch for what
- * the number is (Meal, Slow meal, Low), a big number, a real slider with haptic ticks, quick chips and one
+ * the number is (Bolus, Slow meal, Low, and Meal: added without a bolus), a big number, a real slider with haptic ticks, quick chips and one
  * button. Each mode has its own colour and its own range; the big button asks CarbFill, which types the
  * number and stops.
  */
 public class CarbSheetActivity extends Activity {
 
     static final String EXTRA_MODE = "mode", EXTRA_GRAMS = "grams";
-    static final String MEAL = "meal", SLOW = "slow", LOW = "low";
+    /** MEAL is the bolus calculator; ADD is Add meal's "Meal or snack". */
+    static final String MEAL = "meal", SLOW = "slow", LOW = "low", ADD = "add";
     private static final int CARD = 0xFF1E222A, MUTED = 0xFF9AA3AD;
 
     private String mode = MEAL;
@@ -37,7 +38,7 @@ public class CarbSheetActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         String m = getIntent().getStringExtra(EXTRA_MODE);
-        mode = SLOW.equals(m) ? SLOW : LOW.equals(m) ? LOW : MEAL;
+        mode = SLOW.equals(m) ? SLOW : LOW.equals(m) ? LOW : ADD.equals(m) ? ADD : MEAL;
         grams = start(mode, getIntent().getIntExtra(EXTRA_GRAMS, -1));
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0x99000000);
@@ -53,11 +54,12 @@ public class CarbSheetActivity extends Activity {
     }
 
     static CarbFill.Kind kind(String mode) {
-        return LOW.equals(mode) ? CarbFill.Kind.LOW : SLOW.equals(mode) ? CarbFill.Kind.SLOW : CarbFill.Kind.MEAL;
+        return LOW.equals(mode) ? CarbFill.Kind.LOW : SLOW.equals(mode) ? CarbFill.Kind.SLOW
+                : ADD.equals(mode) ? CarbFill.Kind.ADD : CarbFill.Kind.MEAL;
     }
 
     static int min(String mode) {
-        return MEAL.equals(mode) ? CarbOptions.STEP_MIN : SLOW.equals(mode) ? CarbOptions.STEP_MIN : CarbOptions.LOW_MIN_G;
+        return LOW.equals(mode) ? CarbOptions.LOW_MIN_G : CarbOptions.STEP_MIN;
     }
 
     static int max(String mode) {
@@ -72,7 +74,12 @@ public class CarbSheetActivity extends Activity {
     }
 
     private int accent() {
-        return LOW.equals(mode) ? 0xFF9B7BE0 : SLOW.equals(mode) ? 0xFF5B9BE0 : 0xFF1FA89A;
+        return LOW.equals(mode) ? 0xFF9B7BE0 : SLOW.equals(mode) ? 0xFF5B9BE0 : ADD.equals(mode) ? 0xFFE0A04A : 0xFF1FA89A;
+    }
+
+    private static int filled(String mode) {
+        return LOW.equals(mode) ? R.drawable.carb_set_low : SLOW.equals(mode) ? R.drawable.carb_set_slow
+                : ADD.equals(mode) ? R.drawable.carb_set_add : R.drawable.carb_set;
     }
 
     private int dp(int v) {
@@ -102,9 +109,10 @@ public class CarbSheetActivity extends Activity {
         LinearLayout seg = new LinearLayout(this);
         seg.setBackgroundResource(R.drawable.carb_stepper);
         seg.setPadding(dp(3), dp(3), dp(3), dp(3));
-        seg.addView(segment("Meal", MEAL, R.drawable.carb_set));
-        seg.addView(segment("Slow meal", SLOW, R.drawable.carb_set_slow));
-        seg.addView(segment("Low", LOW, R.drawable.carb_set_low));
+        seg.addView(segment("Bolus", MEAL));
+        seg.addView(segment("Slow meal", SLOW));
+        seg.addView(segment("Low", LOW));
+        seg.addView(segment("Meal", ADD));
         card.addView(seg, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46)));
 
         TextView amount = text(String.valueOf(grams), 60, accent, true);
@@ -127,12 +135,12 @@ public class CarbSheetActivity extends Activity {
         card.addView(bar, sp);
 
         LinearLayout chips = new LinearLayout(this);
-        chips.setGravity(Gravity.CENTER);
-        card.addView(chips, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+        chips.setOrientation(LinearLayout.VERTICAL);
+        card.addView(chips, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView go = text(goLabel(), 17, 0xFFFFFFFF, true);
         go.setGravity(Gravity.CENTER);
-        go.setBackgroundResource(LOW.equals(mode) ? R.drawable.carb_set_low : SLOW.equals(mode) ? R.drawable.carb_set_slow : R.drawable.carb_set);
+        go.setBackgroundResource(filled(mode));
         LinearLayout.LayoutParams gp2 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54));
         gp2.topMargin = dp(14);
         card.addView(go, gp2);
@@ -153,16 +161,22 @@ public class CarbSheetActivity extends Activity {
             public void onStopTrackingTouch(SeekBar s) { }
         });
 
-        int chipBg = LOW.equals(mode) ? R.drawable.carb_chip_low : SLOW.equals(mode) ? R.drawable.carb_chip_slow : R.drawable.carb_chip_snack;
+        int chipBg = LOW.equals(mode) ? R.drawable.carb_chip_low : SLOW.equals(mode) ? R.drawable.carb_chip_slow
+                : ADD.equals(mode) ? R.drawable.carb_chip_add : R.drawable.carb_chip_snack;
         List<CarbOptions.Option> quick = LOW.equals(mode) ? lowChips() : CarbWidget.options(this);
-        for (int i = 0; i < quick.size() && i < 4; i++) {
+        LinearLayout line = null;
+        for (int i = 0; i < quick.size() && i < CarbOptions.SLOTS; i++) {
+            if (i % 3 == 0) {
+                line = new LinearLayout(this);
+                chips.addView(line, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+            }
             CarbOptions.Option o = quick.get(i);
             TextView chip = text(o.plan ? "Plan " + o.grams : String.valueOf(o.grams), 15, 0xFFFFFFFF, o.plan);
             chip.setGravity(Gravity.CENTER);
             chip.setBackgroundResource(o.plan && MEAL.equals(mode) ? R.drawable.carb_chip_plan : chipBg);
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1);
             cp.setMargins(dp(4), dp(6), dp(4), dp(6));
-            chips.addView(chip, cp);
+            line.addView(chip, cp);
             chip.setOnClickListener(v -> {
                 grams = Math.max(min, Math.min(max, CarbOptions.stepped(o.grams, 0)));
                 bar.setProgress((grams - min) / CarbOptions.STEP);
@@ -188,14 +202,15 @@ public class CarbSheetActivity extends Activity {
     }
 
     private String goLabel() {
-        return LOW.equals(mode) ? "Treat " + grams + " g" : SLOW.equals(mode) ? "Slow meal " + grams + " g" : "Put " + grams + " g in CamAPS";
+        return LOW.equals(mode) ? "Treat " + grams + " g" : SLOW.equals(mode) ? "Slow meal " + grams + " g"
+                : ADD.equals(mode) ? "Add meal " + grams + " g, no bolus" : "Put " + grams + " g in bolus calculator";
     }
 
-    private TextView segment(String s, String m, int onBg) {
+    private TextView segment(String s, String m) {
         boolean on = mode.equals(m);
         TextView t = text(s, 15, on ? 0xFFFFFFFF : MUTED, on);
         t.setGravity(Gravity.CENTER);
-        if (on) t.setBackgroundResource(onBg);
+        if (on) t.setBackgroundResource(filled(m));
         t.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
         t.setOnClickListener(v -> {
             if (!mode.equals(m)) {
