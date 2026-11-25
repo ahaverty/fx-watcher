@@ -68,8 +68,10 @@ public class CalmCarbWidget extends AppWidgetProvider {
         v.setOnClickPendingIntent(R.id.cc_status, Calm.open(c));
 
         CalmState.Input in = Calm.input(c, now);
-        boolean low = CarbFill.enabled(c) && CarbOptions.lowOffered(in.glucose, in.glucoseAt, r.state, now);
+        boolean isLow = CarbOptions.lowOffered(in.glucose, in.glucoseAt, r.state, now);
+        boolean low = CarbFill.enabled(c) && isLow;
         List<CarbOptions.Option> opts = CarbWidget.options(c);
+        if (isLow) opts = CarbOptions.whileLow(opts);
         int slots = low ? CHIPS.length - 1 : CHIPS.length;
         for (int s = 0; s < CHIPS.length; s++) {
             if (low && s == CHIPS.length - 1) {

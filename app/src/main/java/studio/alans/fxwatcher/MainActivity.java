@@ -294,8 +294,13 @@ public class MainActivity extends Activity {
                 p.getBoolean(Store.CARB_FILL, false));
         CheckBox carbCorrection = box("Meals: also confirm the glucose so CamAPS adds a correction",
                 p.getBoolean(Store.CARB_CORRECTION, false));
-        EditText carbPresets = field("Quick amounts (grams, separated by commas)", "Up to 6 show on the widget after any plan "
-                + "from Meal Log. Whole grams from 1 to 150.", p.getString(Store.CARB_PRESETS, CarbOptions.DEFAULT_PRESETS));
+        EditText carbPresets = field("Quick amounts (grams, separated by commas)", "Shown in this order after any plan "
+                + "from Meal Log: the first 3 on the one-row widget, up to 6 on the carbs widget. Whole grams from 1 to 150. "
+                + "While low, the one-row widget hides those under 20.",
+                p.getString(Store.CARB_PRESETS, CarbOptions.DEFAULT_PRESETS));
+        EditText carbSnacks = field("Snack amounts in the \u22ef menu (grams, separated by commas)", "Up to 4, for the bolus "
+                + "calculator. Those under 20 are hidden while low. Leave empty for none.",
+                p.getString(Store.CARB_SNACKS, CarbOptions.DEFAULT_SNACKS));
         cur.addView(text("Try the new steps (each asks CamAPS for one thing and stops at the end):", 13));
         cur.addView(button("Start a 30 minute Boost", () -> {
             String no = CarbFill.request(this, 30, "test", CarbFill.Kind.BOOST);
@@ -467,6 +472,7 @@ public class MainActivity extends Activity {
                     .putBoolean(Store.CARB_FILL, carbFill.isChecked())
                     .putBoolean(Store.CARB_CORRECTION, carbCorrection.isChecked())
                     .putString(Store.CARB_PRESETS, CarbOptions.joinPresets(CarbOptions.parsePresets(carbPresets.getText().toString())))
+                    .putString(Store.CARB_SNACKS, CarbOptions.joinPresets(CarbOptions.parsePresets(carbSnacks.getText().toString())))
                     .putBoolean(Store.SERVER_ON, serverOn.isChecked())
                     .putBoolean(Store.GARMIN_PUSH, garminPush.isChecked())
                     .putBoolean(Store.NIGHT_WATCH, nightWatch.isChecked())

@@ -17,8 +17,11 @@ final class CarbOptions {
 
     static final int MIN_G = 1, MAX_G = 150;
     static final String DEFAULT_PRESETS = "20,30,45,60";
-    /** One-tap meal amounts start here, so a quick tap is never a hypo-sized number (those are a separate, coral path). */
-    static final int MEAL_QUICK_MIN = 20;
+    /** While low or heading low, one-tap bolus amounts under this are hidden, so one is not mistaken for a treatment. */
+    static final int LOW_HIDES_UNDER_G = 20;
+    /** The bolus amounts at the top of the three-dots menu, until changed in Settings. */
+    static final String DEFAULT_SNACKS = "10,15";
+    static final int MAX_SNACKS = 4;
     static final int LOW_MIN_G = 5, LOW_MAX_G = 30, LOW_DEFAULT_G = 15;
     static final int[] LOW_CHIPS = {10, 15, 20};
     static final long PLAN_TTL_MS = 2 * 3_600_000L;
@@ -177,6 +180,23 @@ final class CarbOptions {
         return p;
     }
 
+    /** The three-dots menu's bolus amounts: up to 4, none under 20 g while low or heading low. */
+    static List<Integer> snacks(String setting, boolean low) {
+        List<Integer> out = new ArrayList<>();
+        for (int g : parsePresets(setting)) {
+            if (low && g < LOW_HIDES_UNDER_G) continue;
+            if (out.size() < MAX_SNACKS) out.add(g);
+        }
+        return out;
+    }
+
+    /** The buttons while low or heading low: the plan, and quick amounts of 20 g and up. */
+    static List<Option> whileLow(List<Option> opts) {
+        List<Option> out = new ArrayList<>();
+        for (Option o : opts) if (o.plan || o.grams >= LOW_HIDES_UNDER_G) out.add(o);
+        return out;
+    }
+
     /** The widget's and the app's buttons: plan items first, then the presets, up to 6. */
     static List<Option> options(Plan plan, List<Integer> presets, long now) {
         List<Option> out = new ArrayList<>();
@@ -184,7 +204,6 @@ final class CarbOptions {
             for (PlanItem i : plan.items) out.add(new Option(i.name + " " + i.grams + " g", i.grams, true));
         }
         for (int g : presets) {
-            if (g < MEAL_QUICK_MIN) continue;
             if (out.size() >= SLOTS) break;
             boolean dup = false;
             for (Option o : out) if (o.grams == g && !o.plan) dup = true;

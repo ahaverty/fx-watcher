@@ -68,6 +68,7 @@ final class Store {
     static final String CARB_RUNS = "carbfill_runs";             // which plans ran in CamAPS (PlanRuns)
     static final String CARB_FILL = "carbfill_on";              // fill carbs into CamAPS's calculator when tapped (default OFF)
     static final String CARB_PRESETS = "carb_presets";          // "10,15,20,30,45,60"
+    static final String CARB_SNACKS = "carb_snacks";            // bolus amounts in the three-dots menu, "10,15"
     static final String CARB_PLAN = "carb_plan";                // plan amounts an app sent (CarbOptions.Plan)
     static final String GARMIN_PUSH = "garmin_push";            // push the calm state to the watch face (default on)
     static final String NIGHT_WATCH = "lowwarn_night";          // at night also watch slow falls (default off)

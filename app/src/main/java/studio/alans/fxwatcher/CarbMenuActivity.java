@@ -11,10 +11,14 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * The widget's three-dots menu: low treatment amounts in one tap, then the slow meal and the slider.
- * An app widget can't take a long press, so this is the other way in. Each row asks CarbFill (which only
- * types a number and stops) or opens the carbs sheet.
+ * The widget's three-dots menu: your snack amounts for the bolus calculator and low treatment amounts in
+ * one tap, then the slow meal and the slider. Snack amounts under 20 g are hidden while low or heading
+ * low. An app widget can't take a long press, so this is the other way in. Each row asks CarbFill (which
+ * never delivers) or opens the carbs sheet.
  */
 public class CarbMenuActivity extends Activity {
 
@@ -31,24 +35,40 @@ public class CarbMenuActivity extends Activity {
         card.setPadding(dp(18), dp(10), dp(18), dp(20));
         root.addView(card, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
 
-        card.addView(label("Low treatment"));
-        LinearLayout lows = new LinearLayout(this);
-        for (int g : CarbOptions.LOW_CHIPS) {
-            TextView chip = row(g + " g", R.drawable.pill_low, true);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(52), 1);
-            lp.setMargins(dp(4), dp(6), dp(4), dp(6));
-            lows.addView(chip, lp);
-            chip.setOnClickListener(v -> {
-                String no = CarbFill.request(this, g, "menu", CarbFill.Kind.LOW);
-                if (no != null) Toast.makeText(this, no, Toast.LENGTH_LONG).show();
-                finish();
-            });
+        long now = System.currentTimeMillis();
+        CalmState.Input in = Calm.input(this, now);
+        boolean isLow = CarbOptions.lowOffered(in.glucose, in.glucoseAt, CalmState.compute(in).state, now);
+        List<Integer> snacks = CarbOptions.snacks(
+                Store.p(this).getString(Store.CARB_SNACKS, CarbOptions.DEFAULT_SNACKS), isLow);
+        if (!snacks.isEmpty()) {
+            card.addView(label("Bolus calculator"));
+            card.addView(chips(snacks, R.drawable.pill_meal, CarbFill.Kind.MEAL));
         }
-        card.addView(lows);
+
+        card.addView(label("Low treatment, no bolus"));
+        List<Integer> lows = new ArrayList<>();
+        for (int g : CarbOptions.LOW_CHIPS) lows.add(g);
+        card.addView(chips(lows, R.drawable.pill_low, CarbFill.Kind.LOW));
 
         card.addView(item("Slowly absorbed meal\u2026", CarbSheetActivity.SLOW));
         card.addView(item("Carbs slider\u2026", CarbSheetActivity.MEAL));
         setContentView(root);
+    }
+
+    private LinearLayout chips(List<Integer> amounts, int bg, CarbFill.Kind kind) {
+        LinearLayout line = new LinearLayout(this);
+        for (int g : amounts) {
+            TextView chip = row(g + " g", bg, true);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(52), 1);
+            lp.setMargins(dp(4), dp(6), dp(4), dp(6));
+            line.addView(chip, lp);
+            chip.setOnClickListener(v -> {
+                String no = CarbFill.request(this, g, "menu", kind);
+                if (no != null) Toast.makeText(this, no, Toast.LENGTH_LONG).show();
+                finish();
+            });
+        }
+        return line;
     }
 
     private int dp(int v) {

@@ -66,16 +66,31 @@ public class CarbFillTest {
     public void widgetShowsPlanFirstThenPresetsUpToSix() {
         CarbOptions.Plan p = CarbOptions.fromBroadcast("Plan|45", 1000);
         List<CarbOptions.Option> o = CarbOptions.options(p, CarbOptions.parsePresets("10,15,20,30,45,60,90"), 2000);
-        assertEquals("10 and 15 are hypo-sized and never offered as a quick meal tap", 6, o.size());
+        assertEquals(6, o.size());
         assertTrue(o.get(0).plan);
         assertEquals("Plan 45 g", o.get(0).label);
         assertEquals(45, o.get(0).grams);
-        assertEquals(20, o.get(1).grams);
+        assertEquals("your amounts in your order, small ones too", 10, o.get(1).grams);
         assertFalse(o.get(1).plan);
         // a stale plan is not offered
         List<CarbOptions.Option> stale = CarbOptions.options(p, Arrays.asList(10, 20), 1000 + CarbOptions.PLAN_TTL_MS + 5);
-        assertEquals("only 20 is meal-sized", 1, stale.size());
+        assertEquals(2, stale.size());
         assertFalse(stale.get(0).plan);
+    }
+
+    @Test
+    public void smallBolusAmountsAreHiddenWhileLow() {
+        assertEquals(Arrays.asList(10, 15), CarbOptions.snacks(CarbOptions.DEFAULT_SNACKS, false));
+        assertTrue(CarbOptions.snacks(CarbOptions.DEFAULT_SNACKS, true).isEmpty());
+        assertEquals(Arrays.asList(25), CarbOptions.snacks("10,25", true));
+        assertEquals(CarbOptions.MAX_SNACKS, CarbOptions.snacks("5,10,12,15,18", false).size());
+        assertTrue(CarbOptions.snacks("", false).isEmpty());
+        CarbOptions.Plan p = CarbOptions.fromBroadcast("Plan|12", 1000);
+        List<CarbOptions.Option> low = CarbOptions.whileLow(
+                CarbOptions.options(p, CarbOptions.parsePresets("10,15,30"), 2000));
+        assertEquals("the plan stays, 10 and 15 go", 2, low.size());
+        assertTrue(low.get(0).plan);
+        assertEquals(30, low.get(1).grams);
     }
 
     @Test

@@ -11,6 +11,8 @@
 
 Unofficial and not a medical device: keep CamAPS FX's own alerts on.
 
+**New in v3.14.1:** snack-sized bolus amounts. The three-dots menu has a **Bolus calculator** row (10 and 15 g, change it in **Settings > Carbs for CamAPS**), and your widget quick amounts can now be under 20 g. Amounts under 20 g are hidden from the menu and the one-row widget while you are low or heading low.
+
 **New in v3.14.0:** the calm setup. **Early low warning**: a buzz and a no-sound notification ("Low coming, take 10 g") when glucose is on course to go under 3.9 in the next 20 to 25 minutes, in three levels chosen from your own Nightscout history, with a journal of whether each warning was followed by a low. **Treating mode**: you arm it, it quiets CamAPS's media-volume alerts for 20 minutes (10 to 30), FX Watcher's own urgent low buzzes instead of ringing, and it ends early and rings at full volume if glucose goes under 2.5 or is not higher after 15 minutes; pump alarms are never touched. **Calm view**: one word and a colour (steady, handled, check, low soon, treating), a silent notification with no glucose number, and a home-screen widget. **Watch server**: a read-only `127.0.0.1` state.json for a Garmin watch face. A new log shows how CamAPS alerts make their sound.
 
 **New in v3.13.2:** an Add meal entry is no longer missed when CamAPS's "Delivered" popup comes up while you are on the Meal screen (entering a slow meal during the bolus countdown). FX Watcher now reads the dialog the Confirm tap belongs to, and logs it when a Confirm lands on a screen it doesn't know.
