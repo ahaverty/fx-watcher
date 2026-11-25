@@ -31,6 +31,7 @@ import java.util.Arrays;
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es sensor_sim "Pairing code|8538"   (what SensorSwap makes of these texts, app log only, nothing saved or sent)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --ei quiet 30   (quiet event for 30 min; --es cmd quiet_end ends it)
  *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es cmd log_dump  (the app's event log to logcat, tag FXWatcherLog)
+ *   adb shell am broadcast -n studio.alans.fxwatcher/.DebugReceiver --es overlay working|done|stopped|off   (Carbs for CamAPS edge line, look only)
  */
 public class DebugReceiver extends BroadcastReceiver {
     @Override
@@ -99,6 +100,11 @@ public class DebugReceiver extends BroadcastReceiver {
             Store.log(c, "Sensor sim (dry run): " + k + ", code on screen "
                     + (SensorSwap.pairingCode(Arrays.asList(sensorSim.split("\\|"))) != null));
         }
+        String overlay = i.getStringExtra("overlay");
+        if ("working".equals(overlay)) WorkingOverlay.preview(c);
+        else if ("done".equals(overlay)) WorkingOverlay.finished(c, true, "Your turn · check, then Next and Deliver");
+        else if ("stopped".equals(overlay)) WorkingOverlay.finished(c, false, "Stopped · your turn");
+        else if ("off".equals(overlay)) WorkingOverlay.hide();
         if (i.hasExtra("quiet")) Quiet.start(c, System.currentTimeMillis() + i.getIntExtra("quiet", 30) * 60_000L);
         String cmd = i.getStringExtra("cmd");
         if (cmd != null) {

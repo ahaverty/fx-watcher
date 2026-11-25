@@ -48,13 +48,21 @@ final class WorkingOverlay {
     private static final Runnable watch = new Runnable() {
         @Override public void run() {
             // the run ended without telling us (deadline passed between screens): don't leave "hands off" up
-            if (state == State.WORKING && !CarbFill.active()) {
+            if (state == State.WORKING && !CarbFill.active() && System.currentTimeMillis() > previewUntil) {
                 remove();
                 return;
             }
             if (state == State.WORKING) main.postDelayed(this, WATCH_MS);
         }
     };
+
+    private static volatile long previewUntil;
+
+    /** adb only (DebugReceiver): the red line for 20 s without a run, to see how it looks. */
+    static void preview(Context c) {
+        previewUntil = System.currentTimeMillis() + 20_000L;
+        working(c, "FX Watcher working · hands off");
+    }
 
     static boolean allowed(Context c) {
         return Settings.canDrawOverlays(c);
