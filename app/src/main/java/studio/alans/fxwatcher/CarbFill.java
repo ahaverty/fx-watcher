@@ -579,7 +579,8 @@ final class CarbFill {
             plan = null;
             return "Couldn't open CamAPS.";
         }
-        progress(c, "Opening CamAPS and filling in " + sb + ". It can take 10 to 20 seconds while CamAPS connects to the pump. "
+        progress(c, "FX Watcher working · hands off",
+                "Opening CamAPS and filling in " + sb + ". It can take 10 to 20 seconds while CamAPS connects to the pump. "
                 + "Please don't tap anything until you get a notification saying it's done.");
         return null;
     }
@@ -630,7 +631,8 @@ final class CarbFill {
                 if (!r.waitingLogged) {
                     r.waitingLogged = true;
                     Store.logCam(c, "Carbs for CamAPS: waiting, CamAPS shows a screen I don't know (probably connecting to the pump)" + dump(root));
-                    progress(c, "Waiting for CamAPS to finish connecting to the pump. Please don't tap anything, I'll carry on by myself.");
+                    progress(c, "Waiting for the pump · hands off",
+                            "Waiting for CamAPS to finish connecting to the pump. Please don't tap anything, I'll carry on by myself.");
                 }
                 return;
             }
@@ -1406,8 +1408,12 @@ final class CarbFill {
     static final String PROGRESS_CH = "carbfill_progress";
     static final int PROGRESS_ID = 8;
 
-    /** A quiet ongoing note while a run is in progress, so you can see FX Watcher is working and what it is waiting for. */
-    static void progress(Context c, String text) {
+    /**
+     * While a run is in progress: the red line at the top and bottom of the screen (WorkingOverlay) with a
+     * short label. Only if "Display over other apps" is off, a quiet ongoing notification with the long text.
+     */
+    static void progress(Context c, String label, String text) {
+        if (WorkingOverlay.working(c, label)) return;
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         nm.createNotificationChannel(new NotificationChannel(PROGRESS_CH, "Carbs for CamAPS, in progress", NotificationManager.IMPORTANCE_LOW));
         Notification n = new Notification.Builder(c, PROGRESS_CH)
@@ -1447,6 +1453,10 @@ final class CarbFill {
                     + (done.length() > 0 ? "Done before that: " + done + ". " : "")
                     + "Nothing was delivered. Open CamAPS and check what is on screen, then run it again from the plan.";
         }
+        // the line turns green (your turn) or amber (stopped); a success needs no notification on top of that
+        String turn = ok ? (last.kind == Kind.MEAL ? "Your turn · check, then Next and Deliver" : "Done · your turn")
+                : "Stopped · your turn";
+        if (WorkingOverlay.finished(c, ok, turn) && ok) return;
         Notification n = new Notification.Builder(c, CH)
                 .setSmallIcon(R.drawable.ic_stat)
                 .setContentTitle(title)
