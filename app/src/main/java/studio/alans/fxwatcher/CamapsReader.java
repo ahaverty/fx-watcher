@@ -80,6 +80,11 @@ public class CamapsReader extends AccessibilityService {
                 return;
             }
             AccessibilityNodeInfo root = getRootInActiveWindow();
+            // With a CamAPS entry box open the keyboard is the active window; the event's own source still
+            // belongs to CamAPS, so read CamAPS's window from that.
+            if (root == null || root.getPackageName() == null || !root.getPackageName().toString().startsWith("com.camdiab.")) {
+                root = windowOf(e.getSource());
+            }
             if (root == null) return;
             if (root.getPackageName() == null || !root.getPackageName().toString().startsWith("com.camdiab.")) return;
             List<Item> items = new ArrayList<>();
@@ -87,10 +92,21 @@ public class CamapsReader extends AccessibilityService {
             List<String> texts = new ArrayList<>();
             for (Item it : items) texts.add(it.text);
             BolusTab.maybeTap(this, root, texts);   // only acts if turned on and an app just asked
+            CarbFill.maybeAct(this, this, root, texts);   // only acts for a request you made in the last minute
             onScreen(items);
         } catch (Exception ex) {
             Log.w(TAG, "event", ex);
         }
+    }
+
+    /** The root of the window a node is in (up the parents), or null. */
+    private static AccessibilityNodeInfo windowOf(AccessibilityNodeInfo n) {
+        for (int i = 0; n != null && i < 60; i++) {
+            AccessibilityNodeInfo p = n.getParent();
+            if (p == null) return n;
+            n = p;
+        }
+        return null;
     }
 
     private static void collect(AccessibilityNodeInfo n, List<Item> out, int depth) {
@@ -415,6 +431,11 @@ public class CamapsReader extends AccessibilityService {
                         ? "hypo treatment" : "slow".equals(mealType) ? "slowly absorbed meal" : "meal or snack"));
                 Store.logCam(this, t.getString("notes"));
                 if ("slow".equals(mealType)) Nudges.slowMeal(this, now);
+                if ("hypo".equals(mealType)) {
+                    p.edit().putLong(Store.HYPO_AT, now).putFloat(Store.HYPO_G, (float) mealAmount)
+                            .putFloat(Store.HYPO_MMOL, p.getFloat(Store.MMOL, -1f)).apply();
+                    Calm.refresh(this);
+                }
                 Nightscout.postTreatment(this, t);
                 BolusBroadcast.carbs(this, now, mealAmount, mealType);
                 mealAmount = -1;

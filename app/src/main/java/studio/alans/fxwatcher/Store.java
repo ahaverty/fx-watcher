@@ -63,6 +63,13 @@ final class Store {
     static final String LOWWARN_MODE = "lowwarn_mode";          // off / calm / balanced / early
     static final String LOWWARN_TRACKER = "lowwarn_tracker";    // LowWarning.Tracker state
     static final String LOWWARN_JOURNAL = "lowwarn_journal";    // every warning and what came of it
+    static final String CARB_STEP = "carb_step";                // the combined widget's stepper amount
+    static final String CARB_CORRECTION = "carbfill_correction";   // also confirm CamAPS's glucose so it adds a correction (default OFF)
+    static final String CARB_RUNS = "carbfill_runs";             // which plans ran in CamAPS (PlanRuns)
+    static final String CARB_FILL = "carbfill_on";              // fill carbs into CamAPS's calculator when tapped (default OFF)
+    static final String CARB_PRESETS = "carb_presets";          // "10,15,20,30,45,60"
+    static final String CARB_SNACKS = "carb_snacks";            // bolus amounts in the three-dots menu, "10,15"
+    static final String CARB_PLAN = "carb_plan";                // plan amounts an app sent (CarbOptions.Plan)
     static final String GARMIN_PUSH = "garmin_push";            // push the calm state to the watch face (default on)
     static final String NIGHT_WATCH = "lowwarn_night";          // at night also watch slow falls (default off)
     static final String SERVER_ON = "server_on";                // 127.0.0.1 state.json for the watch (default on)
@@ -70,6 +77,7 @@ final class Store {
     static final String CALM_ON = "calm_on";                    // calm status notification (default on)
     static final String CALM_JSON = "calm_json";                // last state.json
     static final String CALM_KEY = "calm_key";                  // state|nudge, to log changes
+    static final String HYPO_AT = "hypo_at", HYPO_G = "hypo_g", HYPO_MMOL = "hypo_mmol";   // the last hypo treatment logged in CamAPS: when, grams, glucose then
     static final String CALM_YES_UNTIL = "calm_yes_until";      // "Did you bolus?" answered yes until then
     static final String TREAT_UNTIL = "treat_until";            // Treating mode end time (0 = not treating)
     static final String TREAT_AT = "treat_at";                  // when it was armed

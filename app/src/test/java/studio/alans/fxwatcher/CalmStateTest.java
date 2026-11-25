@@ -304,4 +304,105 @@ public class CalmStateTest {
             assertFalse(t, t.contains("—") || t.contains("–"));
         }
     }
+
+    @Test
+    public void fallingUnderFourPointFiveIsLowSoonEvenWithoutAWarning() {
+        // 4.5 down to 3.9 over 20 min is 0.03/min: the glance says falling, the buzz rule (0.05) does not fire
+        CalmState.Result r = CalmState.compute(input(series(4.5, -0.03, 20)));
+        assertEquals(CalmState.LOW_SOON, r.state);
+    }
+
+    @Test
+    public void steadyOrRisingNearALowStaysSteady() {
+        assertEquals(CalmState.STEADY, CalmState.compute(input(series(4.2, 0.0, 20))).state);
+        assertEquals(CalmState.STEADY, CalmState.compute(input(series(3.9, 0.05, 20))).state);
+    }
+
+    @Test
+    public void fallingAboveFourPointFiveIsStillSteady() {
+        assertEquals(CalmState.STEADY, CalmState.compute(input(series(7.0, -0.03, 20))).state);
+    }
+
+    @Test
+    public void aLoggedHypoTreatmentShowsHandledNotLowSoon() {
+        CalmState.Input in = input(series(4.5, -0.03, 20));          // 3.9 and falling, as at 11:19
+        in.hypoAt = NOW - 4 * MIN;
+        in.hypoGrams = 5;
+        in.hypoMmol = 4.0;
+        CalmState.Result r = CalmState.compute(in);
+        assertEquals(CalmState.HANDLED, r.state);
+        assertTrue(r.text.startsWith("Treated 5 g"));
+    }
+
+    @Test
+    public void aTreatmentThatHasNotWorkedAfterFifteenMinutesPutsTheWarningBack() {
+        CalmState.Input in = input(series(4.5, -0.03, 20));
+        in.hypoAt = NOW - 16 * MIN;
+        in.hypoGrams = 10;
+        in.hypoMmol = 4.0;                                            // 3.9 now: not higher than then
+        assertEquals(CalmState.LOW_SOON, CalmState.compute(in).state);
+        in.hypoMmol = 3.5;                                            // it did rise: still handled
+        assertEquals(CalmState.HANDLED, CalmState.compute(in).state);
+    }
+
+    @Test
+    public void aTreatmentIsForgottenAfterTwentyMinutesAndNeverHidesARealLow() {
+        CalmState.Input in = input(series(4.5, -0.03, 20));
+        in.hypoAt = NOW - 25 * MIN;
+        in.hypoGrams = 5;
+        in.hypoMmol = 3.0;
+        assertEquals(CalmState.LOW_SOON, CalmState.compute(in).state);
+        CalmState.Input low = input(series(4.4, -0.05, 20));          // down to 3.4
+        low.hypoAt = NOW - 3 * MIN;
+        low.hypoGrams = 5;
+        low.hypoMmol = 3.6;
+        assertEquals("under 3.9 still says take 10 g", CalmState.LOW_SOON, CalmState.compute(low).state);
+        assertTrue(CalmState.compute(low).text.contains("take 10 g"));
+    }
+
+    @Test
+    public void historyJsonHasSlotsSlopeAndMinutesToLow() {
+        List<double[]> r = series(10.0, -0.04, 120);                   // 10.0 down to 5.2 over 2 h
+        String j = CalmState.historyJson(r, NOW);
+        assertTrue(j.startsWith("{\"end\":" + (NOW / 1000) + ",\"h\":["));
+        String h = j.substring(j.indexOf('[') + 1, j.indexOf(']'));
+        String[] v = h.split(",");
+        assertEquals(CalmState.HIST_SLOTS, v.length);
+        assertEquals("the newest slot is the newest reading", String.valueOf(Math.round(r.get(r.size() - 1)[1] * 10)), v[v.length - 1]);
+        assertEquals("before the first reading there is nothing", "-1", v[0]);
+        int sl = Integer.parseInt(j.substring(j.indexOf("\"slope\":") + 8, j.indexOf(",\"lowin\"")));
+        assertTrue("slope " + sl, sl <= -35 && sl >= -45);
+        int lowin = Integer.parseInt(j.substring(j.indexOf("\"lowin\":") + 8, j.length() - 1));
+        double g = r.get(r.size() - 1)[1];
+        assertEquals((g - 3.9) / 0.04, lowin, 5.0);
+    }
+
+    @Test
+    public void historyJsonSaysNoLowWhenFlatOrRisingOrEmpty() {
+        assertTrue(CalmState.historyJson(series(6.0, 0.0, 60), NOW).endsWith("\"lowin\":-1}"));
+        assertTrue(CalmState.historyJson(series(5.0, 0.04, 60), NOW).endsWith("\"lowin\":-1}"));
+        assertEquals("{\"end\":0,\"h\":[],\"slope\":0,\"lowin\":-1}", CalmState.historyJson(new ArrayList<double[]>(), NOW));
+    }
+
+    @Test
+    public void aRiseOutOfALowIsNotADidYouBolus() {
+        // 3.8 up to 8.6 over 40 min: the shape of a meal, but it started from a low
+        List<double[]> r = series(3.8, 0.12, 40);
+        CalmState.Input in = input(r);
+        assertTrue(in.glucose >= 8.0);
+        assertTrue(CalmState.compute(in).state != CalmState.CHECK);
+        // the same rise from 5.5 is still a Did you bolus
+        CalmState.Input meal = input(series(5.5, 0.08, 40));
+        assertTrue(meal.glucose >= 8.0);
+        assertEquals(CalmState.CHECK, CalmState.compute(meal).state);
+    }
+
+    @Test
+    public void aLoggedHypoTreatmentAlsoSilencesDidYouBolus() {
+        CalmState.Input in = input(series(5.5, 0.08, 40));
+        in.hypoAt = NOW - 100 * MIN;
+        in.hypoGrams = 10;
+        in.hypoMmol = 3.8;
+        assertTrue(CalmState.compute(in).state != CalmState.CHECK);
+    }
 }

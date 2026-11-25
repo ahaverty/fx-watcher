@@ -45,6 +45,8 @@ final class CalmState {
         boolean treating;
         long treatingUntil;
         boolean lowSoon;               // the early low warning is active
+        long hypoAt;                   // the last hypo treatment logged in CamAPS (0 = none)
+        double hypoGrams, hypoMmol;    // its grams, and the glucose when it was logged (<= 0 unknown)
         long autoOffSince;             // CamAPS auto mode not On since then; 0 when on
         long bolusYesUntil;            // "Yes done" tapped: no "Did you bolus?" until then
     }
@@ -94,6 +96,21 @@ final class CalmState {
     }
 
     /** Flat is within 0.3 mmol/L over 15 min, the same as the nudges use. */
+    /** A logged hypo treatment counts as handled for this long... */
+    static final long TREATED_WINDOW = 20 * MIN, TREATED_MUST_RISE = 15 * MIN;
+
+    /**
+     * A hypo treatment was logged in CamAPS within the last 20 min and glucose is not already low (under 3.9
+     * always says "take 10 g"). From 15 min in, it stops counting unless glucose is above where it was when
+     * logged: a treatment that has not worked puts the warnings back. Display only: it never silences an alert.
+     */
+    static boolean treatedRecently(Input in, boolean stale) {
+        if (stale || in.hypoAt <= 0 || in.now < in.hypoAt || in.now - in.hypoAt > TREATED_WINDOW) return false;
+        if (in.glucose < LOW) return false;
+        if (in.now - in.hypoAt >= TREATED_MUST_RISE && in.hypoMmol > 0 && in.glucose <= in.hypoMmol + 0.05) return false;
+        return true;
+    }
+
     static boolean flatOrFalling(double slope) {
         return !Double.isNaN(slope) && slope <= NudgeRules.TREND_DELTA / 15.0 + 1e-9;
     }
@@ -111,12 +128,18 @@ final class CalmState {
 
     /**
      * A rise that looks like a meal with no bolus: up at least 2.0 over the last 45 min to 8.0 or more,
-     * still rising, and nothing delivered in the last 2 hours. There is no "I ate" signal, so this is
+     * still rising, nothing delivered in the last 2 hours, and not a recovery from a low. There is no "I ate" signal, so this is
      * the shape of a meal, not proof of one.
      */
     static boolean riseWithoutBolus(Input in) {
         if (in.glucose < 8.0 || in.now < in.bolusYesUntil) return false;
         if (recentBolus(in.boluses, in.now) != null) return false;
+        // A rise out of a low is the treatment working, not a missed meal bolus (24 Nov 2026: "Did you bolus?" after
+        // treating a 3.9): a hypo treatment logged in the last 3 h, or a reading under 4.5 in the last 90 min.
+        if (in.hypoAt > 0 && in.now >= in.hypoAt && in.now - in.hypoAt <= 3 * 60 * MIN) return false;
+        for (double[] r : in.readings) {
+            if (r[0] <= in.now && in.now - r[0] <= 90 * MIN && r[1] < LowWarning.FLOOR_BELOW) return false;
+        }
         double min = Double.MAX_VALUE;
         for (double[] r : in.readings) {
             if (in.now - r[0] <= 45 * MIN && r[0] <= in.now) min = Math.min(min, r[1]);
@@ -161,7 +184,16 @@ final class CalmState {
         if (in.treating) return set(r, TREATING, "Treating, alarm still buzzes");
         boolean low = !r.stale && in.glucose < LOW;
         if (low) return set(r, LOW_SOON, "Low: take 10 g of fast carbs");
+        if (treatedRecently(in, r.stale)) {
+            return set(r, HANDLED, String.format(java.util.Locale.US, "Treated %d g, waiting for it to work", Math.round(in.hypoGrams)));
+        }
         if (in.lowSoon) return set(r, LOW_SOON, "Low coming: take 10 g");
+        // Near a low and falling by the glance's own definition: never "Steady", whatever the buzz rule decided
+        // (24 Nov 2026: 3.9 and "falling" on the watch glance, "Steady" on the face).
+        if (!r.stale && in.glucose < LowWarning.FLOOR_BELOW) {
+            double fall = slope(in.readings, in.now);
+            if (!Double.isNaN(fall) && fall <= -NudgeRules.TREND_DELTA / 15.0 + 1e-9) return set(r, LOW_SOON, "Falling near low: take 10 g");
+        }
         if (loopOff(in)) {
             r.nudge = NUDGE_LOOP;
             r.showOpenCamaps = true;
@@ -228,6 +260,44 @@ final class CalmState {
                 "{\"state\":\"%s\",\"word\":\"%s\",\"colour\":\"%s\",\"text\":\"%s\",\"glucose\":%s,\"trend\":\"%s\",\"age_min\":%d,\"updated\":%d}",
                 r.state, r.stale ? "No data" : r.word, r.stale ? GREY : r.color, esc(r.text),
                 glucose < 0 ? "null" : String.format(Locale.US, "%.1f", glucose), trend, ageMin, updated / 1000);
+    }
+
+    /** Slots in the history: 6 hours at 5 minutes. */
+    static final int HIST_SLOTS = 72;
+
+    /**
+     * What the watch's chart reads (GET /history.json): "end" the newest reading's time in seconds, "h" the last
+     * 6 hours in 5 minute slots oldest first as tenths of mmol/L (-1 where there was no reading), "slope" mmol/L
+     * per minute times 1000 from the same 20 min fit as the trend word (0 when unknown), and "lowin" the minutes
+     * until 3.9 if it keeps going at that rate (-1 when not falling, already low, or more than 10 hours off).
+     */
+    static String historyJson(List<double[]> readings, long now) {
+        if (readings == null || readings.isEmpty()) return "{\"end\":0,\"h\":[],\"slope\":0,\"lowin\":-1}";
+        double[] newest = readings.get(readings.size() - 1);
+        long end = (long) newest[0];
+        StringBuilder sb = new StringBuilder("{\"end\":").append(end / 1000).append(",\"h\":[");
+        for (int i = 0; i < HIST_SLOTS; i++) {
+            long slot = end - (long) (HIST_SLOTS - 1 - i) * 5 * MIN;
+            int v = -1;
+            long best = 150_000L;                                   // within 2.5 minutes of the slot
+            for (double[] r : readings) {
+                long d = Math.abs((long) r[0] - slot);
+                if (d <= best) {
+                    best = d;
+                    v = (int) Math.round(r[1] * 10);
+                }
+            }
+            if (i > 0) sb.append(',');
+            sb.append(v);
+        }
+        double s = slope(readings, now);
+        long slopeMilli = Double.isNaN(s) ? 0 : Math.round(s * 1000);
+        int lowIn = -1;
+        if (!Double.isNaN(s) && s <= -0.005 && newest[1] > LOW) {
+            long m = Math.round((newest[1] - LOW) / -s);
+            if (m <= 600) lowIn = (int) m;
+        }
+        return sb.append("],\"slope\":").append(slopeMilli).append(",\"lowin\":").append(lowIn).append('}').toString();
     }
 
     /** The same fields as the json, as a map for the Garmin push. */

@@ -142,6 +142,18 @@ final class LowWarning {
         return p.fastBelow > 0 && glucose < p.fastBelow && pr.slope <= -p.fastRate + 1e-9;
     }
 
+    /**
+     * The near-low floor, in every level except off: under 4.5 and still falling at 0.05 mmol/L per min or
+     * more (a drop of about 0.75 over the 15 min fit). Applies whatever the insulin on board, since a fall that
+     * close to a low is worth knowing about even when the pump has nothing active (11 Nov 2026: 8.5 to 4.2 with
+     * no warning because the insulin gate held it back).
+     */
+    static final double FLOOR_BELOW = 4.5, FLOOR_RATE = 0.05;
+
+    static boolean floorFall(double glucose, Projection pr) {
+        return pr != null && glucose < FLOOR_BELOW && pr.slope <= -FLOOR_RATE + 1e-9;
+    }
+
     /** Whether the rule says a low is coming at this reading. */
     static boolean fires(double glucose, Projection pr, Params p) {
         return fires(glucose, pr, p, Double.NaN);
@@ -149,7 +161,9 @@ final class LowWarning {
 
     /** iob is insulin on board in units, NaN when unknown (then the insulin gate is skipped, not failed). */
     static boolean fires(double glucose, Projection pr, Params p, double iob) {
-        if (pr == null || glucose > p.maxGlucose) return false;
+        if (pr == null) return false;
+        if (floorFall(glucose, pr)) return true;
+        if (glucose > p.maxGlucose) return false;
         if (p.minIob > 0 && !Double.isNaN(iob) && iob < p.minIob) return false;
         return pr.projected < p.projBelow || fastFall(glucose, pr, p);
     }

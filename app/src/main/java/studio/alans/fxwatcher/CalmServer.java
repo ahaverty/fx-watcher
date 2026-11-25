@@ -17,6 +17,8 @@ import java.util.function.Supplier;
  * server feeds its watch faces). It answers GET /state.json with the calm state and nothing else:
  * no other path, no other method, no writes, no way in from the network.
  *
+ * history.json (the chart on the watch's number widget): the last 6 hours, the rate and the minutes to a low.
+ *
  * state.json: state, word, colour, glucose, trend, age_min, updated (and a text line). The glucose
  * number is in it for the deliberate glance only; the watch face never draws it.
  *
@@ -30,11 +32,17 @@ final class CalmServer {
     private static final int READ_TIMEOUT_MS = 3000;
 
     private final Supplier<String> json;
+    private final Supplier<String> history;
     private ServerSocket socket;
     private Thread thread;
 
     CalmServer(Supplier<String> json) {
+        this(json, null);
+    }
+
+    CalmServer(Supplier<String> json, Supplier<String> history) {
         this.json = json;
+        this.history = history;
     }
 
     /** Binds to the loopback address only. Port 0 picks a free one (tests). */
@@ -87,7 +95,7 @@ final class CalmServer {
             String h = readLine(r);
             if (h == null || h.isEmpty()) break;
         }
-        byte[] out = respond(line, json);
+        byte[] out = respond(line, json, history);
         OutputStream o = c.getOutputStream();
         o.write(out);
         o.flush();
@@ -106,6 +114,11 @@ final class CalmServer {
 
     /** The whole response for a request line. Pure, so it is unit tested without a socket. */
     static byte[] respond(String requestLine, Supplier<String> json) {
+        return respond(requestLine, json, null);
+    }
+
+    /** history serves GET /history.json (the last 6 hours for the watch's chart); null leaves that path a 404. */
+    static byte[] respond(String requestLine, Supplier<String> json, Supplier<String> history) {
         if (requestLine == null || requestLine.length() > MAX_REQUEST_LINE) return plain(400, "Bad Request", "bad request");
         String[] parts = requestLine.split(" ");
         if (parts.length < 2) return plain(400, "Bad Request", "bad request");
@@ -113,10 +126,11 @@ final class CalmServer {
         String path = parts[1];
         int q = path.indexOf('?');
         if (q >= 0) path = path.substring(0, q);
-        if (!"/state.json".equals(path)) return plain(404, "Not Found", "not found");
+        Supplier<String> source = "/state.json".equals(path) ? json : "/history.json".equals(path) ? history : null;
+        if (source == null) return plain(404, "Not Found", "not found");
         String body;
         try {
-            body = json.get();
+            body = source.get();
         } catch (RuntimeException e) {
             return plain(500, "Internal Server Error", "error");
         }
@@ -162,7 +176,7 @@ final class CalmServer {
         int port = p.getInt(Store.SERVER_PORT, DEF_PORT);
         if (instance != null && instance.running()) return;
         final android.content.Context app = c.getApplicationContext();
-        CalmServer s = new CalmServer(() -> Calm.json(app));
+        CalmServer s = new CalmServer(() -> Calm.json(app), () -> Calm.history(app));
         try {
             s.start(port);
             instance = s;

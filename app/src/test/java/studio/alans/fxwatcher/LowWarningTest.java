@@ -30,6 +30,30 @@ public class LowWarningTest {
         return (long) items.get(items.size() - 1)[0];
     }
 
+    // ---- the near-low floor: under 4.5 and falling, whatever the insulin ----
+
+    @Test
+    public void floorFiresUnderFourPointFiveWhenFallingEvenWithNoInsulin() {
+        List<double[]> r = ramp(5.3, -0.06, 15);                       // 5.3 .. 4.4
+        LowWarning.Params fast = LowWarning.preset(LowWarning.FAST);
+        LowWarning.Projection pr = LowWarning.project(r, end(r), fast);
+        assertTrue(LowWarning.floorFall(4.4, pr));
+        assertTrue("no insulin on board", LowWarning.fires(4.4, pr, fast, 0.0));
+        assertTrue("every level but off", LowWarning.fires(4.4, LowWarning.project(r, end(r), P), P, 0.0));
+    }
+
+    @Test
+    public void floorStaysQuietWhenFlatHighOrJustSlightlyDown() {
+        LowWarning.Params fast = LowWarning.preset(LowWarning.FAST);
+        List<double[]> flat = ramp(4.3, 0.0, 15);
+        assertFalse(LowWarning.floorFall(4.3, LowWarning.project(flat, end(flat), fast)));
+        List<double[]> slight = ramp(4.4, -0.02, 15);
+        assertFalse("a drift of 0.02/min is not a fall", LowWarning.floorFall(4.1, LowWarning.project(slight, end(slight), fast)));
+        List<double[]> high = ramp(6.2, -0.07, 15);                    // falling but still 5.2
+        assertFalse(LowWarning.floorFall(5.2, LowWarning.project(high, end(high), fast)));
+        assertFalse(LowWarning.floorFall(4.0, null));
+    }
+
     // ---- the fit ----
 
     @Test

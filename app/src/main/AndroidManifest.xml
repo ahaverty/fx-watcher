@@ -159,6 +159,57 @@
                 android:resource="@xml/calm_widget_info" />
         </receiver>
 
+        <!-- Carb amounts: widget, the no-screen activity a tap lands on, and the plan from Meal Log. -->
+        <receiver
+            android:name=".CalmCarbWidget"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/calm_carb_widget_info" />
+        </receiver>
+        <activity
+            android:name=".CarbMenuActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
+            android:name=".CarbSheetActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
+            android:name=".CarbPlanActivity"
+            android:exported="true"
+            android:permission="studio.alans.fxwatcher.permission.RECEIVE_BOLUS"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.DeviceDefault.Dialog.NoActionBar">
+            <intent-filter>
+                <action android:name="studio.alans.fxwatcher.action.RUN_PLAN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".CarbFillActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <receiver
+            android:name=".CarbPlanReceiver"
+            android:exported="true"
+            android:permission="studio.alans.fxwatcher.permission.RECEIVE_BOLUS">
+            <intent-filter>
+                <action android:name="studio.alans.fxwatcher.action.SET_PLAN" />
+                <action android:name="studio.alans.fxwatcher.action.CLEAR_PLAN" />
+            </intent-filter>
+        </receiver>
+
         <!-- Self-update install progress (asks the user to confirm). -->
         <receiver
             android:name=".Updater$InstallStatus"

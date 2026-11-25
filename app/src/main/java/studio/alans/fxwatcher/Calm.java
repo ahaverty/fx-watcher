@@ -61,6 +61,9 @@ final class Calm {
         in.autoOffSince = p.getBoolean(Store.PRESENT, false) && !status.isEmpty() && !"On".equalsIgnoreCase(status)
                 ? p.getLong(Store.BAD_SINCE, 0) : 0;
         in.bolusYesUntil = p.getLong(Store.CALM_YES_UNTIL, 0);
+        in.hypoAt = p.getLong(Store.HYPO_AT, 0);
+        in.hypoGrams = p.getFloat(Store.HYPO_G, 0);
+        in.hypoMmol = p.getFloat(Store.HYPO_MMOL, -1f);
         return in;
     }
 
@@ -76,6 +79,7 @@ final class Calm {
         p.edit().putString(Store.CALM_JSON, json).putString(Store.CALM_KEY, key).apply();
         if (changed) Store.logCam(c, "Calm state: " + r.state + (r.nudge.isEmpty() ? "" : " (" + r.nudge + ")"));
         CalmWidget.update(c, r);
+        CalmCarbWidget.update(c, r);
         GarminPush.push(c, CalmState.message(r, in.glucose, CalmState.trend(slope), in.glucoseAt, now));
         if (!enabled(p)) {
             cancel(c);
@@ -161,6 +165,12 @@ final class Calm {
         Store.logCam(c, "Calm: \"Did you bolus?\" answered yes");
         lastKey = "";
         refresh(c);
+    }
+
+    /** What the watch's chart reads: the last 6 hours and the rate. */
+    static String history(Context c) {
+        long now = System.currentTimeMillis();
+        return CalmState.historyJson(input(c, now).readings, now);
     }
 
     /** What the watch and widget read, worked out now (so age_min is right when it is asked for). */

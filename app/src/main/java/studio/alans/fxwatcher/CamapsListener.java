@@ -257,6 +257,17 @@ public class CamapsListener extends NotificationListenerService {
         SharedPreferences p = Store.p(c);
         Store.logCam(c, (r.kind == BolusTracker.Kind.NEW ? "Bolus delivered: " : "Bolus updated with carbs: ")
                 + r.units + " U" + (Double.isNaN(r.carbs) ? "" : ", " + r.carbs + " g") + " (" + source + ")");
+        if (!Double.isNaN(r.carbs)) {
+            try {
+                CarbOptions.Plan before = CarbOptions.Plan.load(p.getString(Store.CARB_PLAN, ""));
+                CarbOptions.Plan after = CarbOptions.without(before, r.carbs);
+                if (after != before) {
+                    p.edit().putString(Store.CARB_PLAN, after.items.isEmpty() ? "" : after.save()).apply();
+                    CarbWidget.update(c);
+                    CalmCarbWidget.update(c);
+                }
+            } catch (RuntimeException ignored) { }
+        }
         try {
             Nudges.bolus(c, r);
         } catch (Exception e) {
